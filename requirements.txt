@@ -12,4 +12,5 @@ ruff
 scikit-learn
 tqdm
 typer
+torchvision
 -e .

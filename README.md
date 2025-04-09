@@ -5,6 +5,14 @@
 </a>
 
 Federated Learning project
+## Dataset
+
+**Download dataset CIFAR-100**
+
+```shell
+make data
+```
+
 
 ## Project Organization
 
