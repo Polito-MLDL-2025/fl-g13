@@ -21,8 +21,8 @@ def main(
 ):
     # ---- REPLACE THIS WITH YOUR OWN CODE ----
     logger.info("Downloading dataset cifar100...")
-    train_dataset = download_cifar100(data_dir=RAW_DATA_DIR,train=True)
-    test_dataset = download_cifar100(data_dir=RAW_DATA_DIR,train=False)
+    train_dataset = load_cifar100(data_dir=RAW_DATA_DIR, train=True)
+    test_dataset = load_cifar100(data_dir=RAW_DATA_DIR, train=False)
     logger.success("Downloading dataset complete.")
     # logger.info("Processing dataset...")
     # for i in tqdm(range(10), total=10):
@@ -31,7 +31,7 @@ def main(
     # logger.success("Processing dataset complete.")
     # -----------------------------------------
 
-def download_cifar100(data_dir="data/raw", train=True):
+def load_cifar100(data_dir="data/raw", train=True):
     """
     Downloads the CIFAR-100 dataset into the specified directory.
     

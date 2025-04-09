@@ -110,5 +110,22 @@ make data
     nbautoexport install
     nbautoexport configure notebooks
     ```
+#### Use a Git Hook or File Watcher in PyCharm
 
+You can set up PyCharm to run `nbconvert` (or even `nbautoexport export`) every time a file is saved or committed.
+
+ **PyCharm File Watcher**
+
+1. Go to **Settings > Tools > File Watchers**
+2. Add a new watcher with the following configuration:
+
+- **File Type**: Jupyter Notebook (`*.ipynb`)
+- **Scope**: Current project
+- **Program**: Your Python interpreter path (e.g., `python`)
+- **Arguments**:
+
+  ```bash
+  -m nbautoexport export $FileDir$
+  ```
+- **Working Directory**: `$FileDir$`
 ---
