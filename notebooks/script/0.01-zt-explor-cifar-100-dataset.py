@@ -11,7 +11,7 @@ import numpy as np
 from torchvision import datasets, transforms
 from collections import Counter
 
-from fl_g13 import dataset_handler
+from fl_g13.base_experimentation import dataset_handler
 
 
 # ## Load data
@@ -101,4 +101,7 @@ non_iid_clients_dataset= dataset_handler.non_iid_sharding(cifar100_train,k,keep_
 
 
 dataset_handler.check_subset_distribution(non_iid_clients_dataset[0])
+
+
+
 

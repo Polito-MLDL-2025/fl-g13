@@ -59,17 +59,6 @@ def check_distribution(dataset, name="Dataset"):
     print(f"{name} distribution (class: count):")
     print(dict(sorted(dist.items())))
 
-
-class SubsetToDataset(Dataset):
-    def __init__(self, subset):
-        self.data = [subset[i][0] for i in range(len(subset))]
-        self.targets = [subset[i][1] for i in range(len(subset))]
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        return self.data[idx], self.targets[idx]
 def train_test_split(dataset, train_ratio=0.8,random_state=42):
     targets = np.array(dataset.targets)
     sss = StratifiedShuffleSplit(n_splits=1, train_size=train_ratio, random_state=random_state)
