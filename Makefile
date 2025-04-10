@@ -76,7 +76,7 @@ create_environment:
 ## Make dataset
 .PHONY: data
 data: requirements
-	$(PYTHON_INTERPRETER) fl_g13/dataset.py
+	$(PYTHON_INTERPRETER) fl_g13/dataset_handler.py
 
 
 #################################################################################
