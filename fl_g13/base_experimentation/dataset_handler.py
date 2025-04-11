@@ -107,7 +107,7 @@ def filter_subset_keep_classes(subset, keep_classes=[]):
 
 def non_iid_sharding(dataset, k_clients,keep_classes=None, keep_random=1, seed=42):
 
-    unique_targets = set(dataset.targets)
+    unique_targets = list(set(dataset.targets))
 
     if keep_classes is None:
         random.seed(seed)
