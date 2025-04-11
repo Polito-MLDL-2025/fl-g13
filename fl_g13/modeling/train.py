@@ -55,7 +55,6 @@ def train_model(checkpoint_dir, dataloader, loss_fn,
         weight_decay=weight_decay
     )
     for epoch in range(start_epoch, num_epochs + 1):
-        _train(model, optimizer, dataloader, loss_fn, device, print_batch)
         avg_loss, training_accuracy = _train(model, optimizer, dataloader, loss_fn, device)
         print(f"📘 Epoch [{epoch}/{num_epochs}] - Avg Loss: {avg_loss:.4f}, Accuracy: {training_accuracy:.2f}%")
 
