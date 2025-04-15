@@ -66,8 +66,9 @@ class CustomFedAvg(FedAvg):
         # Note we overwrite the same file with each call to this function.
         # While this works, a more sophisticated approach is preferred
         # in situations where the contents to be saved are larger.
-        with open(f"{self.save_path}/results.json", "w", encoding="utf-8") as fp:
-            json.dump(self.results, fp)
+        ## save results
+        # with open(f"{self.save_path}/results.json", "w", encoding="utf-8") as fp:
+        #     json.dump(self.results, fp)
 
     def _update_best_acc(self, round, accuracy, parameters):
         """Determines if a new best global model has been found.

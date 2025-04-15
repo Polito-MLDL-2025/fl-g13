@@ -152,7 +152,7 @@ def create_run_dir(config: UserConfig) -> Path:
     save_path.mkdir(parents=True, exist_ok=False)
 
     # Save run config as json
-    with open(f"{save_path}/run_config.json", "w", encoding="utf-8") as fp:
-        json.dump(config, fp)
+    # with open(f"{save_path}/run_config.json", "w", encoding="utf-8") as fp:
+    #     json.dump(config, fp)
 
     return save_path, run_dir
