@@ -13,4 +13,8 @@ scikit-learn
 tqdm
 typer
 torchvision
+flwr[simulation]
+flwr-datasets[vision]
+wandb
+ipywidgets
 -e .

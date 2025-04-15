@@ -1,12 +1,12 @@
 import torch
 
 
-def test(model, dataloader, loss_fn,device=None):
+def test_model(model, dataloader, loss_fn,device=None):
     # TODO
     model.eval()
     if not device:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    # print(f"Using device: {device}")
 
     total_loss = 0.0
     correct = 0
@@ -24,7 +24,7 @@ def test(model, dataloader, loss_fn,device=None):
 
             inputs.extend(X.cpu())
             total_loss += loss.item()
-            original_pre = pred.cpu()
+            # original_pre = pred.cpu()
             prob, predicted = torch.max(pred.data, 1)
             total += y.size(0)
             correct += (predicted == y).sum().item()
@@ -33,9 +33,9 @@ def test(model, dataloader, loss_fn,device=None):
             probs.extend(prob.cpu())
 
     test_loss = total_loss / len(dataloader)
-    test_accuracy = 100 * correct / total
-    print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.2f}%")
+    test_accuracy =  correct / total
+    print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy*100:.2f}%")
     preds = torch.tensor(preds)
     labels = torch.tensor(labels)
     probs = torch.tensor(probs)
-    return preds, labels, probs, inputs, test_accuracy
+    return preds, labels, probs, inputs, test_accuracy,test_loss

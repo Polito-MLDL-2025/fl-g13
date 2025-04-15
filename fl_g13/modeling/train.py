@@ -41,12 +41,13 @@ def _train(model, optimizer, dataloader, loss_fn, device, is_print=False):
     return training_loss, training_accuracy
 
 
-def train_model(checkpoint_dir, dataloader, loss_fn,
-                num_epochs=100, save_every=10, lr=1e-4, weight_decay=0.04,
+def train_model(checkpoint_dir, dataloader, loss_fn=torch.nn.CrossEntropyLoss(),
+                num_epochs=10, save_every=None, lr=1e-4, weight_decay=0.04,
                 model=None, optimizer=None, device=None, print_batch=False):
+
     if not device:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    # print(f"Using device: {device}")
     model, optimizer, start_epoch = load_or_create_model(
         checkpoint_dir=checkpoint_dir,
         model=model,
@@ -54,15 +55,15 @@ def train_model(checkpoint_dir, dataloader, loss_fn,
         lr=lr,
         weight_decay=weight_decay
     )
+    total_avg_loss = 0.0
     for epoch in range(start_epoch, num_epochs + 1):
-        avg_loss, training_accuracy = _train(model, optimizer, dataloader, loss_fn, device)
+        avg_loss, training_accuracy = _train(model, optimizer, dataloader, loss_fn, device, print_batch)
         print(f"📘 Epoch [{epoch}/{num_epochs}] - Avg Loss: {avg_loss:.4f}, Accuracy: {training_accuracy:.2f}%")
-
-        # 5. Save checkpoint
+        total_avg_loss += avg_loss
+        # Save checkpoint
         if save_every and epoch % save_every == 0:
             save_model(model, optimizer, checkpoint_dir, epoch, prefix_name="dino_xcit")
-
-
+    return total_avg_loss
 @app.command()
 def main(
         # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
