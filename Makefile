@@ -56,6 +56,13 @@ clean:
 data: requirements
 	$(PYTHON) -m fl_g13.dataset
 
+## Export all notebooks in the notebooks/ directory
+.PHONY: export_notebooks
+export_notebooks: requirements
+	@echo "Exporting all notebooks in the 'notebooks' directory..."
+	$(PYTHON) -m nbautoexport export notebooks/
+	@echo "✅ All notebooks exported."
+
 #################################################################################
 # Self Documenting Commands                                                     #
 #################################################################################
