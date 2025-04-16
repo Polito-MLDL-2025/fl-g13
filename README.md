@@ -87,6 +87,7 @@ Federated Learning Project, Group 13
     ├── dataset.py              <- Scripts to download or generate data
     │
     └── modeling                
+        ├── load.py             <- Code to load models
         ├── test.py             <- Code to test models     
         ├── train.py            <- Code to train models
         └── utils.py            <- Code with utility functions

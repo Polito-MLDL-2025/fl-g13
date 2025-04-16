@@ -1,7 +1,7 @@
 import torch
 
 
-def test(model, dataloader, loss_fn, device=None):
+def test(model, dataloader, loss_fn):
     """
     Evaluate the model on the given dataloader using the specified loss function.
 
@@ -9,14 +9,14 @@ def test(model, dataloader, loss_fn, device=None):
         model (torch.nn.Module): The model to evaluate.
         dataloader (torch.utils.data.DataLoader): DataLoader for the test dataset.
         loss_fn (torch.nn.Module): Loss function to compute the loss.
-        device (torch.device, optional): Device to run the evaluation on. Defaults to GPU if available.
 
     Returns:
         tuple: Predictions, labels, probabilities, inputs, and test accuracy.
     """
-    model.eval()
-    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = next(model.parameters()).device
     print(f"Using device: {device}")
+
+    model.eval()
 
     total_loss = 0.0
     correct = 0
