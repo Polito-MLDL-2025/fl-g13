@@ -14,10 +14,13 @@ class ModelKeys(Enum):
     OPTIMIZER_STATE_DICT = 'optimizer_state_dict'
 
 
-def save_model(checkpoint_dir, model, optimizer, scheduler, epoch=1, filename=generate_goofy_name()):
+def save_model(checkpoint_dir, model, optimizer, scheduler, epoch=1, filename=None):
     """Saves the model and optimizer state to a checkpoint file."""
     os.makedirs(checkpoint_dir, exist_ok=True)
     
+    if filename is None:
+        filename = generate_goofy_name()
+
     checkpoint_path = os.path.join(checkpoint_dir, filename)
 
     torch.save({
@@ -29,7 +32,7 @@ def save_model(checkpoint_dir, model, optimizer, scheduler, epoch=1, filename=ge
     print(f"💾 Saved checkpoint at: {checkpoint_path}")
 
 
-def load_or_create_model(checkpoint_dir, model=None, optimizer=None, lr=1e-4, weight_decay=0.04, device=None):
+def load_or_create_model(checkpoint_dir, model=None, optimizer=None, scheduler=None, lr=1e-4, weight_decay=0.04, device=None):
     """Loads the latest checkpoint or initializes a new model and optimizer."""
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
