@@ -5,7 +5,7 @@ from fl_g13.modeling.test import test
 from fl_g13.modeling.utils import generate_goofy_name
 
 
-def train_one_epoch(model, optimizer, dataloader, loss_fn, verbose=False):
+def train_one_epoch(model, optimizer, dataloader, criterion, verbose=False):
     """
     Trains the model for one epoch using the provided dataloader, optimizer, and loss function.
     """
@@ -18,7 +18,7 @@ def train_one_epoch(model, optimizer, dataloader, loss_fn, verbose=False):
         optimizer.zero_grad()
 
         pred = model(X)
-        loss = loss_fn(pred, y)
+        loss = criterion(pred, y)
         loss.backward()
         optimizer.step()
 
@@ -42,7 +42,7 @@ def train(
     checkpoint_dir,
     train_dataloader,
     val_dataloader,
-    loss_fn,
+    criterion,
     start_epoch,
     num_epochs,
     save_every,
@@ -61,12 +61,12 @@ def train(
 
     for epoch in range(1, num_epochs + 1):
         train_avg_loss, training_accuracy = train_one_epoch(
-            model, optimizer, train_dataloader, loss_fn, verbose=verbose
+            model, optimizer, train_dataloader, criterion, verbose=verbose
         )
         print(
             f"📘 Epoch [{epoch}/{num_epochs}] - Avg Loss: {train_avg_loss:.4f}, Accuracy: {100 * training_accuracy:.2f}%"
         )
-        test_avg_loss, validation_accuracy = test(model, val_dataloader, loss_fn)
+        test_avg_loss, validation_accuracy = test(model, val_dataloader, criterion)
         print(
             f"📘 Test Loss: {test_avg_loss:.4f} - Test Accuracy: {100 * validation_accuracy:.2f}%"
         )
