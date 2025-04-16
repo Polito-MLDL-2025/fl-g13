@@ -65,9 +65,9 @@ def train(
             model, optimizer, train_dataloader, criterion, verbose=verbose
         )
         print(
-            f"🚀 Epoch [{epoch}/{num_epochs}] Completed\n"
-            f"   📊 Training Loss: {train_avg_loss:.4f}\n"
-            f"   ✅ Training Accuracy: {100 * training_accuracy:.2f}%"
+            f"🚀 Epoch [{epoch}/{num_epochs}] Completed ({100*epoch/num_epochs:.2f})\n"
+            f"\t📊 Training Loss: {train_avg_loss:.4f}\n"
+            f"\t✅ Training Accuracy: {100 * training_accuracy:.2f}%"
         )
         
         # Immediately evaluate out-of-distribution accuracy
@@ -76,8 +76,8 @@ def train(
         )
         print(
             f"🔍 Validation Results:\n"
-            f"   📉 Test Loss: {test_avg_loss:.4f}\n"
-            f"   🎯 Test Accuracy: {100 * validation_accuracy:.2f}%"
+            f"\t📉 Test Loss: {test_avg_loss:.4f}\n"
+            f"\t🎯 Test Accuracy: {100 * validation_accuracy:.2f}%"
         )
 
         if scheduler:
