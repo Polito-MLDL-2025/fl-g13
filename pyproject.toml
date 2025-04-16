@@ -6,17 +6,12 @@ build-backend = "flit_core.buildapi"
 name = "fl_g13"
 version = "0.0.1"
 description = "Federated Learning project"
-authors = [
-  { name = "polito_mldl_g13" },
-]
-
+authors = [{ name = "polito_mldl_g13" }]
 readme = "README.md"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    
+  "Programming Language :: Python :: 3",
 ]
 requires-python = ">=3.10.0"
-
 
 [tool.ruff]
 line-length = 99
@@ -24,9 +19,8 @@ src = ["fl_g13"]
 include = ["pyproject.toml", "fl_g13/**/*.py"]
 
 [tool.ruff.lint]
-extend-select = ["I"]  # Add import sorting
+extend-select = ["I"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["fl_g13"]
 force-sort-within-sections = true
-

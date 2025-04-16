@@ -73,7 +73,7 @@ create_environment:
 #################################################################################
 
 
-## Make dataset
+## TODO: Make dataset (does nothing by now)
 .PHONY: data
 data: requirements
 	$(PYTHON_INTERPRETER) fl_g13/dataset.py
