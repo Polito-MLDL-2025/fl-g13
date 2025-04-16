@@ -1,6 +1,7 @@
 import torch
 
 from fl_g13.modeling.load import save
+from fl_g13.modeling.test import test
 from fl_g13.modeling.utils import generate_goofy_name
 
 
@@ -12,7 +13,6 @@ def train_one_epoch(model, optimizer, dataloader, loss_fn, verbose=False):
     model.train()
 
     total_loss, correct, total = 0.0, 0, 0
-
     for batch, (X, y) in enumerate(dataloader):
         X, y = X.to(device), y.to(device)
         optimizer.zero_grad()
@@ -35,13 +35,13 @@ def train_one_epoch(model, optimizer, dataloader, loss_fn, verbose=False):
 
     training_loss = total_loss / len(dataloader)
     training_accuracy = correct / total
-    print(f"Training Loss: {training_loss:.4f}, Training Accuracy: {100 * training_accuracy:.2f}%")
     return training_loss, training_accuracy
 
 
 def train(
     checkpoint_dir,
-    dataloader,
+    train_dataloader,
+    val_dataloader,
     loss_fn,
     start_epoch,
     num_epochs,
@@ -60,11 +60,15 @@ def train(
         prefix = generate_goofy_name(checkpoint_dir)
 
     for epoch in range(1, num_epochs + 1):
-        avg_loss, training_accuracy = train_one_epoch(
-            model, optimizer, dataloader, loss_fn, verbose=verbose
+        train_avg_loss, training_accuracy = train_one_epoch(
+            model, optimizer, train_dataloader, loss_fn, verbose=verbose
         )
         print(
-            f"📘 Epoch [{epoch}/{num_epochs}] - Avg Loss: {avg_loss:.4f}, Accuracy: {100 * training_accuracy:.2f}%"
+            f"📘 Epoch [{epoch}/{num_epochs}] - Avg Loss: {train_avg_loss:.4f}, Accuracy: {100 * training_accuracy:.2f}%"
+        )
+        test_avg_loss, validation_accuracy = test(model, val_dataloader, loss_fn)
+        print(
+            f"📘 Test Loss: {test_avg_loss:.4f} - Test Accuracy: {100 * validation_accuracy:.2f}%"
         )
 
         if scheduler:
