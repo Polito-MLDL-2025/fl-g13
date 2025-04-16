@@ -1,6 +1,5 @@
 import torch
 
-
 def test(model, dataloader, loss_fn,device=None):
     # TODO
     model.eval()

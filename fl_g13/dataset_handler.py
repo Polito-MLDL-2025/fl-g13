@@ -18,41 +18,6 @@ from fl_g13.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
 
 app = typer.Typer()
 
-
-@app.command()
-def main(
-    # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
-    input_path: Path = RAW_DATA_DIR / "dataset.csv",
-    output_path: Path = PROCESSED_DATA_DIR / "dataset.csv",
-    # ----------------------------------------------
-):
-    # ---- REPLACE THIS WITH YOUR OWN CODE ----
-    logger.info("Downloading dataset cifar100...")
-    train_dataset = load_cifar100(data_dir=RAW_DATA_DIR, train=True)
-    test_dataset = load_cifar100(data_dir=RAW_DATA_DIR, train=False)
-    logger.success("Downloading dataset complete.")
-    # logger.info("Processing dataset...")
-    # for i in tqdm(range(10), total=10):
-    #     if i == 5:
-    #         logger.info("Something happened for iteration 5.")
-    # logger.success("Processing dataset complete.")
-    # -----------------------------------------
-
-def load_cifar100(data_dir="data/raw", train=True):
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-    ])
-
-    dataset = datasets.CIFAR100(
-        root=data_dir,
-        train=train,
-        download=True,
-        transform=transform
-    )
-
-    print(f"{'Training' if train else 'Test'} set downloaded to: {data_dir}")
-    return dataset
-
 def check_distribution(dataset, name="Dataset"):
     labels = [dataset[i][1] for i in range(len(dataset))]
     dist = Counter(labels)
@@ -67,7 +32,6 @@ def train_test_split(dataset, train_ratio=0.8,random_state=42):
     test_dataset = torch.utils.data.Subset(dataset, test_idx)
     return train_dataset,test_dataset
 
-
 def check_subset_distribution(subset, plot=False):
     labels = []
 
@@ -79,6 +43,7 @@ def check_subset_distribution(subset, plot=False):
     label_count = Counter(labels)
 
     return label_count
+
 def iid_sharding(dataset, k_clients, seed=42):
     np.random.seed(seed)
 
@@ -116,6 +81,39 @@ def non_iid_sharding(dataset, k_clients,keep_classes=None, keep_random=1, seed=4
     cut_dataset = filter_subset_keep_classes(dataset, keep_classes)
     return iid_sharding(cut_dataset, k_clients)
 
+def load_cifar100(data_dir="data/raw", train=True):
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+    ])
+
+    dataset = datasets.CIFAR100(
+        root=data_dir,
+        train=train,
+        download=True,
+        transform=transform
+    )
+
+    print(f"{'Training' if train else 'Test'} set downloaded to: {data_dir}")
+    return dataset
+
+@app.command()
+def main(
+    # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
+    input_path: Path = RAW_DATA_DIR / "dataset.csv",
+    output_path: Path = PROCESSED_DATA_DIR / "dataset.csv",
+    # ----------------------------------------------
+):
+    # ---- REPLACE THIS WITH YOUR OWN CODE ----
+    logger.info("Downloading dataset cifar100...")
+    train_dataset = load_cifar100(data_dir=RAW_DATA_DIR, train=True)
+    test_dataset = load_cifar100(data_dir=RAW_DATA_DIR, train=False)
+    logger.success("Downloading dataset complete.")
+    logger.info("Processing dataset...")
+    for i in tqdm(range(10), total=10):
+        if i == 5:
+            logger.info("Something happened for iteration 5.")
+    logger.success("Processing dataset complete.")
+    # -----------------------------------------
 
 if __name__ == "__main__":
     app()
