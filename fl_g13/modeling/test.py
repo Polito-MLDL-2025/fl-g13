@@ -4,14 +4,6 @@ import torch
 def test(model, dataloader, loss_fn):
     """
     Evaluate the model on the given dataloader using the specified loss function.
-
-    Args:
-        model (torch.nn.Module): The model to evaluate.
-        dataloader (torch.utils.data.DataLoader): DataLoader for the test dataset.
-        loss_fn (torch.nn.Module): Loss function to compute the loss.
-
-    Returns:
-        tuple: Predictions, labels, probabilities, inputs, and test accuracy.
     """
     device = next(model.parameters()).device
     print(f"Using device: {device}")

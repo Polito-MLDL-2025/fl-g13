@@ -66,7 +66,8 @@ def load(checkpoint_dir, model, optimizer, scheduler=None, filename=None, device
     start_epoch = checkpoint.get("epoch", 0) + 1
 
     print(f"✅ Loaded checkpoint from {ckpt_path}, resuming at epoch {start_epoch}")
-    return model, optimizer, scheduler, start_epoch
+    
+    return start_epoch
 
 
 # def load_or_create_model(checkpoint_dir, model=None, optimizer=None, scheduler=None, lr=1e-4, weight_decay=0.04, device=None):

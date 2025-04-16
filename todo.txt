@@ -11,5 +11,7 @@
     X provide versioning in requirements.txt for future use
     X auto install nbautoexports using requirements.txt
     X clean interfaces
-    - rework codebase (e.g., why model and optimizers as parameters for load_or_create? Should split load_or_create in two distinc functions etc.)
-    - rework README file
+    X rework codebase (e.g., why model and optimizers as parameters for load_or_create? Should split load_or_create in two distinc functions etc.)
+    X rework README file
+    - use of tensors in returns of test values, is it strictly necessary?
+    - 

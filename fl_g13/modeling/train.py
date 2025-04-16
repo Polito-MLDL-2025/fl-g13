@@ -3,6 +3,9 @@ import torch
 from fl_g13.modeling.load import save
 
 def train_one_epoch(model, optimizer, dataloader, loss_fn, verbose=False):
+    """
+    Trains the model for one epoch using the provided dataloader, optimizer, and loss function.
+    """
     device = next(model.parameters()).device
     model.train()
 
@@ -32,14 +35,17 @@ def train_one_epoch(model, optimizer, dataloader, loss_fn, verbose=False):
     return training_loss, training_accuracy
 
 
-def train_model(checkpoint_dir, dataloader, loss_fn, start_epoch, num_epochs, save_every, model, optimizer,
-                scheduler=None, filename=None, verbose=False):
-    for epoch in range(start_epoch, start_epoch + num_epochs):
+def train(checkpoint_dir, dataloader, loss_fn, start_epoch, num_epochs, save_every, model, optimizer,
+            scheduler=None, filename=None, verbose=False):
+    """
+    Trains a model for a specified number of epochs, saving checkpoints periodically.
+    """
+    for epoch in range(1, num_epochs+1):
         avg_loss, training_accuracy = train_one_epoch(model, optimizer, dataloader, loss_fn, verbose=verbose)
-        print(f"📘 Epoch [{epoch}/{start_epoch + num_epochs - 1}] - Avg Loss: {avg_loss:.4f}, Accuracy: {training_accuracy:.2f}%")
+        print(f"📘 Epoch [{epoch}/{num_epochs}] - Avg Loss: {avg_loss:.4f}, Accuracy: {100*training_accuracy:.2f}%")
 
         if scheduler:
             scheduler.step()
 
-        if save_every and (epoch - start_epoch + 1) % save_every == 0:
-            save(checkpoint_dir, model, optimizer, scheduler, epoch=epoch, filename=filename)
+        if save_every and epoch % save_every == 0:
+            save(checkpoint_dir, model, optimizer, scheduler, epoch=(start_epoch+epoch), filename=filename)
