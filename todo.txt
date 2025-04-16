@@ -7,7 +7,7 @@
     X remove modeling/predict.py?
     X move dataset_handler.py to parent folder or modeling?
     X remove unused @app.commands (datasets.py)?
-    - save data in the correct folder (as done in class)
+    X save data in the correct folder (as done in class)
     - cleaning interfaces (e.g., why model and optimizers as parameters for load_or_create? Should split load_or_create in two distinc functions etc.)
     - rework README file
     - provide versioning in requirements.txt for future use
