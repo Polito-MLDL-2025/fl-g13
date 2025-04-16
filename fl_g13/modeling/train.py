@@ -1,6 +1,7 @@
 import torch
 
 from fl_g13.modeling.load import save
+from fl_g13.modeling.utils import generate_goofy_name
 
 def train_one_epoch(model, optimizer, dataloader, loss_fn, verbose=False):
     """
@@ -36,10 +37,13 @@ def train_one_epoch(model, optimizer, dataloader, loss_fn, verbose=False):
 
 
 def train(checkpoint_dir, dataloader, loss_fn, start_epoch, num_epochs, save_every, model, optimizer,
-            scheduler=None, filename=None, verbose=False):
+            scheduler=None, prefix=None, verbose=False):
     """
     Trains a model for a specified number of epochs, saving checkpoints periodically.
     """
+
+    if not prefix: prefix = generate_goofy_name(checkpoint_dir)
+
     for epoch in range(1, num_epochs+1):
         avg_loss, training_accuracy = train_one_epoch(model, optimizer, dataloader, loss_fn, verbose=verbose)
         print(f"📘 Epoch [{epoch}/{num_epochs}] - Avg Loss: {avg_loss:.4f}, Accuracy: {100*training_accuracy:.2f}%")
@@ -48,4 +52,5 @@ def train(checkpoint_dir, dataloader, loss_fn, start_epoch, num_epochs, save_eve
             scheduler.step()
 
         if save_every and epoch % save_every == 0:
-            save(checkpoint_dir, model, optimizer, scheduler, epoch=(start_epoch+epoch), filename=filename)
+            saving_epoch = start_epoch + epoch -1
+            save(checkpoint_dir, model, optimizer, scheduler, epoch=saving_epoch, prefix=prefix)

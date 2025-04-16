@@ -14,14 +14,17 @@ class ModelKeys(Enum):
     SCHEDULER_STATE_DICT = 'scheduler_state_dict'
 
 
-def save(checkpoint_dir, model, optimizer, scheduler=None, epoch=1, filename=None):
+def save(checkpoint_dir, model, optimizer, scheduler=None, epoch=None, prefix=None):
     """Saves the model, optimizer, and optionally scheduler state to a checkpoint file."""
     os.makedirs(checkpoint_dir, exist_ok=True)
     
-    if filename is None:
-        filename = generate_goofy_name()
+    if prefix is None:
+        prefix = generate_goofy_name()
 
-    checkpoint_path = os.path.join(checkpoint_dir, filename)
+    if epoch is None:
+        filename = os.path.join(checkpoint_dir, f"{prefix}.pth")
+    else:
+        filename = os.path.join(checkpoint_dir, f"{prefix}_epoch_{epoch}.pth")
 
     checkpoint = {
         ModelKeys.EPOCH.value: epoch,
@@ -32,9 +35,9 @@ def save(checkpoint_dir, model, optimizer, scheduler=None, epoch=1, filename=Non
     if scheduler is not None:
         checkpoint[ModelKeys.SCHEDULER_STATE_DICT.value] = scheduler.state_dict()
 
-    torch.save(checkpoint, checkpoint_path)
+    torch.save(checkpoint, filename)
 
-    print(f"💾 Saved checkpoint at: {checkpoint_path}")
+    print(f"💾 Saved checkpoint at: {filename}")
 
 def load(checkpoint_dir, model, optimizer, scheduler=None, filename=None, device=None):
     """
@@ -58,16 +61,16 @@ def load(checkpoint_dir, model, optimizer, scheduler=None, filename=None, device
     else:
         checkpoint = torch.load(ckpt_path)
 
-    model.load_state_dict(checkpoint["model_state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-    if scheduler is not None and "scheduler_state_dict" in checkpoint:
-        scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+    model.load_state_dict(checkpoint[ModelKeys.MODEL_STATE_DICT.value])
+    optimizer.load_state_dict(checkpoint[ModelKeys.OPTIMIZER_STATE_DICT.value])
+    if scheduler is not None and ModelKeys.SCHEDULER_STATE_DICT.value in checkpoint:
+        scheduler.load_state_dict(checkpoint[ModelKeys.SCHEDULER_STATE_DICT.value])
 
-    start_epoch = checkpoint.get("epoch", 0) + 1
+    start_epoch = checkpoint.get(ModelKeys.EPOCH.value, 0) + 1
 
     print(f"✅ Loaded checkpoint from {ckpt_path}, resuming at epoch {start_epoch}")
     
-    return start_epoch
+    return int(start_epoch)
 
 
 # def load_or_create_model(checkpoint_dir, model=None, optimizer=None, scheduler=None, lr=1e-4, weight_decay=0.04, device=None):
