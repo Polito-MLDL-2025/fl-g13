@@ -11,7 +11,7 @@ import numpy as np
 from torchvision import datasets, transforms
 from collections import Counter
 
-from fl_g13.base_experimentation import dataset_handler
+from fl_g13 import dataset_handler
 
 
 # ## Load data
@@ -19,8 +19,8 @@ from fl_g13.base_experimentation import dataset_handler
 transform = transforms.Compose([
     transforms.ToTensor()
 ])
-cifar100_train = datasets.CIFAR100(root=DATA_DIR, train=True, download=True, transform=transform)
-cifar100_test = datasets.CIFAR100(root=DATA_DIR, train=False, download=True, transform=transform)
+cifar100_train = datasets.CIFAR100(root=RAW_DATA_DIR, train=True, download=True, transform=transform)
+cifar100_test = datasets.CIFAR100(root=RAW_DATA_DIR, train=False, download=True, transform=transform)
 
 
 # ## Dataset overview
