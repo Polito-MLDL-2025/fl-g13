@@ -6,7 +6,7 @@ from tqdm import tqdm
 import typer
 
 from fl_g13.config import MODELS_DIR, PROCESSED_DATA_DIR
-from fl_g13.modeling.ultis import load_or_create_model, save_model
+from fl_g13.modeling.utils import load_or_create_model, save_model
 
 app = typer.Typer()
 
