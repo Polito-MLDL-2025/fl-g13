@@ -15,6 +15,15 @@ else
     PYTHON := $(VENV_DIR)/bin/python
 endif
 
+# Check if venv exists and use it, otherwise fallback to system Python
+ifeq ($(shell test -d $(VENV_DIR) && echo 1),1)
+    # If the venv exists, use its Python interpreter
+    PYTHON := $(VENV_DIR)/bin/python
+else
+    # If no venv, fall back to system Python
+    PYTHON := python3
+endif
+
 #################################################################################
 # COMMANDS                                                                      #
 #################################################################################
@@ -42,44 +51,10 @@ clean:
 	rm -rf $(VENV_DIR)
 	@echo "Virtual environment removed"
 
-
-
-## Lint using ruff (use `make format` to do formatting)
-.PHONY: lint
-lint:
-	ruff format --check
-	ruff check
-
-## Format source code with ruff
-.PHONY: format
-format:
-	ruff check --fix
-	ruff format
-
-
-# ## Set up Python interpreter environment
-# .PHONY: create_environment
-# create_environment:
-# 	@bash -c "if [ ! -z `which virtualenvwrapper.sh` ]; then source `which virtualenvwrapper.sh`; mkvirtualenv $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); else mkvirtualenv.bat $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); fi"
-# 	@echo ">>> New virtualenv created. Activate with:\nworkon $(PROJECT_NAME)"
-	
-VENV_DIR = .venv
-
-.PHONY: create_environment
-create_environment:
-	$(PYTHON_INTERPRETER) -m venv $(VENV_DIR)
-	@echo "Virtual environment created in $(VENV_DIR)"
-
-#################################################################################
-# PROJECT RULES                                                                 #
-#################################################################################
-
-
-## TODO: Download dataset (does nothing now)
+## Download the dataset
 .PHONY: data
 data: requirements
-	$(PYTHON_INTERPRETER) fl_g13/dataset.py
-
+	$(PYTHON) -m fl_g13.dataset
 
 #################################################################################
 # Self Documenting Commands                                                     #
@@ -97,4 +72,4 @@ endef
 export PRINT_HELP_PYSCRIPT
 
 help:
-	@$(PYTHON_INTERPRETER) -c "${PRINT_HELP_PYSCRIPT}" < $(MAKEFILE_LIST)
+	@$(PYTHON) -c "${PRINT_HELP_PYSCRIPT}" < $(MAKEFILE_LIST)

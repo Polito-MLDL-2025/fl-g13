@@ -95,22 +95,15 @@ def load_cifar100(data_dir="data/raw", train=True):
 
 @app.command()
 def main(
-    # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
-    input_path: Path = RAW_DATA_DIR / "dataset.csv",
-    output_path: Path = PROCESSED_DATA_DIR / "dataset.csv",
-    # ----------------------------------------------
+    path: Path = RAW_DATA_DIR,
 ):
-    # ---- REPLACE THIS WITH YOUR OWN CODE ----
-    logger.info("Downloading dataset cifar100...")
-    train_dataset = load_cifar100(data_dir=RAW_DATA_DIR, train=True)
-    test_dataset = load_cifar100(data_dir=RAW_DATA_DIR, train=False)
-    logger.success("Downloading dataset complete.")
-    logger.info("Processing dataset...")
-    for i in tqdm(range(10), total=10):
-        if i == 5:
-            logger.info("Something happened for iteration 5.")
-    logger.success("Processing dataset complete.")
-    # -----------------------------------------
+    logger.info("Downloading CIFAR100 dataset into the RAW_DATA_DIR...")
+    
+    # Download training and test sets into the specified RAW_DATA_DIR
+    load_cifar100(data_dir=str(path), train=True)
+    load_cifar100(data_dir=str(path), train=False)
+    
+    logger.success("✅ Downloading CIFAR100 dataset complete.")
 
 if __name__ == "__main__":
     app()

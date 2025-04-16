@@ -5,6 +5,7 @@ loguru==0.7.3
 tqdm==4.67.1
 typer==0.15.2
 ruff==0.11.5
+python-dotenv==1.1.0
 nbautoexport==0.5.2
 matplotlib==3.10.1
 numpy==2.2.4
