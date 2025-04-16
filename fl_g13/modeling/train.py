@@ -60,15 +60,24 @@ def train(
         prefix = generate_goofy_name(checkpoint_dir)
 
     for epoch in range(1, num_epochs + 1):
+        # Train on the current epoch
         train_avg_loss, training_accuracy = train_one_epoch(
             model, optimizer, train_dataloader, criterion, verbose=verbose
         )
         print(
-            f"📘 Epoch [{epoch}/{num_epochs}] - Avg Loss: {train_avg_loss:.4f}, Accuracy: {100 * training_accuracy:.2f}%"
+            f"🚀 Epoch [{epoch}/{num_epochs}] Completed\n"
+            f"   📊 Training Loss: {train_avg_loss:.4f}\n"
+            f"   ✅ Training Accuracy: {100 * training_accuracy:.2f}%"
         )
-        test_avg_loss, validation_accuracy = test(model, val_dataloader, criterion)
+        
+        # Immediately evaluate out-of-distribution accuracy
+        test_avg_loss, validation_accuracy = test(
+            model, val_dataloader, criterion
+        )
         print(
-            f"📘 Test Loss: {test_avg_loss:.4f} - Test Accuracy: {100 * validation_accuracy:.2f}%"
+            f"🔍 Validation Results:\n"
+            f"   📉 Test Loss: {test_avg_loss:.4f}\n"
+            f"   🎯 Test Accuracy: {100 * validation_accuracy:.2f}%"
         )
 
         if scheduler:
