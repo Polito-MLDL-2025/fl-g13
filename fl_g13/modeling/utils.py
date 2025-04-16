@@ -1,6 +1,7 @@
-import os
-import glob
 from enum import Enum
+import glob
+import os
+
 import torch
 import torch.optim as optim
 

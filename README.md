@@ -4,7 +4,7 @@
     <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
 </a>
 
-Federated Learning project
+Federated Learning Project, Group 13
 
 ## How to Install
 
@@ -159,4 +159,3 @@ You can set up PyCharm to run `nbconvert` (or even `nbautoexport export`) every 
   -m nbautoexport export $FileDir$
   ```
 - **Working Directory**: `$FileDir$`
----

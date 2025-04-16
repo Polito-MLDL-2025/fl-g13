@@ -1,16 +1,13 @@
-import os
-import random
 from collections import Counter
 from pathlib import Path
-
-import numpy as np
-import torch
-from matplotlib import pyplot as plt
-from sklearn.model_selection import StratifiedShuffleSplit
-from torch.utils.data import Dataset, Subset
-from torchvision import datasets, transforms
+import random
 
 from loguru import logger
+import numpy as np
+from sklearn.model_selection import StratifiedShuffleSplit
+import torch
+from torch.utils.data import Subset
+from torchvision import datasets, transforms
 from tqdm import tqdm
 import typer
 

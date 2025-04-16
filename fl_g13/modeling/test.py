@@ -1,5 +1,6 @@
 import torch
 
+
 def test(model, dataloader, loss_fn, device=None):
     """
     Evaluate the model on the given dataloader using the specified loss function.
