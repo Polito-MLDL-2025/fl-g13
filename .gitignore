@@ -1,8 +1,8 @@
-# Data
-/data/
+# Ignore any 'data' folder
+data/
 
-# Checkpoints
-/checkpoints/
+# Ignore any 'checkpoints' folder (for local training)
+checkpoints/
 
 # Mac OS-specific storage files
 .DS_Store
