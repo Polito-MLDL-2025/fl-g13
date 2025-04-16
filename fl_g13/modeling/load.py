@@ -5,6 +5,8 @@ import os
 import torch
 import torch.optim as optim
 
+from fl_g13.modeling.utils import generate_goofy_name
+
 
 class ModelKeys(Enum):
     EPOCH = 'epoch'
@@ -12,10 +14,10 @@ class ModelKeys(Enum):
     OPTIMIZER_STATE_DICT = 'optimizer_state_dict'
 
 
-def save_model(model, optimizer, checkpoint_dir, epoch=None, prefix_name="model"):
+def save_model(checkpoint_dir, model, optimizer, scheduler, epoch=1, filename=generate_goofy_name()):
     """Saves the model and optimizer state to a checkpoint file."""
     os.makedirs(checkpoint_dir, exist_ok=True)
-    filename = f"{prefix_name}_epoch_{epoch}.pth" if epoch is not None else f"{prefix_name}.pth"
+    
     checkpoint_path = os.path.join(checkpoint_dir, filename)
 
     torch.save({
