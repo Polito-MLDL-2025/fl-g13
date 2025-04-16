@@ -31,37 +31,75 @@ endif
 ## Set up new venv and install requirements
 .PHONY: install
 install:
-	@echo "Creating virtual environment if it doesn't exist..."
+	@echo ""
+	@echo "🔧 ----------------------------------------------------------"
+	@echo "🔧 Creating virtual environment (if it doesn't exist)..."
+	@echo "🔧 ----------------------------------------------------------"
+	@echo ""
 	@test -d $(VENV_DIR) || $(PYTHON_INTERPRETER) -m venv $(VENV_DIR)
-	@echo "Installing Python dependencies..."
+
+	@echo ""
+	@echo "📦 Installing Python dependencies..."
+	@echo "📦 ----------------------------------------------------------"
+	@echo ""
 	$(PYTHON) -m pip install --upgrade pip
 	$(PYTHON) -m pip install -r requirements.txt
-	@echo "Python dependencies installed in virtual environment '$(VENV_DIR)'"
+
+	@echo ""
+	@echo "✅ Environment setup complete in '$(VENV_DIR)'"
+	@echo ""
 
 ## Install only requirements (assumes venv or conda already exists)
 .PHONY: requirements
 requirements:
+	@echo ""
+	@echo "📦 Installing dependencies from requirements.txt..."
+	@echo ""
 	$(PYTHON) -m pip install -r requirements.txt
+	@echo ""
+	@echo "✅ Dependencies installed."
+	@echo ""
 
 ## Delete all compiled Python files and venv
 .PHONY: clean
 clean:
+	@echo ""
+	@echo "🧹 Cleaning up __pycache__ and .pyc files..."
+	@echo ""
 	find . -type f -name "*.py[co]" -delete
 	find . -type d -name "__pycache__" -delete
+
+	@echo ""
+	@echo "🧨 Removing virtual environment directory..."
+	@echo ""
 	rm -rf $(VENV_DIR)
-	@echo "Virtual environment removed"
+
+	@echo ""
+	@echo "✅ Cleanup complete."
+	@echo ""
 
 ## Download the dataset
 .PHONY: data
 data: requirements
+	@echo ""
+	@echo "⬇️  Downloading dataset with fl_g13.dataset..."
+	@echo ""
 	$(PYTHON) -m fl_g13.dataset
+	@echo ""
+	@echo "✅ Dataset downloaded successfully."
+	@echo ""
 
 ## Export all notebooks in the notebooks/ directory
 .PHONY: export_notebooks
 export_notebooks: requirements
-	@echo "Exporting all notebooks in the 'notebooks' directory..."
+	@echo ""
+	@echo "📤 Exporting all notebooks in 'notebooks/' using nbautoexport..."
+	@echo ""
 	$(PYTHON) -m nbautoexport export notebooks/
-	@echo "✅ All notebooks exported."
+	@echo ""
+	@echo "✅ Notebooks exported successfully."
+	@echo ""
+
 
 #################################################################################
 # Self Documenting Commands                                                     #
