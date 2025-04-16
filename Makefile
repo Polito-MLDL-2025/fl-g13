@@ -2,44 +2,46 @@
 # GLOBALS                                                                       #
 #################################################################################
 
-PROJECT_NAME = fl-g13
-PYTHON_VERSION = 3.10
-PYTHON_INTERPRETER = python3
+PROJECT_NAME := fl-g13
+PYTHON_VERSION := 3.10
+PYTHON_INTERPRETER := python3
+VENV_DIR := .venv
 
 ifeq ($(OS),Windows_NT)
-    ACTIVATE = $(VENV_DIR)\Scripts\activate.bat
-    PYTHON = $(VENV_DIR)\Scripts\python.exe
+    ACTIVATE := $(VENV_DIR)\Scripts\activate.bat
+    PYTHON := $(VENV_DIR)\Scripts\python.exe
 else
-    ACTIVATE = source $(VENV_DIR)/bin/activate
-    PYTHON = $(VENV_DIR)/bin/python
+    ACTIVATE := source $(VENV_DIR)/bin/activate
+    PYTHON := $(VENV_DIR)/bin/python
 endif
 
 #################################################################################
 # COMMANDS                                                                      #
 #################################################################################
 
-
-## Install Python dependencies
-.PHONY: requirements
-requirements:
-	$(PYTHON_INTERPRETER) -m pip install -U pip
-	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
-	
+## Install Python dependencies and set up the environment
 .PHONY: install
 install:
-	. $(VENV_DIR)/bin/activate
-# 	$(VENV_DIR)/bin/pip install --upgrade pip
-	$(VENV_DIR)/bin/pip install -r requirements.txt
-	@echo "Python dependencies installed"
+	@echo "Creating virtual environment if it doesn't exist..."
+	@test -d $(VENV_DIR) || $(PYTHON_INTERPRETER) -m venv $(VENV_DIR)
+	@echo "Installing Python dependencies..."
+	$(PYTHON) -m pip install --upgrade pip
+	$(PYTHON) -m pip install -r requirements.txt
+	@echo "Python dependencies installed in virtual environment '$(VENV_DIR)'"
 
+## Install only requirements (assumes venv already exists)
+.PHONY: requirements
+requirements:
+	$(PYTHON) -m pip install -r requirements.txt
 
-## Delete all compiled Python files
+## Delete all compiled Python files and venv
 .PHONY: clean
 clean:
 	find . -type f -name "*.py[co]" -delete
 	find . -type d -name "__pycache__" -delete
 	rm -rf $(VENV_DIR)
 	@echo "Virtual environment removed"
+
 
 
 ## Lint using ruff (use `make format` to do formatting)
@@ -73,7 +75,7 @@ create_environment:
 #################################################################################
 
 
-## TODO: Make dataset (does nothing by now)
+## TODO: Download dataset (does nothing now)
 .PHONY: data
 data: requirements
 	$(PYTHON_INTERPRETER) fl_g13/dataset.py

@@ -11,8 +11,6 @@ import numpy as np
 from torchvision import datasets, transforms
 from collections import Counter
 
-from fl_g13 import dataset_handler
-
 
 # ## Load data
 
