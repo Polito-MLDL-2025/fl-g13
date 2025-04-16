@@ -1,4 +1,4 @@
-from .train import train, train_one_epoch  # <- This exposes the function directly
-from .test import test
-from .load import load, save
-from .utils import generate_goofy_name
+from .load import load, save  # noqa: F401
+from .test import test  # noqa: F401
+from .train import train, train_one_epoch  # noqa: F401
+from .utils import generate_goofy_name  # noqa: F401

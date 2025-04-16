@@ -8,12 +8,12 @@ from sklearn.model_selection import StratifiedShuffleSplit
 import torch
 from torch.utils.data import Subset
 from torchvision import datasets, transforms
-from tqdm import tqdm
 import typer
 
-from fl_g13.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
+from fl_g13.config import RAW_DATA_DIR
 
 app = typer.Typer()
+
 
 def check_distribution(dataset, name="Dataset"):
     labels = [dataset[i][1] for i in range(len(dataset))]
@@ -21,13 +21,15 @@ def check_distribution(dataset, name="Dataset"):
     print(f"{name} distribution (class: count):")
     print(dict(sorted(dist.items())))
 
-def train_test_split(dataset, train_ratio=0.8,random_state=42):
+
+def train_test_split(dataset, train_ratio=0.8, random_state=42):
     targets = np.array(dataset.targets)
     sss = StratifiedShuffleSplit(n_splits=1, train_size=train_ratio, random_state=random_state)
-    train_idx,test_idx = next(sss.split(targets, targets))
+    train_idx, test_idx = next(sss.split(targets, targets))
     train_dataset = torch.utils.data.Subset(dataset, train_idx)
     test_dataset = torch.utils.data.Subset(dataset, test_idx)
-    return train_dataset,test_dataset
+    return train_dataset, test_dataset
+
 
 def check_subset_distribution(subset, plot=False):
     labels = []
@@ -40,6 +42,7 @@ def check_subset_distribution(subset, plot=False):
     label_count = Counter(labels)
 
     return label_count
+
 
 def iid_sharding(dataset, k_clients, seed=42):
     np.random.seed(seed)
@@ -57,53 +60,54 @@ def iid_sharding(dataset, k_clients, seed=42):
     shuffled_indices = np.random.permutation(base_indices)
 
     client_subsets = [
-        Subset(base_dataset, shuffled_indices[i * data_per_client: (i + 1) * data_per_client])
+        Subset(base_dataset, shuffled_indices[i * data_per_client : (i + 1) * data_per_client])
         for i in range(k_clients)
     ]
 
     return client_subsets
 
+
 def filter_subset_keep_classes(subset, keep_classes=[]):
     filtered_indices = [i for i in range(len(subset)) if subset[i][1] in keep_classes]
     return Subset(subset, filtered_indices)
 
-def non_iid_sharding(dataset, k_clients,keep_classes=None, keep_random=1, seed=42):
 
+def non_iid_sharding(dataset, k_clients, keep_classes=None, keep_random=1, seed=42):
     unique_targets = list(set(dataset.targets))
 
     if keep_classes is None:
         random.seed(seed)
-        keep_classes = random.sample(unique_targets,keep_random)
+        keep_classes = random.sample(unique_targets, keep_random)
 
     cut_dataset = filter_subset_keep_classes(dataset, keep_classes)
     return iid_sharding(cut_dataset, k_clients)
 
-def load_cifar100(data_dir="data/raw", train=True):
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-    ])
 
-    dataset = datasets.CIFAR100(
-        root=data_dir,
-        train=train,
-        download=True,
-        transform=transform
+def load_cifar100(data_dir="data/raw", train=True):
+    transform = transforms.Compose(
+        [
+            transforms.ToTensor(),
+        ]
     )
+
+    dataset = datasets.CIFAR100(root=data_dir, train=train, download=True, transform=transform)
 
     print(f"{'Training' if train else 'Test'} set downloaded to: {data_dir}")
     return dataset
+
 
 @app.command()
 def main(
     path: Path = RAW_DATA_DIR,
 ):
     logger.info("Downloading CIFAR100 dataset into the RAW_DATA_DIR...")
-    
+
     # Download training and test sets into the specified RAW_DATA_DIR
     load_cifar100(data_dir=str(path), train=True)
     load_cifar100(data_dir=str(path), train=False)
-    
+
     logger.success("✅ Downloading CIFAR100 dataset complete.")
+
 
 if __name__ == "__main__":
     app()

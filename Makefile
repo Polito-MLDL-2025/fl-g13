@@ -28,6 +28,36 @@ endif
 # COMMANDS                                                                      #
 #################################################################################
 
+## Lint using ruff (use `make format` to do formatting)
+.PHONY: lint
+lint:
+	@echo ""
+	@echo "🔍 ----------------------------------------------------------"
+	@echo "🔍 Running Ruff Linter (checking code formatting and issues)..."
+	@echo "🔍 ----------------------------------------------------------"
+	@echo ""
+	ruff format --check
+	ruff check
+
+	@echo ""
+	@echo "✅ Linting complete. No issues detected (if any)."
+	@echo ""
+
+## Format source code with ruff
+.PHONY: format
+format:
+	@echo ""
+	@echo "⚙️ ----------------------------------------------------------"
+	@echo "⚙️ Running Ruff Formatter (auto-fixing issues)..."
+	@echo "⚙️ ----------------------------------------------------------"
+	@echo ""
+	ruff check --fix
+	ruff format
+
+	@echo ""
+	@echo "✅ Formatting complete. Code is now formatted."
+	@echo ""
+
 ## Set up new venv and install requirements
 .PHONY: install
 install:

@@ -8,16 +8,16 @@ from fl_g13.modeling.utils import generate_goofy_name
 
 
 class ModelKeys(Enum):
-    EPOCH = 'epoch'
-    MODEL_STATE_DICT = 'model_state_dict'
-    OPTIMIZER_STATE_DICT = 'optimizer_state_dict'
-    SCHEDULER_STATE_DICT = 'scheduler_state_dict'
+    EPOCH = "epoch"
+    MODEL_STATE_DICT = "model_state_dict"
+    OPTIMIZER_STATE_DICT = "optimizer_state_dict"
+    SCHEDULER_STATE_DICT = "scheduler_state_dict"
 
 
 def save(checkpoint_dir, model, optimizer, scheduler=None, epoch=None, prefix=None):
     """Saves the model, optimizer, and optionally scheduler state to a checkpoint file."""
     os.makedirs(checkpoint_dir, exist_ok=True)
-    
+
     if prefix is None:
         prefix = generate_goofy_name()
 
@@ -39,6 +39,7 @@ def save(checkpoint_dir, model, optimizer, scheduler=None, epoch=None, prefix=No
 
     print(f"💾 Saved checkpoint at: {filename}")
 
+
 def load(checkpoint_dir, model, optimizer, scheduler=None, filename=None, device=None):
     """
     Loads the latest checkpoint into the given model and optimizer (optionally scheduler). Raises an error if no checkpoint is found.
@@ -49,8 +50,7 @@ def load(checkpoint_dir, model, optimizer, scheduler=None, filename=None, device
             raise FileNotFoundError(f"Specified checkpoint file not found: {ckpt_path}")
     else:
         checkpoint_files = sorted(
-            glob.glob(os.path.join(checkpoint_dir, "*.pth")),
-            key=os.path.getmtime
+            glob.glob(os.path.join(checkpoint_dir, "*.pth")), key=os.path.getmtime
         )
         if not checkpoint_files:
             raise FileNotFoundError(f"No checkpoint found in directory: {checkpoint_dir}")
@@ -69,7 +69,7 @@ def load(checkpoint_dir, model, optimizer, scheduler=None, filename=None, device
     start_epoch = checkpoint.get(ModelKeys.EPOCH.value, 0) + 1
 
     print(f"✅ Loaded checkpoint from {ckpt_path}, resuming at epoch {start_epoch}")
-    
+
     return int(start_epoch)
 
 
