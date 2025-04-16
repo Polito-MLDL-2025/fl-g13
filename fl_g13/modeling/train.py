@@ -1,13 +1,12 @@
 import torch
 
-from fl_g13.modeling.load import load_or_create_model, save_model
+from fl_g13.modeling.load import save
 
-
-def _train(model, optimizer, dataloader, loss_fn, device, verbose=False):
+def train_one_epoch(model, optimizer, dataloader, loss_fn, verbose=False):
+    device = next(model.parameters()).device
     model.train()
-    total_loss = 0.0
-    correct = 0
-    total = 0
+
+    total_loss, correct, total = 0.0, 0, 0
 
     for batch, (X, y) in enumerate(dataloader):
         X, y = X.to(device), y.to(device)
@@ -19,36 +18,28 @@ def _train(model, optimizer, dataloader, loss_fn, device, verbose=False):
         optimizer.step()
 
         total_loss += loss.item()
-        _, predicted = torch.max(pred.data, 1)
+        _, predicted = torch.max(pred, 1)
         total += y.size(0)
         correct += (predicted == y).sum().item()
 
         if verbose:
-            batch_acc = 100 * (predicted == y).sum().item() / y.size(0)
-            print(f"  ↳ Batch {batch + 1}/{len(dataloader)} | Loss: {loss.item():.4f} | Batch Acc: {batch_acc:.2f}%")
+            batch_acc = correct / total
+            print(f"  ↳ Batch {batch + 1}/{len(dataloader)} | Loss: {loss.item():.4f} | Batch Acc: {100*batch_acc:.2f}%")
 
     training_loss = total_loss / len(dataloader)
-    training_accuracy = 100 * correct / total
-    print(f"Training Loss: {training_loss:.4f}, Training Accuracy: {training_accuracy:.2f}%")
+    training_accuracy = correct / total
+    print(f"Training Loss: {training_loss:.4f}, Training Accuracy: {100*training_accuracy:.2f}%")
     return training_loss, training_accuracy
 
 
-def train_model(checkpoint_dir, dataloader, loss_fn, num_epochs=100, save_every=10, lr=1e-4, weight_decay=0.04,
-                model=None, optimizer=None, device=None, verbose=False):
-    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+def train_model(checkpoint_dir, dataloader, loss_fn, start_epoch, num_epochs, save_every, model, optimizer,
+                scheduler=None, filename=None, verbose=False):
+    for epoch in range(start_epoch, start_epoch + num_epochs):
+        avg_loss, training_accuracy = train_one_epoch(model, optimizer, dataloader, loss_fn, verbose=verbose)
+        print(f"📘 Epoch [{epoch}/{start_epoch + num_epochs - 1}] - Avg Loss: {avg_loss:.4f}, Accuracy: {training_accuracy:.2f}%")
 
-    model, optimizer, start_epoch = load_or_create_model(
-        checkpoint_dir=checkpoint_dir,
-        model=model,
-        optimizer=optimizer,
-        lr=lr,
-        weight_decay=weight_decay
-    )
+        if scheduler:
+            scheduler.step()
 
-    for epoch in range(start_epoch, num_epochs + 1):
-        avg_loss, training_accuracy = _train(model, optimizer, dataloader, loss_fn, device, verbose=verbose)
-        print(f"📘 Epoch [{epoch}/{num_epochs}] - Avg Loss: {avg_loss:.4f}, Accuracy: {training_accuracy:.2f}%")
-
-        if save_every and epoch % save_every == 0:
-            save_model(model, optimizer, checkpoint_dir, epoch, prefix_name="dino_xcit")
+        if save_every and (epoch - start_epoch + 1) % save_every == 0:
+            save(checkpoint_dir, model, optimizer, scheduler, epoch=epoch, filename=filename)

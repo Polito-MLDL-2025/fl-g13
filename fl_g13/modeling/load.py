@@ -14,7 +14,7 @@ class ModelKeys(Enum):
     SCHEDULER_STATE_DICT = 'scheduler_state_dict'
 
 
-def save_model(checkpoint_dir, model, optimizer, scheduler=None, epoch=1, filename=None):
+def save(checkpoint_dir, model, optimizer, scheduler=None, epoch=1, filename=None):
     """Saves the model, optimizer, and optionally scheduler state to a checkpoint file."""
     os.makedirs(checkpoint_dir, exist_ok=True)
     
