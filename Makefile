@@ -28,7 +28,7 @@ endif
 # COMMANDS                                                                      #
 #################################################################################
 
-## Install Python dependencies and set up the environment
+## Set up new venv and install requirements
 .PHONY: install
 install:
 	@echo "Creating virtual environment if it doesn't exist..."
@@ -38,7 +38,7 @@ install:
 	$(PYTHON) -m pip install -r requirements.txt
 	@echo "Python dependencies installed in virtual environment '$(VENV_DIR)'"
 
-## Install only requirements (assumes venv already exists)
+## Install only requirements (assumes venv or conda already exists)
 .PHONY: requirements
 requirements:
 	$(PYTHON) -m pip install -r requirements.txt
