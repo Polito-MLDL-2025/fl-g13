@@ -79,7 +79,7 @@ model2 = TinyCNN(num_classes=100)
 optimizer2 = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.04)
 loss_fn2 = torch.nn.CrossEntropyLoss()
 
-start_epoch = load(checkpoint_dir, model=model2, optimizer=optimizer2, filename="TinyCNN_epoch_3.pth")
+start_epoch = load(checkpoint_dir, model=model2, optimizer=optimizer2, filename="TinyCNN_epoch_2.pth")
 
 
 num_epochs = 4
