@@ -1,7 +1,7 @@
 import torch
 
 
-def eval(model, dataloader, criterion, verbose=False):
+def eval(dataloader, model, criterion, verbose=False):
     """
     Evaluate the model on the given dataloader using the specified loss function.
     If verbose is True, print progress and intermediate results.

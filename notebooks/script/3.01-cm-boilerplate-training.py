@@ -8,7 +8,7 @@ get_ipython().run_line_magic('autoreload', '2')
 from fl_g13.config import RAW_DATA_DIR
 from torchvision import datasets, transforms
 
-from fl_g13.modeling import train, train_one_epoch
+from fl_g13.modeling import train
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -74,20 +74,20 @@ train(
     model=model,
     optimizer=optimizer,
     scheduler=None,
-    verbose=False,
+    verbose=True,
 )
 
 
 train(
     checkpoint_dir=checkpoint_dir,
     prefix="TinyCNN", # Setting a name for the model
-    train_dataloader=train_dataloader,
-    val_dataloader=test_dataloader,
-    criterion=criterion,
     start_epoch=start_epoch,
     num_epochs=num_epochs,
     save_every=save_every,
+    train_dataloader=train_dataloader,
+    val_dataloader=test_dataloader,
     model=model, # Use the same model as before (partially pre-trained)
+    criterion=criterion,
     optimizer=optimizer,
     scheduler=None,
     verbose=False,
@@ -114,13 +114,13 @@ save_every = 2
 train(
     checkpoint_dir=checkpoint_dir,
     prefix="TinyCNN", # Use the same name as before to continue training!
-    train_dataloader=train_dataloader,
-    val_dataloader=test_dataloader,
-    criterion=criterion2,
     start_epoch=start_epoch, # Now start epoch is not 1 (will resume from where it was left)
     num_epochs=num_epochs, # This is not the number of epochs to reach, but how many to do starting from now!
     save_every=save_every,
+    train_dataloader=train_dataloader,
+    val_dataloader=test_dataloader,
     model=model2,
+    criterion=criterion2,
     optimizer=optimizer2,
     scheduler=None,
     verbose=False,

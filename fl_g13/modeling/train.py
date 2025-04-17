@@ -5,7 +5,13 @@ from fl_g13.modeling.eval import eval
 from fl_g13.modeling.utils import generate_goofy_name
 
 
-def train_one_epoch(model, optimizer, dataloader, criterion, verbose=False):
+def train_one_epoch(
+    dataloader, 
+    model, 
+    criterion, 
+    optimizer, 
+    verbose=False
+):
     """
     Trains the model for one epoch using the provided dataloader, optimizer, and loss function.
     """
@@ -43,13 +49,13 @@ def train_one_epoch(model, optimizer, dataloader, criterion, verbose=False):
 def train(
     checkpoint_dir,
     prefix,
-    train_dataloader,
-    val_dataloader,
-    criterion,
     start_epoch,
     num_epochs,
     save_every,
+    train_dataloader,
+    val_dataloader,
     model,
+    criterion,
     optimizer,
     scheduler=None,
     verbose=False,
@@ -65,7 +71,7 @@ def train(
     for epoch in range(1, num_epochs + 1):
         # Train on the current epoch
         train_avg_loss, training_accuracy = train_one_epoch(
-            model, optimizer, train_dataloader, criterion, verbose=verbose
+            dataloader=train_dataloader, model=model, criterion=criterion, optimizer=optimizer, verbose=verbose
         )
         print(
             f"🚀 Epoch [{epoch}/{num_epochs}] Completed ({100*epoch/num_epochs:.2f})\n"
@@ -75,7 +81,7 @@ def train(
         
         # Immediately evaluate out-of-distribution accuracy
         validation_avg_loss, validation_accuracy = eval(
-            model, val_dataloader, criterion
+            dataloader=val_dataloader, model=model, criterion=criterion
         )
         print(
             f"🔍 Validation Results:\n"

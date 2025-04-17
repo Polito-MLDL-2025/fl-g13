@@ -168,16 +168,16 @@ criterion = torch.nn.CrossEntropyLoss()
 train(
     checkpoint_dir=CHECKPOINT_DIR,
     prefix="", # Automatically find a name for the model
-    train_dataloader=train_dataloader,
-    val_dataloader=test_dataloader,
-    criterion=criterion,
     start_epoch=start_epoch,
     num_epochs=num_epochs,
     save_every=save_every,
+    train_dataloader=train_dataloader,
+    val_dataloader=test_dataloader,
     model=model, # Use the same model as before (partially pre-trained)
+    criterion=criterion,
     optimizer=optimizer,
-    scheduler=None,
-    verbose=False,
+    scheduler=scheduler,
+    verbose=True,
 )
 
 
