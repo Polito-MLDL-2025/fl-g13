@@ -14,8 +14,12 @@
     X rework codebase (e.g., why model and optimizers as parameters for load_or_create? Should split load_or_create in two distinc functions etc.)
     X rework README file
     X use of tensors in returns of test values, is it strictly necessary?
-    - plots of loss, stats and similar (using wandb? or maybe by hand in the karpathy way)
-    - add comments
+    X add comments
     X reorder parameters signature
     X resedisgn train save and load signatures
-    - data/raw -> data
+    - plots of loss, stats and similar (using wandb? or maybe doing them by hand in the karpathy way?)
+        - lossi (list of losses to plot later)
+        - plot image maps of activations in neurons
+        - plot saturations plots of activation layers
+        - plot gradient to data ratios (should be among -2 and -3 in a log10 scale)\
+        - see https://github.com/karpathy/nn-zero-to-hero/blob/master/lectures/makemore/makemore_part3_bn.ipynb
