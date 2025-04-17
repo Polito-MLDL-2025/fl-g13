@@ -109,11 +109,11 @@ test_dataloader = DataLoader(cifar100_test)
 
 # ## Train Model
 
-from timm.models.layers import DropPath
+from timm.layers import DropPath
 
 # Load model from torch
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Using device: {device}")
+print(f"Using device: {device}")
 
 dropout_rate = 0.1      # Dropout rate for MLP and attention layers
 drop_path_rate = 0.1    # DropPath rate for stochastic depth
