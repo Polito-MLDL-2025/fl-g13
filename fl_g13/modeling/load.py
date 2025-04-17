@@ -120,33 +120,3 @@ def load(path, model, optimizer, scheduler=None, device=None):
 
     # Return the starting epoch as an integer
     return int(start_epoch)
-
-
-# def load_or_create_model(checkpoint_dir, model=None, optimizer=None, scheduler=None, lr=1e-4, weight_decay=0.04, device=None):
-#     """Loads the latest checkpoint or initializes a new model, optimizer, and optionally scheduler."""
-#     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-#     if model is None:
-#         model = torch.hub.load('facebookresearch/dino:main', 'dino_vits16').to(device)
-
-#     if optimizer is None:
-#         optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-
-#     checkpoint_files = sorted(glob.glob(os.path.join(checkpoint_dir, "*.pth")), key=os.path.getmtime)
-
-#     if checkpoint_files:
-#         latest_ckpt = checkpoint_files[-1]
-#         checkpoint = torch.load(latest_ckpt, map_location=device)
-#         model.load_state_dict(checkpoint[ModelKeys.MODEL_STATE_DICT.value])
-#         optimizer.load_state_dict(checkpoint[ModelKeys.OPTIMIZER_STATE_DICT.value])
-#         start_epoch = checkpoint[ModelKeys.EPOCH.value] + 1
-
-#         if scheduler is not None and ModelKeys.SCHEDULER_STATE_DICT.value in checkpoint:
-#             scheduler.load_state_dict(checkpoint[ModelKeys.SCHEDULER_STATE_DICT.value])
-
-#         print(f"✅ Loaded checkpoint from {latest_ckpt}, resuming at epoch {start_epoch}")
-#     else:
-#         start_epoch = 1
-#         print("⚠️ No checkpoint found, initializing new model from scratch.")
-
-#     return model, optimizer, scheduler, start_epoch
