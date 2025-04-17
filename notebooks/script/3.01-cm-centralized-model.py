@@ -115,7 +115,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 dropout_rate = 0.1      # Dropout rate for MLP and attention layers
-drop_path_rate = 0.1    # DropPath rate for stochastic depth (drops some residuals)
+drop_path_rate = 0.1    # DropPath rate for stochastic depth (drops some residuals) -- probably will have to ignore in FedLearn setting
 
 # Load model from torch
 model = torch.hub.load('facebookresearch/dino:main', 'dino_vits16', pretrained=True)
@@ -174,7 +174,7 @@ model.to(device)
 
 CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
 
-# Parameters
+# Hyper-parameters
 batch_size = 128
 start_epoch = 1
 num_epochs = 5
@@ -185,13 +185,14 @@ optimizer = optim.SGD(model.parameters(), lr=0.001)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 criterion = torch.nn.CrossEntropyLoss()
 
+# Preallocated lists: if the training interrupts, it will still save their values
 all_training_losses=[]       # Pre-allocated list for training losses
 all_validation_losses=[]     # Pre-allocated list for validation losses
 all_training_accuracies=[]   # Pre-allocated list for training accuracies
 all_validation_accuracies=[] # Pre-allocated list for validation accuracies
 
 # Train the model and save periodically
-train(
+_, _, _, _ = train(
     checkpoint_dir=CHECKPOINT_DIR,
     prefix="", # Automatically find a name for the model
     start_epoch=start_epoch,
