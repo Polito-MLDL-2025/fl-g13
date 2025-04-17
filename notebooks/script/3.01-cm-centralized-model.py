@@ -164,20 +164,20 @@ optimizer = optim.SGD(model.parameters(), lr=0.001)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 criterion = torch.nn.CrossEntropyLoss()
 
-# Train
+# Train the model and save periodically
 train(
     checkpoint_dir=CHECKPOINT_DIR,
+    prefix="", # Automatically find a name for the model
     train_dataloader=train_dataloader,
     val_dataloader=test_dataloader,
     criterion=criterion,
     start_epoch=start_epoch,
     num_epochs=num_epochs,
     save_every=save_every,
-    model=model,
+    model=model, # Use the same model as before (partially pre-trained)
     optimizer=optimizer,
-    scheduler=scheduler,
-    prefix=None,
-    verbose=True,
+    scheduler=None,
+    verbose=False,
 )
 
 

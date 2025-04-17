@@ -35,13 +35,14 @@ def train_one_epoch(model, optimizer, dataloader, criterion, verbose=False):
             print(
                 f"  ↳ Batch {batch_idx + 1}/{len(dataloader)} | Loss: {loss.item():.4f} | Batch Acc: {100 * batch_acc:.2f}%"
             )
-    training_loss = total_loss / len(dataloader)
+    training_avg_loss = total_loss / len(dataloader)
     training_accuracy = correct / total
-    return training_loss, training_accuracy
+    return training_avg_loss, training_accuracy
 
 
 def train(
     checkpoint_dir,
+    prefix,
     train_dataloader,
     val_dataloader,
     criterion,
@@ -51,7 +52,6 @@ def train(
     model,
     optimizer,
     scheduler=None,
-    prefix=None,
     verbose=False,
 ):
     """
@@ -60,6 +60,7 @@ def train(
 
     if not prefix:
         prefix = generate_goofy_name(checkpoint_dir)
+        print(f"No prefix/name for the model was provided, choosen prefix/name: {prefix}")
 
     for epoch in range(1, num_epochs + 1):
         # Train on the current epoch
@@ -87,4 +88,4 @@ def train(
 
         if save_every and epoch % save_every == 0:
             saving_epoch = start_epoch + epoch - 1
-            save(checkpoint_dir, model, optimizer, scheduler, epoch=saving_epoch, prefix=prefix)
+            save(checkpoint_dir, prefix, model, optimizer, scheduler, epoch=saving_epoch)

@@ -58,34 +58,73 @@ test_dataloader = torch.utils.data.DataLoader(cifar100_test, batch_size=batch_si
 
 model = TinyCNN(100)
 model.to(device)
-
 optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.04)
-
-loss_fn = torch.nn.CrossEntropyLoss()
-
-
-train(checkpoint_dir, train_dataloader, loss_fn, start_epoch, num_epochs, save_every, model, optimizer, scheduler=None, prefix=None, verbose=False)
+criterion = torch.nn.CrossEntropyLoss()
 
 
-train(checkpoint_dir, train_dataloader, loss_fn, start_epoch, num_epochs, save_every, model, optimizer, scheduler=None, prefix="TinyCNN", verbose=False)
+train(
+    checkpoint_dir=checkpoint_dir,
+    prefix="", # Will automatically generate a name for the model
+    train_dataloader=train_dataloader,
+    val_dataloader=test_dataloader,
+    criterion=criterion,
+    start_epoch=start_epoch,
+    num_epochs=num_epochs,
+    save_every=save_every,
+    model=model,
+    optimizer=optimizer,
+    scheduler=None,
+    verbose=False,
+)
+
+
+train(
+    checkpoint_dir=checkpoint_dir,
+    prefix="TinyCNN", # Setting a name for the model
+    train_dataloader=train_dataloader,
+    val_dataloader=test_dataloader,
+    criterion=criterion,
+    start_epoch=start_epoch,
+    num_epochs=num_epochs,
+    save_every=save_every,
+    model=model, # Use the same model as before (partially pre-trained)
+    optimizer=optimizer,
+    scheduler=None,
+    verbose=False,
+)
 
 
 # **Resume training**
 
 from fl_g13.modeling import load
 
-# Load the model from the latest checkpoint
+# Generate untrained objects
 model2 = TinyCNN(num_classes=100)
 optimizer2 = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.04)
-loss_fn2 = torch.nn.CrossEntropyLoss()
+criterion2 = torch.nn.CrossEntropyLoss()
 
-start_epoch = load(checkpoint_dir, model=model2, optimizer=optimizer2, filename="TinyCNN_epoch_2.pth")
+# Load the model from the latest checkpoint
+path = checkpoint_dir + "/TinyCNN_epoch_2.pth"
+start_epoch = load(path=path, model=model2, optimizer=optimizer2, scheduler=None)
 
 
 num_epochs = 4
 save_every = 2
 
-train(checkpoint_dir, train_dataloader, loss_fn2, start_epoch, num_epochs, save_every, model2, optimizer2, scheduler=None, prefix="TinyCNN", verbose=False)
+train(
+    checkpoint_dir=checkpoint_dir,
+    prefix="TinyCNN", # Use the same name as before to continue training!
+    train_dataloader=train_dataloader,
+    val_dataloader=test_dataloader,
+    criterion=criterion2,
+    start_epoch=start_epoch, # Now start epoch is not 1 (will resume from where it was left)
+    num_epochs=num_epochs, # This is not the number of epochs to reach, but how many to do starting from now!
+    save_every=save_every,
+    model=model2,
+    optimizer=optimizer2,
+    scheduler=None,
+    verbose=False,
+)
 
 
 

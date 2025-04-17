@@ -14,14 +14,14 @@ class ModelKeys(Enum):
     SCHEDULER_STATE_DICT = "scheduler_state_dict"
 
 
-def save(checkpoint_dir, model, optimizer, scheduler=None, epoch=None, prefix=None):
+def save(checkpoint_dir, prefix, model, optimizer, scheduler=None, epoch=None):
     """Saves the model, optimizer, and optionally scheduler state to a checkpoint file."""
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    if prefix is None:
+    if not prefix:
         prefix = generate_goofy_name()
 
-    if epoch is None:
+    if not epoch:
         filename = os.path.join(checkpoint_dir, f"{prefix}.pth")
     else:
         filename = os.path.join(checkpoint_dir, f"{prefix}_epoch_{epoch}.pth")
@@ -40,21 +40,23 @@ def save(checkpoint_dir, model, optimizer, scheduler=None, epoch=None, prefix=No
     print(f"💾 Saved checkpoint at: {filename}")
 
 
-def load(checkpoint_dir, model, optimizer, scheduler=None, filename=None, device=None):
+def load(path, model, optimizer, scheduler=None, device=None):
     """
-    Loads the latest checkpoint into the given model and optimizer (optionally scheduler). Raises an error if no checkpoint is found.
+    Loads a checkpoint into the given model and optimizer (optionally scheduler). Raises an error if no checkpoint is found.
     """
-    if filename:
-        ckpt_path = os.path.join(checkpoint_dir, filename)
-        if not os.path.isfile(ckpt_path):
-            raise FileNotFoundError(f"Specified checkpoint file not found: {ckpt_path}")
-    else:
+    if os.path.isdir(path):
         checkpoint_files = sorted(
-            glob.glob(os.path.join(checkpoint_dir, "*.pth")), key=os.path.getmtime
+            glob.glob(os.path.join(path, "*.pth")), key=os.path.getmtime
         )
         if not checkpoint_files:
-            raise FileNotFoundError(f"No checkpoint found in directory: {checkpoint_dir}")
+            raise FileNotFoundError(f"No checkpoint found in directory: {path}")
         ckpt_path = checkpoint_files[-1]
+    elif os.path.isfile(path):
+        ckpt_path = path
+    else:
+        raise FileNotFoundError(f"Checkpoint path is neither a file nor a directory: {path}")
+
+    # TODO Could implement that if the path do not ends with _epoch_int then the most recent could be picked (higher epoch)
 
     if device:
         checkpoint = torch.load(ckpt_path, map_location=device)
