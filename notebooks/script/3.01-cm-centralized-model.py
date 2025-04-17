@@ -19,53 +19,53 @@ from torch.utils.data import DataLoader
 
 # ## Load data
 
-transform = transforms.Compose([
-    transforms.ToTensor(),
+from torchvision import models
+from torchvision.transforms import Compose, Resize, RandomCrop, RandomHorizontalFlip, RandomVerticalFlip, ToTensor, Normalize
+
+# Define preprocessing pipeline
+train_transform = Compose([
+    Resize((256, 256)),
+    RandomCrop((224, 224)),
+    RandomHorizontalFlip(),
+    ToTensor(),
+    Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
 ])
 
-cifar100_train = datasets.CIFAR100(root=RAW_DATA_DIR, train=True, download=True, transform=transform)
-cifar100_test = datasets.CIFAR100(root=RAW_DATA_DIR, train=False, download=True, transform=transform)
+eval_transform = Compose([
+    ToTensor(),
+    Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
+])
+
+cifar100_train = datasets.CIFAR100(root=RAW_DATA_DIR, train=True, download=True, transform=train_transform)
+cifar100_test = datasets.CIFAR100(root=RAW_DATA_DIR, train=False, download=True, transform=eval_transform)
 
 
 train_dataloader = DataLoader(cifar100_train)
 test_dataloader = DataLoader(cifar100_test)
 
 
-# Stack all images into a single tensor
-all_images = torch.cat([cifar100_train[i][0].unsqueeze(0) for i in range(len(cifar100_train))], dim=0)
+# # Stack all images into a single tensor
+# all_images = torch.cat([cifar100_train[i][0].unsqueeze(0) for i in range(len(cifar100_train))], dim=0)
 
-print(all_images.shape)
+# print(all_images.shape)
 
-# Calculate mean and std for each channel (RGB)
-mean = all_images.mean(dim=(0, 2, 3))  # Mean across batch, height, and width
-std = all_images.std(dim=(0, 2, 3))    # Std across batch, height, and width
+# # Calculate mean and std for each channel (RGB)
+# mean = all_images.mean(dim=(0, 2, 3))  # Mean across batch, height, and width
+# std = all_images.std(dim=(0, 2, 3))    # Std across batch, height, and width
 
-print(f"Mean: {mean}")
-print(f"Std: {std}")
+# print(f"Mean: {mean}")
+# print(f"Std: {std}")
 
 
 # ## Train Model
 
-from torchvision import models
-from torchvision.transforms import Compose, Resize, RandomCrop, RandomHorizontalFlip, RandomVerticalFlip, ToTensor, Normalize
-from PIL import Image
 import requests
-import torch
-
 from IPython.display import display
+from PIL import Image
 
 # Load the pretrained DINO ViT-S/16 model
 model = torch.hub.load('facebookresearch/dino:main', 'dino_vits16', pretrained=True)
 model.eval()  # Set the model to evaluation mode
-
-# Define preprocessing pipeline
-transform = Compose([
-    Resize((256, 256)),
-    RandomCrop((224, 224)),
-    RandomHorizontalFlip(),
-    ToTensor(),
-    Normalize(mean=mean, std=std),
-])
 
 # Download a sample image from ImageNet
 url = "https://raw.githubusercontent.com/pytorch/hub/master/images/dog.jpg"
@@ -73,8 +73,13 @@ response = requests.get(url, stream=True)
 img = Image.open(response.raw).convert("RGB")
 display(img.resize((128, 128)))
 
+imagenet_transform = Compose([
+    ToTensor(),
+    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
 # Preprocess the image
-input_tensor = transform(img).unsqueeze(0)  # Add batch dimension
+input_tensor = imagenet_transform(img).unsqueeze(0)  # Add batch dimension
 
 # Move to device (CPU or GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -85,11 +90,6 @@ input_tensor = input_tensor.to(device)
 with torch.no_grad():
     output = model(input_tensor)
 
-# Get the predicted label
-predicted_label = output.argmax(dim=1).item()
-print("Predicted label:", predicted_label)
-
-# Get the predicted label
 # Load ImageNet class labels
 imagenet_classes_url = "https://raw.githubusercontent.com/anishathalye/imagenet-simple-labels/master/imagenet-simple-labels.json"
 imagenet_classes = requests.get(imagenet_classes_url).json()
@@ -168,7 +168,7 @@ train(
     optimizer=optimizer,
     scheduler=scheduler,
     prefix=None,
-    verbose=False,
+    verbose=True,
 )
 
 
