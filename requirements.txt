@@ -14,4 +14,7 @@ scikit-learn==1.6.1
 torch==2.6.0
 torchvision==0.21.0
 timm==1.0.15
+flwr[simulation]==1.17.0
+flwr-datasets[vision]==0.5.0
+wandb==0.19.9
 -e .
