@@ -130,7 +130,7 @@ def load_data_client_default(context: Context):
     return trainloader, valloader
 
 
-def get_client_app(load_data_fn=load_data_client_default, model=None, optimizer=None, criterion=None,device=None):
+def get_client_app(load_data_fn=load_data_client_default, model=None, optimizer=None, criterion=None,device=None,config:dict={'local-epochs':2}):
     def client_fn(context: Context):
         # Load model and data
         # net = model
@@ -138,7 +138,7 @@ def get_client_app(load_data_fn=load_data_client_default, model=None, optimizer=
         # num_partitions = context.node_config["num-partitions"]
         # trainloader, valloader = load_data(partition_id, num_partitions)
         trainloader, valloader = load_data_fn(context)
-        local_epochs = context.run_config.get("local-epochs") or 1
+        local_epochs = context.run_config.get("local-epochs") or config.get('local-epochs')
 
         # Return Client instance
         # We pass the state to persist information across
