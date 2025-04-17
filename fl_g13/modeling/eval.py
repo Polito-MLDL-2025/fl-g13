@@ -3,8 +3,19 @@ import torch
 
 def eval(dataloader, model, criterion, verbose=False):
     """
-    Evaluate the model on the given dataloader using the specified loss function.
-    If verbose is True, print progress and intermediate results.
+    Evaluate the model's performance on a given dataloader using the specified loss function.
+
+    Args:
+        dataloader (torch.utils.data.DataLoader): DataLoader providing the evaluation dataset.
+        model (torch.nn.Module): The model to evaluate.
+        criterion (torch.nn.Module): Loss function used for evaluation.
+        verbose (bool, optional): If True, prints progress and intermediate results. Defaults to False.
+
+    Returns:
+        tuple: A tuple containing:
+            - test_loss (float): Average loss over all batches.
+            - test_accuracy (float): Overall accuracy of the model on the evaluation dataset.
+            - iteration_losses (list): List of per-batch losses.
     """
     # Get the device where the model is located
     device = next(model.parameters()).device

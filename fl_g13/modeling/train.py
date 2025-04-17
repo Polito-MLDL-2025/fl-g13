@@ -9,8 +9,20 @@ from fl_g13.modeling.utils import generate_goofy_name
 
 def train_one_epoch(dataloader, model, criterion, optimizer, verbose=False):
     """
-    Trains the model for one epoch using the provided dataloader, optimizer, and loss function.
-    Returns the average training loss, training accuracy, and a list of loss values for each iteration.
+    Train the model for a single epoch.
+
+    Args:
+        dataloader (DataLoader): DataLoader providing the training data.
+        model (torch.nn.Module): The model to be trained.
+        criterion (torch.nn.Module): Loss function used for training.
+        optimizer (torch.optim.Optimizer): Optimizer to update model parameters.
+        verbose (bool, optional): If True, prints progress every 10 batches. Defaults to False.
+
+    Returns:
+        tuple: A tuple containing:
+            - float: Average training loss for the epoch.
+            - float: Training accuracy for the epoch.
+            - list: List of loss values for each iteration.
     """
     # Get the device where the model is located
     device = next(model.parameters()).device
@@ -62,25 +74,50 @@ def train_one_epoch(dataloader, model, criterion, optimizer, verbose=False):
 
 
 def train(
-    checkpoint_dir,
-    prefix,
-    start_epoch,
-    num_epochs,
-    save_every,
-    train_dataloader,
-    val_dataloader,
-    model,
-    criterion,
-    optimizer,
-    scheduler=None,
-    verbose=False,
-    all_training_losses=None,  # Pre-allocated list for training losses
-    all_validation_losses=None,  # Pre-allocated list for validation losses
-    all_training_accuracies=None,  # Pre-allocated list for training accuracies
-    all_validation_accuracies=None,  # Pre-allocated list for validation accuracies
+    checkpoint_dir,         # Directory where model checkpoints will be saved
+    prefix,                 # Prefix or name for the model checkpoints
+    start_epoch,            # Starting epoch number (useful for resuming training)
+    num_epochs,             # Total number of epochs to train the model
+    save_every,             # Frequency (in epochs) to save model checkpoints
+    train_dataloader,       # DataLoader for the training dataset
+    val_dataloader,         # DataLoader for the validation dataset
+    model,                  # The model to be trained
+    criterion,              # Loss function used for training
+    optimizer,              # Optimizer used to update model parameters
+    scheduler=None,         # Learning rate scheduler (optional)
+    verbose=False,          # Whether to print detailed progress during training
+    all_training_losses=None,           # Pre-allocated list to store training losses (optional)
+    all_validation_losses=None,         # Pre-allocated list to store validation losses (optional)
+    all_training_accuracies=None,       # Pre-allocated list to store training accuracies (optional)
+    all_validation_accuracies=None,     # Pre-allocated list to store validation accuracies (optional)
 ):
     """
-    Trains a model for a specified number of epochs, saving checkpoints periodically.
+    Train the model for a given number of epochs, periodically saving checkpoints and tracking performance metrics.
+    
+    Args:
+        checkpoint_dir (str): Directory where model checkpoints will be saved.
+        prefix (str): Prefix or name for the model checkpoints. If not provided, a random name will be generated.
+        start_epoch (int): Starting epoch number (useful for resuming training).
+        num_epochs (int): Total number of epochs to train the model.
+        save_every (int): Frequency (in epochs) to save model checkpoints.
+        train_dataloader (DataLoader): DataLoader for the training dataset.
+        val_dataloader (DataLoader): DataLoader for the validation dataset.
+        model (torch.nn.Module): The model to be trained.
+        criterion (torch.nn.Module): Loss function used for training.
+        optimizer (torch.optim.Optimizer): Optimizer used to update model parameters.
+        scheduler (torch.optim.lr_scheduler._LRScheduler, optional): Learning rate scheduler (optional). Defaults to None.
+        verbose (bool, optional): Whether to print detailed progress during training. Defaults to False.
+        all_training_losses (list, optional): Pre-allocated list to store training losses (optional). Defaults to None.
+        all_validation_losses (list, optional): Pre-allocated list to store validation losses (optional). Defaults to None.
+        all_training_accuracies (list, optional): Pre-allocated list to store training accuracies (optional). Defaults to None.
+        all_validation_accuracies (list, optional): Pre-allocated list to store validation accuracies (optional). Defaults to None.
+    
+    Returns:
+        tuple: A tuple containing:
+            - all_training_losses (list): List of training losses for each epoch.
+            - all_validation_losses (list): List of validation losses for each epoch.
+            - all_training_accuracies (list): List of training accuracies for each epoch.
+            - all_validation_accuracies (list): List of validation accuracies for each epoch.
     """
 
     # Generate a random prefix/name for the model if none is provided

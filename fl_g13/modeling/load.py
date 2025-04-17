@@ -16,7 +16,20 @@ class ModelKeys(Enum):
 
 
 def save(checkpoint_dir, prefix, model, optimizer, scheduler=None, epoch=None):
-    """Saves the model, optimizer, and optionally scheduler state to a checkpoint file."""
+    """
+    Saves the model, optimizer, and optionally scheduler state to a checkpoint file.
+
+    Args:
+        checkpoint_dir (str): Directory where the checkpoint file will be saved.
+        prefix (str): Prefix for the checkpoint file name. If None, a random name will be generated.
+        model (torch.nn.Module): The model whose state will be saved.
+        optimizer (torch.optim.Optimizer): The optimizer whose state will be saved.
+        scheduler (torch.optim.lr_scheduler._LRScheduler, optional): The learning rate scheduler whose state will be saved. Defaults to None.
+        epoch (int, optional): The current epoch number to include in the checkpoint file name. Defaults to None.
+
+    Returns:
+        None
+    """
     # Ensure the checkpoint directory exists
     os.makedirs(checkpoint_dir, exist_ok=True)
 
@@ -50,7 +63,22 @@ def save(checkpoint_dir, prefix, model, optimizer, scheduler=None, epoch=None):
 
 def load(path, model, optimizer, scheduler=None, device=None):
     """
-    Loads a checkpoint into the given model and optimizer (optionally scheduler). Raises an error if no checkpoint is found.
+    Loads a checkpoint into the provided model, optimizer, and optionally a scheduler. 
+    Automatically determines whether the given path is a file (loads the specified file) 
+    or a directory (loads the most recently modified checkpoint file in the directory).
+
+    Raises:
+        FileNotFoundError: If no checkpoint is found at the specified path.
+
+    Args:
+        path (str): Path to the checkpoint file or directory containing checkpoint files.
+        model (torch.nn.Module): The model to load the state into.
+        optimizer (torch.optim.Optimizer): The optimizer to load the state into.
+        scheduler (torch.optim.lr_scheduler._LRScheduler, optional): The scheduler to load the state into. Defaults to None.
+        device (torch.device, optional): The device to map the checkpoint to. Defaults to None.
+
+    Returns:
+        int: The epoch to resume training from.
     """
     # Check if the path is a directory
     if os.path.isdir(path):

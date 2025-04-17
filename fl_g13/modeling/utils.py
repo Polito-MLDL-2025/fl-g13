@@ -82,6 +82,25 @@ nouns = [
 
 
 def generate_goofy_name(folder_path=None):
+    """
+    Generates a unique and "goofy" name by combining a random adjective, noun, and a two-digit number.
+    
+    If a folder path is provided, the function ensures that the generated name does not conflict
+    with existing names in the folder (specifically, filenames ending with ".pth" and following
+    a specific naming convention).
+
+    Args:
+        folder_path (str, optional): The path to a folder where existing names are checked. 
+            If None, the function generates a name without checking for conflicts.
+
+    Returns:
+        str: A unique goofy name in the format "<adjective>_<noun>_<two-digit-number>".
+
+    Raises:
+        FileNotFoundError: If the provided folder path does not exist or is not a directory.
+        RuntimeError: If an unexpected error occurs while listing files in the folder, or if
+            a unique name cannot be generated after 1000 attempts.
+    """
     taken_names = set()
 
     if not folder_path:
