@@ -10,54 +10,15 @@ from fl_g13.modeling import train, test, save, load
 
 import torch
 import torch.nn as nn
-from torch.nn import Linear
-import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms
+from torchvision import datasets
 from torch.utils.data import DataLoader
 
 
-# ## Load data
+# ## Test Model
 
 from torchvision import models
-from torchvision.transforms import Compose, Resize, RandomCrop, RandomHorizontalFlip, RandomVerticalFlip, ToTensor, Normalize
-
-# Define preprocessing pipeline
-train_transform = Compose([
-    Resize((256, 256)),
-    RandomCrop((224, 224)),
-    RandomHorizontalFlip(),
-    ToTensor(),
-    Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
-])
-
-eval_transform = Compose([
-    ToTensor(),
-    Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
-])
-
-cifar100_train = datasets.CIFAR100(root=RAW_DATA_DIR, train=True, download=True, transform=train_transform)
-cifar100_test = datasets.CIFAR100(root=RAW_DATA_DIR, train=False, download=True, transform=eval_transform)
-
-
-train_dataloader = DataLoader(cifar100_train)
-test_dataloader = DataLoader(cifar100_test)
-
-
-# # Stack all images into a single tensor
-# all_images = torch.cat([cifar100_train[i][0].unsqueeze(0) for i in range(len(cifar100_train))], dim=0)
-
-# print(all_images.shape)
-
-# # Calculate mean and std for each channel (RGB)
-# mean = all_images.mean(dim=(0, 2, 3))  # Mean across batch, height, and width
-# std = all_images.std(dim=(0, 2, 3))    # Std across batch, height, and width
-
-# print(f"Mean: {mean}")
-# print(f"Std: {std}")
-
-
-# ## Train Model
+from torchvision.transforms import Compose, Normalize, ToTensor
 
 import requests
 from IPython.display import display
@@ -81,7 +42,7 @@ imagenet_transform = Compose([
 # Preprocess the image
 input_tensor = imagenet_transform(img).unsqueeze(0)  # Add batch dimension
 
-# Move to device (CPU or GPU)
+# Move to device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 input_tensor = input_tensor.to(device)
@@ -97,23 +58,69 @@ imagenet_classes = requests.get(imagenet_classes_url).json()
 # Get the predicted label string
 predicted_label = output.argmax(dim=1).item()
 predicted_label_str = imagenet_classes[predicted_label]
-print("Predicted label:", predicted_label_str)
+print(f"Predicted label: {predicted_label_str} ({predicted_label})")
 
+
+# ## Load data
+
+from torchvision import models
+from torchvision.transforms import Compose, Resize, RandomCrop, RandomHorizontalFlip, RandomVerticalFlip, Normalize, ToTensor
+
+# Define preprocessing pipeline
+train_transform = Compose([
+    Resize((256, 256)),
+    RandomCrop((224, 224)),
+    RandomHorizontalFlip(),
+    RandomVerticalFlip(),
+    ToTensor(),
+    Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
+])
+
+eval_transform = Compose([
+    ToTensor(),
+    Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
+])
+
+cifar100_train = datasets.CIFAR100(root=RAW_DATA_DIR, train=True, download=True, transform=train_transform)
+cifar100_test = datasets.CIFAR100(root=RAW_DATA_DIR, train=False, download=True, transform=eval_transform)
+
+
+train_dataloader = DataLoader(cifar100_train)
+test_dataloader = DataLoader(cifar100_test)
+
+
+# Uncomment to extract mean and var
+# WARNING: DO NOT RUN IF YOU APPLY OTHER TRANSOFRMATIONS THAN ToTensor()
+
+# # Stack all images into a single tensor
+# all_images = torch.cat([cifar100_train[i][0].unsqueeze(0) for i in range(len(cifar100_train))], dim=0)
+
+# print(all_images.shape)
+
+# # Calculate mean and std for each channel (RGB)
+# mean = all_images.mean(dim=(0, 2, 3))  # Mean across batch, height, and width
+# std = all_images.std(dim=(0, 2, 3))    # Std across batch, height, and width
+
+# print(f"Mean: {mean}")
+# print(f"Std: {std}")
+
+
+# ## Train Model
 
 # Load model from torch
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = torch.hub.load('facebookresearch/dino:main', 'dino_vits16', pretrained=True)
 model.head = nn.Sequential(
-    Linear(384, 1024),
+    nn.Linear(384, 1024),
     nn.ReLU(),
-    Linear(1024, 1024),
+    nn.Linear(1024, 1024),
     nn.ReLU(),
-    Linear(1024, 1024),
+    nn.Linear(1024, 1024),
     nn.ReLU(),
-    Linear(1024, 1024),
+    nn.Linear(1024, 1024),
     nn.ReLU(),
-    Linear(1024, 100),
+    nn.Linear(1024, 100),
 )
 def initialize_weights(layer):
     if isinstance(layer, nn.Linear):
