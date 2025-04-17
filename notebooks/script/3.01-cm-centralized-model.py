@@ -111,28 +111,27 @@ test_dataloader = DataLoader(cifar100_test)
 
 from timm.layers import DropPath
 
-# Load model from torch
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 dropout_rate = 0.1      # Dropout rate for MLP and attention layers
-drop_path_rate = 0.1    # DropPath rate for stochastic depth
+drop_path_rate = 0.1    # DropPath rate for stochastic depth (drops some residuals)
 
-# Eventually TODO for avoiding overfitting: provide dropout, drop_path within the ViT, and dropout in the head
+# Load model from torch
 model = torch.hub.load('facebookresearch/dino:main', 'dino_vits16', pretrained=True)
 model.head = nn.Sequential(
     nn.Linear(384, 1024),
     nn.ReLU(),
-    nn.Dropout(p=dropout_rate),  # Add dropout
+    nn.Dropout(p=dropout_rate),
     nn.Linear(1024, 1024),
     nn.ReLU(),
-    nn.Dropout(p=dropout_rate),  # Add dropout
+    nn.Dropout(p=dropout_rate),
     nn.Linear(1024, 1024),
     nn.ReLU(),
-    nn.Dropout(p=dropout_rate),  # Add dropout
+    nn.Dropout(p=dropout_rate),
     nn.Linear(1024, 1024),
     nn.ReLU(),
-    nn.Dropout(p=dropout_rate),  # Add dropout
+    nn.Dropout(p=dropout_rate),
     nn.Linear(1024, 100),
 )
 def initialize_weights(layer):
@@ -151,8 +150,8 @@ for block in model.blocks:
 
 # Add DropPath to transformer blocks
 for i, block in enumerate(model.blocks):
-    drop_prob = drop_path_rate * (i / len(model.blocks))  # Linearly scale drop rate
-    block.drop_path = DropPath(drop_prob)  # Replace Identity with DropPath
+    drop_prob = drop_path_rate * (i / len(model.blocks))  # Linearly scale drop rate through blocks
+    block.drop_path = DropPath(drop_prob)  # DropPath
 
 # Freeze whole model
 for param in model.parameters():
