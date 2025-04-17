@@ -15,32 +15,49 @@ def train_one_epoch(
     """
     Trains the model for one epoch using the provided dataloader, optimizer, and loss function.
     """
+    # Get the device where the model is located
     device = next(model.parameters()).device
+    # Set the model to training mode
     model.train()
 
+    # Initialize variables to track total loss, correct predictions, and total samples
     total_loss, correct, total = 0.0, 0, 0
     for batch_idx, (X, y) in enumerate(dataloader):
+        # Move input data and labels to the same device as the model
         X, y = X.to(device), y.to(device)
+        # Zero the gradients for the optimizer
         optimizer.zero_grad()
 
+        # Perform a forward pass through the model
         logits = model(X)
+        # Compute the loss using the criterion
         loss = criterion(logits, y)
+        # Backpropagate the loss
         loss.backward()
+        # Update the model's parameters
         optimizer.step()
 
+        # Accumulate the total loss
         total_loss += loss.item()
+        # Get the predicted class labels
         _, predicted = torch.max(logits, 1)
+        # Count the number of correct predictions in the batch
         batch_correct = (predicted == y).sum().item()
+        # Get the total number of samples in the batch
         batch_total = y.size(0)
 
+        # Update the total correct predictions and total samples
         correct += batch_correct
         total += batch_total
 
+        # Print progress every 10 batches if verbose is enabled
         if verbose and batch_idx % 10 == 0:
             print(
                 f"  ↳ Batch {batch_idx + 1}/{len(dataloader)} | Loss: {loss.item():.4f}"
             )
+    # Compute the average training loss for the epoch
     training_loss = total_loss / len(dataloader)
+    # Compute the training accuracy for the epoch
     training_accuracy = correct / total
     return training_loss, training_accuracy
 
@@ -63,34 +80,41 @@ def train(
     Trains a model for a specified number of epochs, saving checkpoints periodically.
     """
 
+    # Generate a random prefix/name for the model if none is provided
     if not prefix:
         prefix = generate_goofy_name(checkpoint_dir)
         print(f"No prefix/name for the model was provided, choosen prefix/name: {prefix}")
 
     for epoch in range(1, num_epochs + 1):
-        # Train on the current epoch
+        # Train the model for one epoch
         train_loss, training_accuracy = train_one_epoch(
             dataloader=train_dataloader, model=model, criterion=criterion, optimizer=optimizer, verbose=verbose
         )
+        # Print training results for the current epoch
         print(
-            f"🚀 Epoch [{epoch}/{num_epochs}] Completed ({100*epoch/num_epochs:.2f})\n"
+            f"🚀 Epoch [{epoch}/{num_epochs}] Completed ({100*epoch/num_epochs:.2f}%)\n"
             f"\t📊 Training Loss: {train_loss:.4f}\n"
             f"\t✅ Training Accuracy: {100 * training_accuracy:.2f}%"
         )
         
-        # Immediately evaluate out-of-distribution accuracy
+        # Evaluate the model on the validation dataset
         validation_loss, validation_accuracy = eval(
             dataloader=val_dataloader, model=model, criterion=criterion
         )
+        # Print validation results for the current epoch
         print(
             f"🔍 Validation Results:\n"
             f"\t📉 Validation Loss: {validation_loss:.4f}\n"
             f"\t🎯 Validation Accuracy: {100 * validation_accuracy:.2f}%"
         )
 
+        # Update the learning rate scheduler if provided
         if scheduler:
             scheduler.step()
 
+        # Save the model checkpoint periodically based on save_every
         if save_every and epoch % save_every == 0:
+            # Calculate the saving epoch number
             saving_epoch = start_epoch + epoch - 1
+            # Save the model, optimizer, and scheduler state
             save(checkpoint_dir, prefix, model, optimizer, scheduler, epoch=saving_epoch)

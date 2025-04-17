@@ -74,7 +74,7 @@ train(
     model=model,
     optimizer=optimizer,
     scheduler=None,
-    verbose=True,
+    verbose=False,
 )
 
 
