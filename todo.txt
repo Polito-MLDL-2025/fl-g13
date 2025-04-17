@@ -17,6 +17,7 @@
     X add comments
     X reorder parameters signature
     X resedisgn train save and load signatures
+    - typing parameter in fl_g13 code
     - plots of loss, stats and similar (using wandb? or maybe doing them by hand in the karpathy way?)
         - lossi (list of losses to plot later)
         - plot image maps of activations in neurons

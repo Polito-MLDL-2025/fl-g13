@@ -64,19 +64,21 @@ print(f"Predicted label: {predicted_label_str} ({predicted_label})")
 # ## Load data
 
 from torchvision import models
-from torchvision.transforms import Compose, Resize, RandomCrop, RandomHorizontalFlip, RandomVerticalFlip, Normalize, ToTensor
+from torchvision.transforms import Compose, Resize, CenterCrop, RandomCrop, RandomHorizontalFlip, RandomVerticalFlip, Normalize, ToTensor
 
 # Define preprocessing pipeline
 train_transform = Compose([
-    Resize((256, 256)),
-    RandomCrop((224, 224)),
+    Resize(256), # CIFRA100 is originally 32x32
+    RandomCrop(224), # But Dino works on 224x224
     RandomHorizontalFlip(),
-    RandomVerticalFlip(),
+    #RandomVerticalFlip(), # Dino was not pretrained with Vertical flip, lets avoid
     ToTensor(),
     Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
 ])
 
 eval_transform = Compose([
+    Resize(256), # CIFRA100 is originally 32x32
+    CenterCrop(224), # But Dino works on 224x224
     ToTensor(),
     Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
 ])
