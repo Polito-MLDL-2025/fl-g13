@@ -107,7 +107,7 @@ def load_data_client(context: Context):
 
 from fl_g13.fl_pytorch.client_app import get_client_app
 
-configs={'local-epochs':1}
+config={'local-epochs':1}
 client = get_client_app(load_data_client,model=net,optimizer=optimizer,criterion=criterion,device=DEVICE,config=config)
 
 
