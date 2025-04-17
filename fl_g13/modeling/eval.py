@@ -23,11 +23,10 @@ def eval(dataloader, model, criterion, verbose=False):
 
             correct += batch_correct
             total += batch_total
-            batch_acc = batch_correct / batch_total
 
-            if verbose:
+            if verbose and batch_idx % 10 == 0:
                 print(
-                    f"  ↳ Batch {batch_idx + 1}/{len(dataloader)} | Loss: {loss.item():.4f} | Batch Acc: {100 * batch_acc:.2f}%"
+                    f"  ↳ Batch {batch_idx + 1}/{len(dataloader)} | Loss: {loss.item():.4f}"
                 )
 
     test_avg_loss = total_loss / len(dataloader)
