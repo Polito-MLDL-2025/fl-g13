@@ -1,7 +1,7 @@
 import torch
 
 from fl_g13.modeling.load import save
-from fl_g13.modeling.test import test
+from fl_g13.modeling.eval import eval
 from fl_g13.modeling.utils import generate_goofy_name
 
 
@@ -17,13 +17,13 @@ def train_one_epoch(model, optimizer, dataloader, criterion, verbose=False):
         X, y = X.to(device), y.to(device)
         optimizer.zero_grad()
 
-        pred = model(X)
-        loss = criterion(pred, y)
+        logits = model(X)
+        loss = criterion(logits, y)
         loss.backward()
         optimizer.step()
 
         total_loss += loss.item()
-        _, predicted = torch.max(pred, 1)
+        _, predicted = torch.max(logits, 1)
         total += y.size(0)
         correct += (predicted == y).sum().item()
 
@@ -71,13 +71,13 @@ def train(
         )
         
         # Immediately evaluate out-of-distribution accuracy
-        test_avg_loss, validation_accuracy = test(
+        validation_avg_loss, validation_accuracy = eval(
             model, val_dataloader, criterion
         )
         print(
             f"🔍 Validation Results:\n"
-            f"\t📉 Test Loss: {test_avg_loss:.4f}\n"
-            f"\t🎯 Test Accuracy: {100 * validation_accuracy:.2f}%"
+            f"\t📉 Validation Loss: {validation_avg_loss:.4f}\n"
+            f"\t🎯 Validation Accuracy: {100 * validation_accuracy:.2f}%"
         )
 
         if scheduler:

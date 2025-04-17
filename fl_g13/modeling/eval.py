@@ -1,7 +1,7 @@
 import torch
 
 
-def test(model, dataloader, criterion):
+def eval(model, dataloader, criterion):
     """
     Evaluate the model on the given dataloader using the specified loss function.
     """
@@ -12,11 +12,11 @@ def test(model, dataloader, criterion):
     with torch.no_grad():
         for X, y in dataloader:
             X, y = X.to(device), y.to(device)
-            pred = model(X)
-            loss = criterion(pred, y)
+            logits = model(X)
+            loss = criterion(logits, y)
 
             total_loss += loss.item()
-            correct += (pred.argmax(dim=1) == y).sum().item()
+            correct += (logits.argmax(dim=1) == y).sum().item()
             total += y.size(0)
 
     test_loss = total_loss / len(dataloader)

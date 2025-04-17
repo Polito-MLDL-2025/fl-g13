@@ -6,7 +6,7 @@ get_ipython().run_line_magic('autoreload', '2')
 
 
 from fl_g13.config import RAW_DATA_DIR
-from fl_g13.modeling import train, test, save, load
+from fl_g13.modeling import train, eval, save, load
 
 import torch
 import torch.nn as nn
@@ -109,7 +109,9 @@ test_dataloader = DataLoader(cifar100_test)
 
 # Load model from torch
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device: {device}")
 
+# Eventually TODO for avoiding overfitting: provide dropout, drop_path within the ViT, and dropout in the head
 model = torch.hub.load('facebookresearch/dino:main', 'dino_vits16', pretrained=True)
 model.head = nn.Sequential(
     nn.Linear(384, 1024),
@@ -134,8 +136,8 @@ model.head.apply(initialize_weights)
 for param in model.parameters():
     param.requires_grad = False
 
-# Allow to access some of the blocks
-for param in model.blocks[-4:].parameters():
+# Allow to access some of the blocks in the backbone
+for param in model.blocks[-3:].parameters():
     param.requires_grad = True
 
 # Also allow the LayerNorm
@@ -155,7 +157,7 @@ CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
 batch_size = 128
 start_epoch = 1
 num_epochs = 50
-save_every = 5
+save_every = 1
 
 # Optimizer and loss
 optimizer = optim.SGD(model.parameters(), lr=0.001)
