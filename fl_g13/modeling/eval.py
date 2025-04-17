@@ -29,7 +29,7 @@ def eval(dataloader, model, criterion, verbose=False):
                     f"  ↳ Batch {batch_idx + 1}/{len(dataloader)} | Loss: {loss.item():.4f}"
                 )
 
-    test_avg_loss = total_loss / len(dataloader)
+    test_loss = total_loss / len(dataloader)
     test_accuracy = correct / total
 
-    return test_avg_loss, test_accuracy
+    return test_loss, test_accuracy
