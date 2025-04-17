@@ -11,8 +11,9 @@ def eval(dataloader, model, criterion, verbose=False):
     # Set the model to evaluation mode
     model.eval()
 
-    # Initialize variables to track total loss, correct predictions, and total samples
+    # Initialize variables to track total loss, correct predictions, total samples, and per-batch losses
     total_loss, correct, total = 0.0, 0, 0
+    iteration_losses = []
     # Disable gradient computation for evaluation
     with torch.no_grad():
         # Iterate over batches in the dataloader
@@ -26,6 +27,8 @@ def eval(dataloader, model, criterion, verbose=False):
 
             # Accumulate the loss
             total_loss += loss.item()
+            # Append the current batch loss to the list
+            iteration_losses.append(loss.item())
             # Get the predicted class labels
             _, predicted = torch.max(logits, 1)
             # Count the number of correct predictions in the batch
@@ -46,5 +49,5 @@ def eval(dataloader, model, criterion, verbose=False):
     # Compute the overall accuracy
     test_accuracy = correct / total
 
-    # Return the average loss and accuracy
-    return test_loss, test_accuracy
+    # Return the average loss, accuracy, and per-batch losses
+    return test_loss, test_accuracy, iteration_losses

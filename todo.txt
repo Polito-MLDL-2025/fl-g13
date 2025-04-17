@@ -19,7 +19,7 @@
     X resedisgn train save and load signatures
     - typing parameter in fl_g13 code
     - plots of loss, stats and similar (using wandb? or maybe doing them by hand in the karpathy way?)
-        - lossi (list of losses to plot later)
+        X lossi and acci (list of losses to plot later)
         - plot image maps of activations in neurons
         - plot saturations plots of activation layers
         - plot gradient to data ratios (should be among -2 and -3 in a log10 scale)\

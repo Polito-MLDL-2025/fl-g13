@@ -178,13 +178,18 @@ CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
 # Parameters
 batch_size = 128
 start_epoch = 1
-num_epochs = 10
+num_epochs = 5
 save_every = 1
 
 # Optimizer and loss
 optimizer = optim.SGD(model.parameters(), lr=0.001)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 criterion = torch.nn.CrossEntropyLoss()
+
+all_training_losses=[]       # Pre-allocated list for training losses
+all_validation_losses=[]     # Pre-allocated list for validation losses
+all_training_accuracies=[]   # Pre-allocated list for training accuracies
+all_validation_accuracies=[] # Pre-allocated list for validation accuracies
 
 # Train the model and save periodically
 train(
@@ -200,7 +205,36 @@ train(
     optimizer=optimizer,
     scheduler=scheduler,
     verbose=False,
+    all_training_losses=all_training_losses,  # Pre-allocated list for training losses
+    all_validation_losses=all_validation_losses,  # Pre-allocated list for validation losses
+    all_training_accuracies=all_training_accuracies,  # Pre-allocated list for training accuracies
+    all_validation_accuracies=all_validation_accuracies,  # Pre-allocated list for validation accuracies
 )
+
+
+import matplotlib.pyplot as plt
+
+# Plot losses
+plt.figure(figsize=(12, 6))
+plt.subplot(1, 2, 1)
+plt.plot(all_training_losses, label='Training Loss')
+plt.plot(all_validation_losses, label='Validation Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('Loss vs Epochs')
+plt.legend()
+
+# Plot accuracies
+plt.subplot(1, 2, 2)
+plt.plot(all_training_accuracies, label='Training Accuracy')
+plt.plot(all_validation_accuracies, label='Validation Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.title('Accuracy vs Epochs')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
 
 
 
