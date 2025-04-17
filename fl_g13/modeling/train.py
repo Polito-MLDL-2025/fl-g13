@@ -13,7 +13,7 @@ def train_one_epoch(model, optimizer, dataloader, criterion, verbose=False):
     model.train()
 
     total_loss, correct, total = 0.0, 0, 0
-    for batch, (X, y) in enumerate(dataloader):
+    for batch_idx, (X, y) in enumerate(dataloader):
         X, y = X.to(device), y.to(device)
         optimizer.zero_grad()
 
@@ -24,15 +24,17 @@ def train_one_epoch(model, optimizer, dataloader, criterion, verbose=False):
 
         total_loss += loss.item()
         _, predicted = torch.max(logits, 1)
-        total += y.size(0)
-        correct += (predicted == y).sum().item()
+        batch_correct = (predicted == y).sum().item()
+        batch_total = y.size(0)
+
+        correct += batch_correct
+        total += batch_total
+        batch_acc = batch_correct / batch_total
 
         if verbose:
-            batch_acc = correct / total
             print(
-                f"  ↳ Batch {batch + 1}/{len(dataloader)} | Loss: {loss.item():.4f} | Batch Acc: {100 * batch_acc:.2f}%"
+                f"  ↳ Batch {batch_idx + 1}/{len(dataloader)} | Loss: {loss.item():.4f} | Batch Acc: {100 * batch_acc:.2f}%"
             )
-
     training_loss = total_loss / len(dataloader)
     training_accuracy = correct / total
     return training_loss, training_accuracy
