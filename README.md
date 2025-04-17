@@ -97,6 +97,41 @@ Federated Learning Project, Group 13
 
 ## How to contribute
 
+### **Commit Message and Branch Naming Rules**
+
+1. **Commit Message Format**
+    - Use the following format for commit messages:
+      ```
+      <type>: <short description>
+      ```
+    - **Types**:
+      - `feat`: A new feature
+      - `fix`: A bug fix
+      - `docs`: Documentation changes
+      - `style`: Code style changes (formatting, missing semicolons, etc.)
+      - `refactor`: Code refactoring without adding features or fixing bugs
+    - Example:
+      ```
+      feat: add data preprocessing pipeline
+      fix: resolve issue with model training script
+      ```
+
+2. **Branch Naming Convention**
+    - Use the following format for branch names:
+      ```
+      <type>-<short-description>-<initials>
+      ```
+    - **Types**:
+      - `feat`: For new features
+      - `fix`: For bug fixes
+      - `docs`: For documentation updates
+      - `refactor`: For refactoring tasks
+    - Example:
+      ```
+      feat-add-preprocessing-pipeline-pjb
+      fix-model-training-bug-mc
+      ```
+
 ### **Jupyter Notebook Usage**
 
 1. **Notebook Organization**
