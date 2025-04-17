@@ -15,3 +15,7 @@
     X rework README file
     X use of tensors in returns of test values, is it strictly necessary?
     - plots of loss, stats and similar (using wandb? or maybe by hand in the karpathy way)
+    - add comments
+    - reorder parameters signature
+    - resedisgn train save and load signatures
+    - data/raw -> data
