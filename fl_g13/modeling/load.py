@@ -55,9 +55,7 @@ def load(path, model, optimizer, scheduler=None, device=None):
     # Check if the path is a directory
     if os.path.isdir(path):
         # Get all checkpoint files in the directory, sorted by modification time
-        checkpoint_files = sorted(
-            glob.glob(os.path.join(path, "*.pth")), key=os.path.getmtime
-        )
+        checkpoint_files = sorted(glob.glob(os.path.join(path, "*.pth")), key=os.path.getmtime)
         # Raise an error if no checkpoint files are found
         if not checkpoint_files:
             raise FileNotFoundError(f"No checkpoint found in directory: {path}")

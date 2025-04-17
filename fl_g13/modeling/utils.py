@@ -80,6 +80,7 @@ nouns = [
     "clefairy",
 ]
 
+
 def generate_goofy_name(folder_path=None):
     taken_names = set()
 

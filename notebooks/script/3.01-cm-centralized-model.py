@@ -15,7 +15,7 @@ from torchvision import datasets
 from torch.utils.data import DataLoader
 
 
-# ## Test Model
+# ## Boilerplate usecase of Dino
 
 from torchvision import models
 from torchvision.transforms import Compose, Normalize, ToTensor
@@ -107,21 +107,30 @@ test_dataloader = DataLoader(cifar100_test)
 
 # ## Train Model
 
+from timm.models.layers import DropPath
+
 # Load model from torch
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device: {device}")
+
+dropout_rate = 0.1      # Dropout rate for MLP and attention layers
+drop_path_rate = 0.1    # DropPath rate for stochastic depth
 
 # Eventually TODO for avoiding overfitting: provide dropout, drop_path within the ViT, and dropout in the head
 model = torch.hub.load('facebookresearch/dino:main', 'dino_vits16', pretrained=True)
 model.head = nn.Sequential(
     nn.Linear(384, 1024),
     nn.ReLU(),
+    nn.Dropout(p=dropout_rate),  # Add dropout
     nn.Linear(1024, 1024),
     nn.ReLU(),
+    nn.Dropout(p=dropout_rate),  # Add dropout
     nn.Linear(1024, 1024),
     nn.ReLU(),
+    nn.Dropout(p=dropout_rate),  # Add dropout
     nn.Linear(1024, 1024),
     nn.ReLU(),
+    nn.Dropout(p=dropout_rate),  # Add dropout
     nn.Linear(1024, 100),
 )
 def initialize_weights(layer):
@@ -131,6 +140,17 @@ def initialize_weights(layer):
             torch.nn.init.zeros_(layer.bias)
 
 model.head.apply(initialize_weights)
+
+# Add dropout to attention layers
+for block in model.blocks:
+    block.attn.attn_drop = nn.Dropout(p=dropout_rate)  # Dropout in attention
+    block.attn.proj_drop = nn.Dropout(p=dropout_rate)  # Dropout in projection
+    block.mlp.drop = nn.Dropout(p=dropout_rate)  # Dropout in MLP
+
+# Add DropPath to transformer blocks
+for i, block in enumerate(model.blocks):
+    drop_prob = drop_path_rate * (i / len(model.blocks))  # Linearly scale drop rate
+    block.drop_path = DropPath(drop_prob)  # Replace Identity with DropPath
 
 # Freeze whole model
 for param in model.parameters():
@@ -156,7 +176,7 @@ CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
 # Parameters
 batch_size = 128
 start_epoch = 1
-num_epochs = 50
+num_epochs = 10
 save_every = 1
 
 # Optimizer and loss
@@ -177,7 +197,7 @@ train(
     criterion=criterion,
     optimizer=optimizer,
     scheduler=scheduler,
-    verbose=True,
+    verbose=False,
 )
 
 

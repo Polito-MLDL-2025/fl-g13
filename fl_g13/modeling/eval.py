@@ -39,9 +39,7 @@ def eval(dataloader, model, criterion, verbose=False):
 
             # If verbose is enabled, print progress every 10 batches
             if verbose and batch_idx % 10 == 0:
-                print(
-                    f"  ↳ Batch {batch_idx + 1}/{len(dataloader)} | Loss: {loss.item():.4f}"
-                )
+                print(f"  ↳ Batch {batch_idx + 1}/{len(dataloader)} | Loss: {loss.item():.4f}")
 
     # Compute the average loss over all batches
     test_loss = total_loss / len(dataloader)

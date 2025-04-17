@@ -1,17 +1,13 @@
+import time
+
 import torch
 
-from fl_g13.modeling.load import save
 from fl_g13.modeling.eval import eval
+from fl_g13.modeling.load import save
 from fl_g13.modeling.utils import generate_goofy_name
 
 
-def train_one_epoch(
-    dataloader, 
-    model, 
-    criterion, 
-    optimizer, 
-    verbose=False
-):
+def train_one_epoch(dataloader, model, criterion, optimizer, verbose=False):
     """
     Trains the model for one epoch using the provided dataloader, optimizer, and loss function.
     """
@@ -52,9 +48,7 @@ def train_one_epoch(
 
         # Print progress every 10 batches if verbose is enabled
         if verbose and batch_idx % 10 == 0:
-            print(
-                f"  ↳ Batch {batch_idx + 1}/{len(dataloader)} | Loss: {loss.item():.4f}"
-            )
+            print(f"  ↳ Batch {batch_idx + 1}/{len(dataloader)} | Loss: {loss.item():.4f}")
     # Compute the average training loss for the epoch
     training_loss = total_loss / len(dataloader)
     # Compute the training accuracy for the epoch
@@ -86,17 +80,30 @@ def train(
         print(f"No prefix/name for the model was provided, choosen prefix/name: {prefix}")
 
     for epoch in range(1, num_epochs + 1):
+        start_time = time.time()
+
         # Train the model for one epoch
         train_loss, training_accuracy = train_one_epoch(
-            dataloader=train_dataloader, model=model, criterion=criterion, optimizer=optimizer, verbose=verbose
+            dataloader=train_dataloader,
+            model=model,
+            criterion=criterion,
+            optimizer=optimizer,
+            verbose=verbose,
         )
+        # Calculate elapsed time and estimate time remaining
+        elapsed_time = time.time() - start_time
+        eta = elapsed_time * (num_epochs - epoch)
+
         # Print training results for the current epoch
         print(
-            f"🚀 Epoch [{epoch}/{num_epochs}] Completed ({100*epoch/num_epochs:.2f}%)\n"
+            f"🚀 Epoch {epoch}/{num_epochs} ({100 * epoch / num_epochs:.2f}%) Completed\n"
             f"\t📊 Training Loss: {train_loss:.4f}\n"
-            f"\t✅ Training Accuracy: {100 * training_accuracy:.2f}%"
+            f"\t✅ Training Accuracy: {100 * training_accuracy:.2f}%\n"
+            f"\t⏳ Elapsed Time: {elapsed_time:.2f}s | ETA: {eta:.2f}s"
         )
-        
+
+        print()
+
         # Evaluate the model on the validation dataset
         validation_loss, validation_accuracy = eval(
             dataloader=val_dataloader, model=model, criterion=criterion

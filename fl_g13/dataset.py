@@ -14,6 +14,8 @@ from fl_g13.config import RAW_DATA_DIR
 
 app = typer.Typer()
 
+# TODO add changes made by thanh
+
 
 def check_distribution(dataset, name="Dataset"):
     labels = [dataset[i][1] for i in range(len(dataset))]
@@ -22,6 +24,7 @@ def check_distribution(dataset, name="Dataset"):
     print(dict(sorted(dist.items())))
 
 
+# TODO remove random state default parameter
 def train_test_split(dataset, train_ratio=0.8, random_state=42):
     targets = np.array(dataset.targets)
     sss = StratifiedShuffleSplit(n_splits=1, train_size=train_ratio, random_state=random_state)
