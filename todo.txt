@@ -13,5 +13,5 @@
     X clean interfaces
     X rework codebase (e.g., why model and optimizers as parameters for load_or_create? Should split load_or_create in two distinc functions etc.)
     X rework README file
-    - use of tensors in returns of test values, is it strictly necessary?
-    - 
+    X use of tensors in returns of test values, is it strictly necessary?
+    - plots of loss, stats and similar (using wandb? or maybe by hand in the karpathy way)
