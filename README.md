@@ -68,11 +68,10 @@ Federated Learning Project, Group 13
 │
 ├── models             <- Trained and serialized models, model predictions, or model summaries
 │
-├── checkpoints        <- Checkpoints created during training 
-    │
-    └── ModelClass
-        │
-        └── name_modelclass_epoch_i.pth
+├── checkpoints        <- Folder for storning checkpoints created during training (the folder you mount in drive)
+│   └── ModelClass     <- Sub-folder for storing models of a certain class, automaitcally created
+│       └── runName_modelclass_epoch_i.pth
+│
 ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
 │                         the creator's initials, and a short `-` delimited description, e.g.
 │                         `1.0-jqp-initial-data-exploration`.

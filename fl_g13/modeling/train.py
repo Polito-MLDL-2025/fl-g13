@@ -107,7 +107,7 @@ def train(
     
     Args:
         checkpoint_dir (str): Directory where model checkpoints will be saved.
-        prefix (str): Prefix or name for the model checkpoints. If not provided, a random name will be generated.
+        name (str): Prefix or name for the model checkpoints. If not provided, a random name will be generated.
         start_epoch (int): Starting epoch number (useful for resuming training).
         num_epochs (int): Total number of epochs to train the model.
         save_every (int): Frequency (in epochs) to save model checkpoints.
