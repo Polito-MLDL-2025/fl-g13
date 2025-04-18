@@ -11,8 +11,6 @@ import numpy as np
 from torchvision import datasets, transforms
 from collections import Counter
 
-from fl_g13.base_experimentation import dataset_handler
-
 
 # ## Load data
 
@@ -73,23 +71,26 @@ plot_distribution(test_dist, "Class Distribution (Test)")
 
 # ## Train, val split
 
+from fl_g13.dataset import iid_sharding, non_iid_sharding, train_test_split, check_subset_distribution
+
+
 ### train val split
-train_dataset,val_dataset = dataset_handler.train_test_split(cifar100_train,train_ratio=0.8)
+train_dataset, val_dataset = train_test_split(cifar100_train,train_ratio=0.8)
 
 
 # **Check distribution**
 
-dataset_handler.check_subset_distribution(val_dataset)
+check_subset_distribution(val_dataset)
 
 
 # ## I.I.D Sharding Split
 
 ## k client
 k =10
-clients_dataset= dataset_handler.iid_sharding(cifar100_train,k)
+clients_dataset= iid_sharding(cifar100_train,k)
 
 
-dataset_handler.check_subset_distribution(clients_dataset[0])
+check_subset_distribution(clients_dataset[0])
 
 
 # ## Non I.I.D Sharding Split
@@ -97,11 +98,8 @@ dataset_handler.check_subset_distribution(clients_dataset[0])
 ## k client , nc = 2
 k =10
 nc = 2 
-non_iid_clients_dataset= dataset_handler.non_iid_sharding(cifar100_train,k,keep_random=nc)
+non_iid_clients_dataset= non_iid_sharding(cifar100_train,k,keep_random=nc)
 
 
-dataset_handler.check_subset_distribution(non_iid_clients_dataset[0])
-
-
-
+check_subset_distribution(non_iid_clients_dataset[0])
 

@@ -1,0 +1,26 @@
+## Todo
+
+- [ ] Clean codebase
+    X rename modeling/ultis in modeling/utlis
+    X remove references, docs?
+    X remove plots.py, features.py?
+    X remove modeling/predict.py?
+    X move dataset_handler.py to parent folder or modeling?
+    X remove unused @app.commands (datasets.py)?
+    X save data in the correct folder (as done in class)
+    X provide versioning in requirements.txt for future use
+    X auto install nbautoexports using requirements.txt
+    X clean interfaces
+    X rework codebase (e.g., why model and optimizers as parameters for load_or_create? Should split load_or_create in two distinc functions etc.)
+    X rework README file
+    X use of tensors in returns of test values, is it strictly necessary?
+    X add comments
+    X reorder parameters signature
+    X resedisgn train save and load signatures
+    - typing parameter in fl_g13 code
+    - plots of loss, stats and similar
+        X lossi and acci (list of losses to plot later)
+        - plot image maps of activations in neurons
+        - plot saturations plots of activation layers
+        - plot gradient to data ratios (should be among -2 and -3 in a log10 scale)\
+        - see https://github.com/karpathy/nn-zero-to-hero/blob/master/lectures/makemore/makemore_part3_bn.ipynb
