@@ -96,6 +96,8 @@ _, _, _, _ = train(
 
 # This will train again the same model, but with a custom name
 # The epochs will still start from 1
+# NOTE: If a checkpoint with the exact same model name, 
+# model class and epoch number exists, it will be overwritten!!!
 _, _, _, _ = train(
     checkpoint_dir=checkpoint_dir,
     name="ditto", # Setting a name for the model
@@ -119,14 +121,14 @@ from fl_g13.modeling import load
 # Load the model from the latest checkpoint (a specific file!)
 path = f"{checkpoint_dir}/TinyCNN/ditto_TinyCNN_epoch_2.pth"
 # Note: make sure to define a _config parameter and a from_config method in the model class
-model2, start_epoch = load(path=path, model_class=TinyCNN, device=device)
+model2, start_epoch = load(path=path, model_class=TinyCNN, device=device, verbose=True)
 
 
 num_epochs = 4
 save_every = 2
 
 # Now we can continue training the model (model2 now!) from the last checkpoint (which has been loaded)
-# Note again: loading is done by the user in the cell above! It is not done automatically!
+# NOTE again: loading is done by the user in the cell above! It is not done automatically!
 # The start_epoch is now 2 (value returned by the load function)
 _, _, _, _ = train(
     checkpoint_dir=checkpoint_dir,

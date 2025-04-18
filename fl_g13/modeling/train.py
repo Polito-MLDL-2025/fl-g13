@@ -198,7 +198,7 @@ def train(
         # Save the model checkpoint periodically based on save_every
         if save_every and epoch % save_every == 0:
             # Save the model, optimizer, and scheduler state
-            save(checkpoint_dir, name, model, epoch=adjusted_epoch)
+            save(checkpoint_dir=checkpoint_dir, prefix=name, model=model, epoch=adjusted_epoch, optimizer=optimizer, scheduler=scheduler)
             print()
 
     return all_training_losses, all_validation_losses, all_training_accuracies, all_validation_accuracies
