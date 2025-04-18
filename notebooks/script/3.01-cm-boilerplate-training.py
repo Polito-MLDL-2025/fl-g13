@@ -62,6 +62,7 @@ optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.04)
 criterion = torch.nn.CrossEntropyLoss()
 
 
+# This will train the model, using an automatically generated name
 train(
     checkpoint_dir=checkpoint_dir,
     prefix="", # Will automatically generate a name for the model
@@ -78,6 +79,8 @@ train(
 )
 
 
+# This will train again the same model, but with a custom name
+# The epochs will still start from 1
 train(
     checkpoint_dir=checkpoint_dir,
     prefix="TinyCNN", # Setting a name for the model
@@ -94,16 +97,16 @@ train(
 )
 
 
-# **Resume training**
+# ### Resume training
 
 from fl_g13.modeling import load
 
-# Generate untrained objects
+# Generate untrained model and optimizer
 model2 = TinyCNN(num_classes=100)
 optimizer2 = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.04)
 criterion2 = torch.nn.CrossEntropyLoss()
 
-# Load the model from the latest checkpoint
+# Load the model from the latest checkpoint (a specific file!)
 path = checkpoint_dir + "/TinyCNN_epoch_2.pth"
 start_epoch = load(path=path, model=model2, optimizer=optimizer2, scheduler=None)
 
@@ -111,6 +114,9 @@ start_epoch = load(path=path, model=model2, optimizer=optimizer2, scheduler=None
 num_epochs = 4
 save_every = 2
 
+# Now we can continue training the model (model2 now!) from the last checkpoint (which has been loaded)
+# Note again: loading is done by the user in the cell above! It is not done automatically!
+# The start_epoch is now 2 (value returned by the load function)
 train(
     checkpoint_dir=checkpoint_dir,
     prefix="TinyCNN", # Use the same name as before to continue training!

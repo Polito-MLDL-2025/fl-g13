@@ -137,6 +137,12 @@ def train(
         all_validation_accuracies = []
 
     for epoch in range(1, num_epochs + 1):
+        
+        # Adjust the epoch number for saving checkpoints
+        adjusted_epoch = start_epoch + epoch - 1
+        adjusted_end_epoch = start_epoch + num_epochs - 1
+
+        # Start the timer for the epoch
         start_time = time.time()
 
         # Train the model for one epoch
@@ -158,7 +164,7 @@ def train(
         # Print training results for the current epoch
         current_time = time.strftime("%H:%M", time.localtime())
         print(
-            f"🚀 Epoch {epoch}/{num_epochs} ({100 * epoch / num_epochs:.2f}%) Completed\n"
+            f"🚀 Epoch {adjusted_epoch}/{adjusted_end_epoch} ({100 * adjusted_epoch / adjusted_end_epoch:.2f}%) Completed\n"
             f"\t📊 Training Loss: {train_loss:.4f}\n"
             f"\t✅ Training Accuracy: {100 * training_accuracy:.2f}%\n"
             f"\t⏳ Elapsed Time: {elapsed_time:.2f}s | ETA: {eta:.2f}s\n"
@@ -189,9 +195,8 @@ def train(
         # Save the model checkpoint periodically based on save_every
         if save_every and epoch % save_every == 0:
             # Calculate the saving epoch number
-            saving_epoch = start_epoch + epoch - 1
             # Save the model, optimizer, and scheduler state
-            save(checkpoint_dir, prefix, model, optimizer, scheduler, epoch=saving_epoch)
+            save(checkpoint_dir, prefix, model, optimizer, scheduler, epoch=adjusted_epoch)
             print()
 
     return all_training_losses, all_validation_losses, all_training_accuracies, all_validation_accuracies
