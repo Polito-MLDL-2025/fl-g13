@@ -1,5 +1,17 @@
+from typing import Callable
+
 import torch
 import torch.nn as nn
+
+# === Default configuration constants ===
+DEFAULT_VARIANT = "dino_vits16"
+DEFAULT_HEAD_HIDDEN_SIZE = 1024
+DEFAULT_HEAD_LAYERS = 5
+DEFAULT_UNFREEZE_BLOCKS = 3
+DEFAULT_DROPOUT_RATE = 0.1
+DEFAULT_ACTIVATION = nn.GELU
+DEFAULT_PRETRAINED = True
+DEFAULT_NUM_CLASSES = 100
 
 class BaseDino(nn.Module):
     """
@@ -8,16 +20,18 @@ class BaseDino(nn.Module):
     """
     def __init__(
         self,
-        variant: str = "dino_vits16",
-        dropout_rate: float = 0.1,
-        head_hidden_size: int = 1024,
-        head_layers: int = 5,
-        num_classes: int = 100,
-        unfreeze_blocks: int = 3
+        variant: str = DEFAULT_VARIANT,
+        head_hidden_size: int = DEFAULT_HEAD_HIDDEN_SIZE,
+        head_layers: int = DEFAULT_HEAD_LAYERS,
+        unfreeze_blocks: int = DEFAULT_UNFREEZE_BLOCKS,
+        dropout_rate: float = DEFAULT_DROPOUT_RATE,
+        activation: Callable = DEFAULT_ACTIVATION,
+        pretrained: bool = DEFAULT_PRETRAINED,
+        num_classes: int = DEFAULT_NUM_CLASSES,
     ):
         super().__init__()
         # Load pretrained DINO model backbone (e.g., dino_vits16, dino_vits8)
-        net = torch.hub.load('facebookresearch/dino:main', variant, pretrained=True)
+        net = torch.hub.load('facebookresearch/dino:main', variant, pretrained=pretrained)
         
         # Add dropout to attention and MLP modules
         for block in net.blocks:
@@ -32,7 +46,7 @@ class BaseDino(nn.Module):
         curr_dim = input_dim
         for _ in range(head_layers):
             layers.append(nn.Linear(curr_dim, head_hidden_size))
-            layers.append(nn.ReLU())
+            layers.append(activation())
             layers.append(nn.Dropout(p=dropout_rate))
             curr_dim = head_hidden_size
         layers.append(nn.Linear(curr_dim, num_classes))
@@ -58,14 +72,16 @@ class BaseDino(nn.Module):
 
         self.net = net  # Save the network as self.net
 
-        # Store configuration settings
+        # Store configuration
         self._config = {
             'variant': variant,
             'dropout_rate': dropout_rate,
             'head_hidden_size': head_hidden_size,
             'head_layers': head_layers,
             'num_classes': num_classes,
-            'unfreeze_blocks': unfreeze_blocks
+            'unfreeze_blocks': unfreeze_blocks,
+            'activation_fn': activation.__name__,
+            'pretrained': pretrained
         }
 
     def init_weights(self, head):
@@ -94,12 +110,21 @@ class BaseDino(nn.Module):
 
     @classmethod
     def from_config(cls, config: dict) -> 'BaseDino':
-        """Instantiate the model from a config dict."""
+        # Map string activation name back to class
+        activation_map = {
+            'ReLU': nn.ReLU,
+            'GELU': nn.GELU,
+            'SiLU': nn.SiLU,
+            'ELU': nn.ELU,
+        }
+        act = activation_map.get(config.get('activation_fn', DEFAULT_ACTIVATION.__name__), DEFAULT_ACTIVATION)
         return cls(
-            variant=config.get('variant', 'dino_vits16'),
-            dropout_rate=config.get('dropout_rate', 0.1),
-            head_hidden_size=config.get('head_hidden_size', 1024),
-            head_layers=config.get('head_layers', 5),
-            num_classes=config.get('num_classes', 100),
-            unfreeze_blocks=config.get('unfreeze_blocks', 3)
+            variant=config.get('variant', DEFAULT_VARIANT),
+            dropout_rate=config.get('dropout_rate', DEFAULT_DROPOUT_RATE),
+            head_hidden_size=config.get('head_hidden_size', DEFAULT_HEAD_HIDDEN_SIZE),
+            head_layers=config.get('head_layers', DEFAULT_HEAD_LAYERS),
+            num_classes=config.get('num_classes', DEFAULT_NUM_CLASSES),
+            unfreeze_blocks=config.get('unfreeze_blocks', DEFAULT_UNFREEZE_BLOCKS),
+            activation_fn=act,
+            pretrained=config.get('pretrained', DEFAULT_PRETRAINED),
         )
