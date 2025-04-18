@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-class BaseDinoModel(nn.Module):
+class BaseDino(nn.Module):
     """
     Model class wrapping DINO Vision Transformer (e.g., S16, S8) with a configurable head and dropout.
     Includes utilities for configuration management.
@@ -93,7 +93,7 @@ class BaseDinoModel(nn.Module):
         )
 
     @classmethod
-    def from_config(cls, config: dict) -> 'BaseDinoModel':
+    def from_config(cls, config: dict) -> 'BaseDino':
         """Instantiate the model from a config dict."""
         return cls(
             variant=config.get('variant', 'dino_vits16'),

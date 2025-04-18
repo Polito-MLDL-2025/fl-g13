@@ -1,1 +1,1 @@
-from .BaseDinoModel import BaseDinoModel
+from .BaseDino import BaseDino
