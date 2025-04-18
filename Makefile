@@ -2,81 +2,133 @@
 # GLOBALS                                                                       #
 #################################################################################
 
-PROJECT_NAME = fl-g13
-PYTHON_VERSION = 3.10
-PYTHON_INTERPRETER = python3
+PROJECT_NAME := fl-g13
+PYTHON_VERSION := 3.10
+PYTHON_INTERPRETER := python3
+VENV_DIR := .venv
 
 ifeq ($(OS),Windows_NT)
-    ACTIVATE = $(VENV_DIR)\Scripts\activate.bat
-    PYTHON = $(VENV_DIR)\Scripts\python.exe
+    ACTIVATE := $(VENV_DIR)\Scripts\activate.bat
+    PYTHON := $(VENV_DIR)\Scripts\python.exe
 else
-    ACTIVATE = source $(VENV_DIR)/bin/activate
-    PYTHON = $(VENV_DIR)/bin/python
+    ACTIVATE := source $(VENV_DIR)/bin/activate
+    PYTHON := $(VENV_DIR)/bin/python
+endif
+
+# Check if venv exists and use it, otherwise fallback to system Python
+ifeq ($(shell test -d $(VENV_DIR) && echo 1),1)
+    # If the venv exists, use its Python interpreter
+    PYTHON := $(VENV_DIR)/bin/python
+else
+    # If no venv, fall back to system Python
+    PYTHON := python3
 endif
 
 #################################################################################
 # COMMANDS                                                                      #
 #################################################################################
 
-
-## Install Python dependencies
-.PHONY: requirements
-requirements:
-	$(PYTHON_INTERPRETER) -m pip install -U pip
-	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
-	
-.PHONY: install
-install:
-	. $(VENV_DIR)/bin/activate
-# 	$(VENV_DIR)/bin/pip install --upgrade pip
-	$(VENV_DIR)/bin/pip install -r requirements.txt
-	@echo "Python dependencies installed"
-
-
-## Delete all compiled Python files
-.PHONY: clean
-clean:
-	find . -type f -name "*.py[co]" -delete
-	find . -type d -name "__pycache__" -delete
-	rm -rf $(VENV_DIR)
-	@echo "Virtual environment removed"
-
-
 ## Lint using ruff (use `make format` to do formatting)
 .PHONY: lint
 lint:
+	@echo ""
+	@echo "🔍 ----------------------------------------------------------"
+	@echo "🔍 Running Ruff Linter (checking code formatting and issues)..."
+	@echo "🔍 ----------------------------------------------------------"
+	@echo ""
 	ruff format --check
 	ruff check
+
+	@echo ""
+	@echo "✅ Linting complete. No issues detected (if any)."
+	@echo ""
 
 ## Format source code with ruff
 .PHONY: format
 format:
+	@echo ""
+	@echo "⚙️ ----------------------------------------------------------"
+	@echo "⚙️ Running Ruff Formatter (auto-fixing issues)..."
+	@echo "⚙️ ----------------------------------------------------------"
+	@echo ""
 	ruff check --fix
 	ruff format
 
+	@echo ""
+	@echo "✅ Formatting complete. Code is now formatted."
+	@echo ""
 
-# ## Set up Python interpreter environment
-# .PHONY: create_environment
-# create_environment:
-# 	@bash -c "if [ ! -z `which virtualenvwrapper.sh` ]; then source `which virtualenvwrapper.sh`; mkvirtualenv $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); else mkvirtualenv.bat $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); fi"
-# 	@echo ">>> New virtualenv created. Activate with:\nworkon $(PROJECT_NAME)"
-	
-VENV_DIR = .venv
+## Set up new venv and install requirements
+.PHONY: install
+install:
+	@echo ""
+	@echo "🔧 ----------------------------------------------------------"
+	@echo "🔧 Creating virtual environment (if it doesn't exist)..."
+	@echo "🔧 ----------------------------------------------------------"
+	@echo ""
+	@test -d $(VENV_DIR) || $(PYTHON_INTERPRETER) -m venv $(VENV_DIR)
 
-.PHONY: create_environment
-create_environment:
-	$(PYTHON_INTERPRETER) -m venv $(VENV_DIR)
-	@echo "Virtual environment created in $(VENV_DIR)"
+	@echo ""
+	@echo "📦 Installing Python dependencies..."
+	@echo "📦 ----------------------------------------------------------"
+	@echo ""
+	$(PYTHON) -m pip install --upgrade pip
+	$(PYTHON) -m pip install -r requirements.txt
 
-#################################################################################
-# PROJECT RULES                                                                 #
-#################################################################################
+	@echo ""
+	@echo "✅ Environment setup complete in '$(VENV_DIR)'"
+	@echo ""
 
+## Install only requirements (assumes venv or conda already exists)
+.PHONY: requirements
+requirements:
+	@echo ""
+	@echo "📦 Installing dependencies from requirements.txt..."
+	@echo ""
+	$(PYTHON) -m pip install -r requirements.txt
+	@echo ""
+	@echo "✅ Dependencies installed."
+	@echo ""
 
-## Make dataset
+## Delete all compiled Python files and venv
+.PHONY: clean
+clean:
+	@echo ""
+	@echo "🧹 Cleaning up __pycache__ and .pyc files..."
+	@echo ""
+	find . -type f -name "*.py[co]" -delete
+	find . -type d -name "__pycache__" -delete
+
+	@echo ""
+	@echo "🧨 Removing virtual environment directory..."
+	@echo ""
+	rm -rf $(VENV_DIR)
+
+	@echo ""
+	@echo "✅ Cleanup complete."
+	@echo ""
+
+## Download the dataset
 .PHONY: data
 data: requirements
-	$(PYTHON_INTERPRETER) fl_g13/dataset.py
+	@echo ""
+	@echo "⬇️  Downloading dataset with fl_g13.dataset..."
+	@echo ""
+	$(PYTHON) -m fl_g13.dataset
+	@echo ""
+	@echo "✅ Dataset downloaded successfully."
+	@echo ""
+
+## Export all notebooks in the notebooks/ directory
+.PHONY: export_notebooks
+export_notebooks: requirements
+	@echo ""
+	@echo "📤 Exporting all notebooks in 'notebooks/' using nbautoexport..."
+	@echo ""
+	$(PYTHON) -m nbautoexport export notebooks/
+	@echo ""
+	@echo "✅ Notebooks exported successfully."
+	@echo ""
 
 
 #################################################################################
@@ -95,4 +147,4 @@ endef
 export PRINT_HELP_PYSCRIPT
 
 help:
-	@$(PYTHON_INTERPRETER) -c "${PRINT_HELP_PYSCRIPT}" < $(MAKEFILE_LIST)
+	@$(PYTHON) -c "${PRINT_HELP_PYSCRIPT}" < $(MAKEFILE_LIST)
