@@ -122,6 +122,7 @@ from fl_g13.modeling import load
 path = f"{checkpoint_dir}/TinyCNN/ditto_TinyCNN_epoch_2.pth"
 # Note: make sure to define a _config parameter and a from_config method in the model class
 model2, start_epoch = load(path=path, model_class=TinyCNN, device=device, verbose=True)
+model2.to(device) # Very Important! Passing device to load DO NOT move the model to the device, but its state dict only!
 
 
 num_epochs = 4

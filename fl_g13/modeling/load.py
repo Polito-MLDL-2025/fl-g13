@@ -43,31 +43,42 @@ def save(
     Returns:
         None
     """
+    # Get the name of the model class
     model_name = model.__class__.__name__
+
+    # Create a directory for saving checkpoints specific to the model
     model_dir = os.path.join(checkpoint_dir, model_name)
     os.makedirs(model_dir, exist_ok=True)
 
+    # If no prefix is provided, generate a random one
     if not prefix:
         prefix = generate_goofy_name()
 
+    # Construct the filename for the checkpoint
     filename = os.path.join(model_dir, f"{prefix}_{model_name}_epoch_{epoch}.pth")
 
+    # Create a dictionary to store the checkpoint data
     checkpoint = {
-        ModelKeys.EPOCH.value: epoch,
-        ModelKeys.MODEL_STATE_DICT.value: model.state_dict(),
-        ModelKeys.CONFIG.value: model._config,
-        ModelKeys.MODEL_CLASS.value: model.__class__.__name__,
+        ModelKeys.EPOCH.value: epoch,  # Save the current epoch
+        ModelKeys.MODEL_STATE_DICT.value: model.state_dict(),  # Save model parameters
+        ModelKeys.CONFIG.value: model._config,  # Save model configuration
+        ModelKeys.MODEL_CLASS.value: model.__class__.__name__,  # Save model class name
     }
 
+    # If optimizer is provided, save its state and class name
     if optimizer is not None:
         checkpoint[ModelKeys.OPTIMIZER_STATE_DICT.value] = optimizer.state_dict()
         checkpoint[ModelKeys.OPTIMIZER_CLASS.value] = optimizer.__class__.__name__
 
+    # If scheduler is provided, save its state and class name
     if scheduler is not None:
         checkpoint[ModelKeys.SCHEDULER_STATE_DICT.value] = scheduler.state_dict()
         checkpoint[ModelKeys.SCHEDULER_CLASS.value] = scheduler.__class__.__name__
 
+    # Save the checkpoint dictionary to the specified file
     torch.save(checkpoint, filename)
+
+    # Print confirmation message with the path to the saved checkpoint
     print(f"💾 Saved checkpoint at: {filename}")
 
 
@@ -92,40 +103,68 @@ def load(
     Returns:
         Tuple[nn.Module, int]: The model with restored state and the epoch to resume training from.
     """
+    # Check if the path is a directory
     if os.path.isdir(path):
+        # Get all .pth files in the directory, sorted by modification time (oldest to newest)
         checkpoint_files = sorted(glob.glob(os.path.join(path, "*.pth")), key=os.path.getmtime)
+        
+        # Raise an error if no checkpoint files are found
         if not checkpoint_files:
             raise FileNotFoundError(f"No checkpoint found in directory: {path}")
+        
+        # Use the most recent checkpoint file
         ckpt_path = checkpoint_files[-1]
+
+    # If path is a file, use it directly as the checkpoint path
     elif os.path.isfile(path):
         ckpt_path = path
+
+    # If path is neither file nor directory, raise an error
     else:
         raise FileNotFoundError(f"Checkpoint path is neither a file nor a directory: {path}")
 
+    # Load the checkpoint, mapping it to the specified device if given
     checkpoint = torch.load(ckpt_path, map_location=device) if device else torch.load(ckpt_path)
 
-    # Print content of the checkpoint for debugging
+    # If verbose is enabled, print checkpoint details for debugging
     if verbose:
         print(f"🔍 Loading checkpoint from {ckpt_path}")
+        
+        # Print model class info if available
         if ModelKeys.MODEL_CLASS.value in checkpoint:
             print(f"📦 Model class in checkpoint: {checkpoint[ModelKeys.MODEL_CLASS.value]}")
+        
+        # Print optimizer class info if available
         if ModelKeys.OPTIMIZER_CLASS.value in checkpoint:
             print(f"⚙️ Optimizer class in checkpoint: {checkpoint[ModelKeys.OPTIMIZER_CLASS.value]}")
+        
+        # Print scheduler class info if available
         if ModelKeys.SCHEDULER_CLASS.value in checkpoint:
             print(f"📈 Scheduler class in checkpoint: {checkpoint[ModelKeys.SCHEDULER_CLASS.value]}")
+        
+        # Print model configuration info if available
         if ModelKeys.CONFIG.value in checkpoint:
             print(f"🔧 Model configuration: {checkpoint[ModelKeys.CONFIG.value]}")
 
+    # Reconstruct the model from its saved configuration
     model = model_class.from_config(checkpoint[ModelKeys.CONFIG.value])
+
+    # Load model weights from the checkpoint
     model.load_state_dict(checkpoint[ModelKeys.MODEL_STATE_DICT.value])
 
+    # Load optimizer state if an optimizer is provided and the checkpoint contains its state
     if optimizer and ModelKeys.OPTIMIZER_STATE_DICT.value in checkpoint:
         optimizer.load_state_dict(checkpoint[ModelKeys.OPTIMIZER_STATE_DICT.value])
 
+    # Load scheduler state if a scheduler is provided and the checkpoint contains its state
     if scheduler and ModelKeys.SCHEDULER_STATE_DICT.value in checkpoint:
         scheduler.load_state_dict(checkpoint[ModelKeys.SCHEDULER_STATE_DICT.value])
 
+    # Determine the epoch to resume from (one after the saved epoch, default to 0 if not found)
     start_epoch = checkpoint.get(ModelKeys.EPOCH.value, 0) + 1
+
+    # Confirm successful loading
     print(f"✅ Loaded checkpoint from {ckpt_path}, resuming at epoch {start_epoch}")
 
+    # Return the loaded model and starting epoch
     return model, start_epoch

@@ -87,6 +87,11 @@ cifar100_train = datasets.CIFAR100(root=RAW_DATA_DIR, train=True, download=True,
 cifar100_test = datasets.CIFAR100(root=RAW_DATA_DIR, train=False, download=True, transform=eval_transform)
 
 
+# Hyper-parameters
+BATCH_SIZE = 64
+LR = 0.001
+
+
 train_dataloader = DataLoader(cifar100_train)
 test_dataloader = DataLoader(cifar100_test)
 
@@ -109,80 +114,25 @@ test_dataloader = DataLoader(cifar100_test)
 
 # ## Train Model
 
-from timm.layers import DropPath
+from models import BaseDino
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-dropout_rate = 0.1      # Dropout rate for MLP and attention layers
-drop_path_rate = 0.1    # DropPath rate for stochastic depth (drops some residuals) -- probably will have to ignore in FedLearn setting
-
-# Load model from torch
-model = torch.hub.load('facebookresearch/dino:main', 'dino_vits16', pretrained=True)
-model.head = nn.Sequential(
-    nn.Linear(384, 1024),
-    nn.ReLU(),
-    nn.Dropout(p=dropout_rate),
-    nn.Linear(1024, 1024),
-    nn.ReLU(),
-    nn.Dropout(p=dropout_rate),
-    nn.Linear(1024, 1024),
-    nn.ReLU(),
-    nn.Dropout(p=dropout_rate),
-    nn.Linear(1024, 1024),
-    nn.ReLU(),
-    nn.Dropout(p=dropout_rate),
-    nn.Linear(1024, 100),
-)
-def initialize_weights(layer):
-    if isinstance(layer, nn.Linear):
-        torch.nn.init.xavier_uniform_(layer.weight)
-        if layer.bias is not None:
-            torch.nn.init.zeros_(layer.bias)
-
-model.head.apply(initialize_weights)
-
-# Add dropout to attention layers
-for block in model.blocks:
-    block.attn.attn_drop = nn.Dropout(p=dropout_rate)  # Dropout in attention
-    block.attn.proj_drop = nn.Dropout(p=dropout_rate)  # Dropout in projection
-    block.mlp.drop = nn.Dropout(p=dropout_rate)  # Dropout in MLP
-
-# Add DropPath to transformer blocks
-for i, block in enumerate(model.blocks):
-    drop_prob = drop_path_rate * (i / len(model.blocks))  # Linearly scale drop rate through blocks
-    block.drop_path = DropPath(drop_prob)  # DropPath
-
-# Freeze whole model
-for param in model.parameters():
-    param.requires_grad = False
-
-# Allow to access some of the blocks in the backbone
-for param in model.blocks[-3:].parameters():
-    param.requires_grad = True
-
-# Also allow the LayerNorm
-for param in model.norm.parameters():
-    param.requires_grad = True
-
-# And obviously the head (MLP)
-for param in model.head.parameters():
-    param.requires_grad = True
-
+model = BaseDino()
 model.to(device)
+
+
+model.get_config()
 
 
 CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
 
-# Hyper-parameters
-batch_size = 128
-start_epoch = 1
-num_epochs = 5
-save_every = 1
-
-# Optimizer and loss
-optimizer = optim.SGD(model.parameters(), lr=0.001)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
+# Optimizer
+optimizer = optim.SGD(model.parameters(), lr=LR)
+# Learning rate scheduler
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5) # Numb of epochs non relevant
+# Loss function
 criterion = torch.nn.CrossEntropyLoss()
 
 # Preallocated lists: if the training interrupts, it will still save their values
@@ -191,13 +141,16 @@ all_validation_losses=[]     # Pre-allocated list for validation losses
 all_training_accuracies=[]   # Pre-allocated list for training accuracies
 all_validation_accuracies=[] # Pre-allocated list for validation accuracies
 
+
 # Train the model and save periodically
+# NOTE: If a checkpoint with the exact same model name, 
+# model class and epoch number exists, it will be overwritten!!!
 _, _, _, _ = train(
     checkpoint_dir=CHECKPOINT_DIR,
-    prefix="", # Automatically find a name for the model
-    start_epoch=start_epoch,
-    num_epochs=num_epochs,
-    save_every=save_every,
+    name="arceus", # If empty, will automatically find a name for the model
+    start_epoch=1, # Try one epoch
+    num_epochs=1, # Try one epoch
+    save_every=1, # Try one epoch
     train_dataloader=train_dataloader,
     val_dataloader=test_dataloader,
     model=model, # Use the same model as before (partially pre-trained)
@@ -209,6 +162,37 @@ _, _, _, _ = train(
     all_validation_losses=all_validation_losses,  # Pre-allocated list for validation losses
     all_training_accuracies=all_training_accuracies,  # Pre-allocated list for training accuracies
     all_validation_accuracies=all_validation_accuracies,  # Pre-allocated list for validation accuracies
+)
+
+
+# Load the model from a checkpoint
+model_class = BaseDino
+# NOTE: If you do not specify a file name, it will automatically find the latest checkpoint
+checkpoint_path = f"{CHECKPOINT_DIR}/{model_class.__name__}/arceus_{model_class.__name__}_epoch_1.pth"
+
+# Pass device also here to directly load the state dict (not the model itself!) on the device
+model, start_epoch = load(path=checkpoint_path, model_class=model_class, verbose=True)
+model.to(device)  # Move model to the device, for real this time!
+
+
+# Resume training
+_, _, _, _ = train(
+    checkpoint_dir=CHECKPOINT_DIR,
+    name="arceus", # Use the same name, or just a different one if you are afraid of overwriting!
+    start_epoch=start_epoch, # Resume from the correct epoch
+    num_epochs=3, 
+    save_every=1, 
+    train_dataloader=train_dataloader,
+    val_dataloader=test_dataloader,
+    model=model, # Use the same model as before (partially pre-trained)
+    criterion=criterion,
+    optimizer=optimizer,  # I could also change the optimizer if I wanted to!
+    scheduler=scheduler,
+    verbose=False,
+    all_training_losses=all_training_losses,  # Will not overwrite the original, but just append
+    all_validation_losses=all_validation_losses,
+    all_training_accuracies=all_training_accuracies,
+    all_validation_accuracies=all_validation_accuracies,
 )
 
 
