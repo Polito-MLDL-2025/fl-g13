@@ -18,7 +18,7 @@ from torchvision import models
 from torchvision.transforms import Compose, Resize, CenterCrop, RandomCrop, RandomHorizontalFlip, RandomVerticalFlip, Normalize, ToTensor
 
 from fl_g13.config import RAW_DATA_DIR
-from fl_g13.modeling import train, eval, save, load
+from fl_g13.modeling import train, eval, save, load, backup
 from fl_g13.dataset import train_test_split
 
 from models import BaseDino
@@ -94,24 +94,37 @@ all_validation_losses=[]     # Pre-allocated list for validation losses
 all_training_accuracies=[]   # Pre-allocated list for training accuracies
 all_validation_accuracies=[] # Pre-allocated list for validation accuracies
 
-_, _, _, _ = train(
-    checkpoint_dir=CHECKPOINT_DIR,
-    name="arceus",
-    start_epoch=start_epoch,
-    num_epochs=num_epochs,
-    save_every=save_every,
-    train_dataloader=train_dataloader,
-    val_dataloader=test_dataloader,
-    model=model,
-    criterion=criterion,
-    optimizer=optimizer,
-    scheduler=scheduler,
-    verbose=False,
-    all_training_losses=all_training_losses,  # Pre-allocated list for training losses
-    all_validation_losses=all_validation_losses,  # Pre-allocated list for validation losses
-    all_training_accuracies=all_training_accuracies,  # Pre-allocated list for training accuracies
-    all_validation_accuracies=all_validation_accuracies,  # Pre-allocated list for validation accuracies
-)
+name = "arceus"
+
+try:
+    _, _, _, _ = train(
+        checkpoint_dir=CHECKPOINT_DIR,
+        name=name,
+        start_epoch=start_epoch,
+        num_epochs=num_epochs,
+        save_every=save_every,
+        train_dataloader=train_dataloader,
+        val_dataloader=test_dataloader,
+        model=model,
+        criterion=criterion,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        verbose=False,
+        all_training_losses=all_training_losses,
+        all_validation_losses=all_validation_losses,
+        all_training_accuracies=all_training_accuracies,
+        all_validation_accuracies=all_validation_accuracies,
+    )
+
+except KeyboardInterrupt:
+    print("Training interrupted manually. Backing up latest checkpoint...")
+
+except Exception as e:
+    print(f"Training stopped due to error: {e}")
+
+finally:
+    # This always runs no matter what (hopefully)
+    backup(f"{CHECKPOINT_DIR}/{name}") # Backup the final checkpoint
 
 
 import matplotlib.pyplot as plt
@@ -147,8 +160,6 @@ print(
     f"\t📉 Test Loss: {test_loss:.4f}\n"
     f"\t🎯 Test Accuracy: {100 * test_accuracy:.2f}%"
 )
-
-print()
 
 
 

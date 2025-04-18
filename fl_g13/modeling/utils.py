@@ -1,5 +1,8 @@
 import os
 import random
+import shutil
+import glob
+
 
 # Sample lists of funny adjectives and nouns
 adjectives = [
@@ -127,3 +130,41 @@ def generate_goofy_name(folder_path=None):
     raise RuntimeError(
         f"Failed to generate a unique name after {max_attempts} attempts. All names could be already taken."
     )
+
+def backup(path):
+    """
+    Backups a file to a 'backup' directory located in the same parent directory.
+    The backup directory is created if it does not exist.
+    The backup file will have the same name as the original file.
+    Args:
+        path (str): The path to the file to be backed up.
+    Raises:
+        ValueError: If the provided path is not a file.
+    """
+    # Check if the provided path is a file
+    if os.path.isfile(path):
+        file_to_backup = path
+    # Check if the provided path is a directory, and find the most recent file
+    elif os.path.isdir(path):
+        files = glob.glob(os.path.join(path, '*'), recursive=False)
+        files = [f for f in files if os.path.isfile(f)]
+        if not files:
+            raise ValueError(f"No files found in directory: {path}")
+        file_to_backup = max(files, key=os.path.getmtime)
+        print(f"Directory given. Most recent file selected: {file_to_backup}")
+    else:
+        raise ValueError(f"Invalid path: {path}")
+
+    # Get directory and filename
+    dir_name, file_name = os.path.split(path)
+
+    # Create the backup directory inside the same parent directory
+    backup_dir = os.path.join(os.path.dirname(dir_name), 'backup')
+    os.makedirs(backup_dir, exist_ok=True)
+
+    # Define the destination path
+    dest_path = os.path.join(backup_dir, file_name)
+
+    # Copy the file
+    shutil.copy2(path, dest_path)
+    print(f"Backed up '{path}' to '{dest_path}'")
