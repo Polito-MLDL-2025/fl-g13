@@ -14,10 +14,9 @@ class ModelKeys(Enum):
     MODEL_STATE_DICT = "model_state_dict"
     CONFIG = "config"  # Removed unused entries
 
-
 def save(checkpoint_dir: str, prefix: Optional[str], model: nn.Module, epoch: int) -> None:
     """
-    Saves the model state to a checkpoint file.
+    Saves the model state to a checkpoint file under a subfolder named after the model's class name.
 
     Args:
         checkpoint_dir (str): Directory where the checkpoint file will be saved.
@@ -28,13 +27,14 @@ def save(checkpoint_dir: str, prefix: Optional[str], model: nn.Module, epoch: in
     Returns:
         None
     """
-    os.makedirs(checkpoint_dir, exist_ok=True)
+    model_name = model.__class__.__name__
+    model_dir = os.path.join(checkpoint_dir, model_name)
+    os.makedirs(model_dir, exist_ok=True)
 
     if not prefix:
         prefix = generate_goofy_name()
 
-    model_name = model.__class__.__name__
-    filename = os.path.join(checkpoint_dir, f"{prefix}_{model_name}_epoch_{epoch}.pth")
+    filename = os.path.join(model_dir, f"{prefix}_{model_name}_epoch_{epoch}.pth")
 
     checkpoint = {
         ModelKeys.EPOCH.value: epoch,
