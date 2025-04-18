@@ -59,6 +59,7 @@ print(f"Using device: {device}")
 start_epoch=1
 num_epochs=50
 save_every=1
+backup_every=10
 
 # Hyper-parameters
 BATCH_SIZE = 128
@@ -103,6 +104,7 @@ try:
         start_epoch=start_epoch,
         num_epochs=num_epochs,
         save_every=save_every,
+        backup_every=backup_every
         train_dataloader=train_dataloader,
         val_dataloader=test_dataloader,
         model=model,

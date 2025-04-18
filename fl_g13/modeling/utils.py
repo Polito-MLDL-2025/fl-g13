@@ -131,20 +131,22 @@ def generate_goofy_name(folder_path=None):
         f"Failed to generate a unique name after {max_attempts} attempts. All names could be already taken."
     )
 
-def backup(path):
+
+def backup(path, new_filename=None):
     """
     Backups a file to a 'backup' directory located in the same parent directory.
-    The backup directory is created if it does not exist.
-    The backup file will have the same name as the original file.
+    If a directory is passed, the most recently modified file is selected.
+    
     Args:
-        path (str): The path to the file to be backed up.
+        path (str): The path to the file or directory to back up.
+        new_filename (str, optional): New name for the backup file. If not provided, the original name is used.
+        
     Raises:
-        ValueError: If the provided path is not a file.
+        ValueError: If the provided path is invalid or contains no files.
     """
-    # Check if the provided path is a file
+    # Resolve the file to back up
     if os.path.isfile(path):
         file_to_backup = path
-    # Check if the provided path is a directory, and find the most recent file
     elif os.path.isdir(path):
         files = glob.glob(os.path.join(path, '*'), recursive=False)
         files = [f for f in files if os.path.isfile(f)]
@@ -155,16 +157,21 @@ def backup(path):
     else:
         raise ValueError(f"Invalid path: {path}")
 
-    # Get directory and filename
-    dir_name, file_name = os.path.split(path)
+    # Extract the directory and original filename
+    dir_name = os.path.dirname(file_to_backup)
+    original_filename = os.path.basename(file_to_backup)
 
-    # Create the backup directory inside the same parent directory
+    # Determine final backup filename
+    backup_filename = new_filename if new_filename is not None else original_filename
+
+    # Create the backup directory
     backup_dir = os.path.join(os.path.dirname(dir_name), 'backup')
     os.makedirs(backup_dir, exist_ok=True)
 
-    # Define the destination path
-    dest_path = os.path.join(backup_dir, file_name)
+    # Define final destination
+    dest_path = os.path.join(backup_dir, backup_filename)
 
-    # Copy the file
-    shutil.copy2(path, dest_path)
-    print(f"Backed up '{path}' to '{dest_path}'")
+    # Perform the copy
+    shutil.copy2(file_to_backup, dest_path)
+    print(f"Backed up '{file_to_backup}' to '{dest_path}'")
+

@@ -90,6 +90,7 @@ def train(
     start_epoch: int,            # Starting epoch number (useful for resuming training)
     num_epochs: int,             # Total number of epochs to train the model
     save_every: int,             # Frequency (in epochs) to save model checkpoints
+    backup_every: int,           # Frequency (in epochs) to backup model checkpoints
     train_dataloader: DataLoader,       # DataLoader for the training dataset
     val_dataloader: DataLoader,         # DataLoader for the validation dataset
     model: Module,                              # The model to be trained
@@ -111,6 +112,7 @@ def train(
         start_epoch (int): Starting epoch number (useful for resuming training).
         num_epochs (int): Total number of epochs to train the model.
         save_every (int): Frequency (in epochs) to save model checkpoints.
+        backup_every (int): Frequency (in epochs) to backup model checkpoints.
         train_dataloader (DataLoader): DataLoader for the training dataset.
         val_dataloader (DataLoader): DataLoader for the validation dataset.
         model (torch.nn.Module): The model to be trained.
@@ -211,5 +213,12 @@ def train(
             # Save the model, optimizer, and scheduler state
             save(checkpoint_dir=checkpoint_dir, prefix=name, model=model, epoch=adjusted_epoch, optimizer=optimizer, scheduler=scheduler)
             print()
+
+        if backup_every and epoch % backup_every == 0:
+            # Backup the model, optimizer, and scheduler state to avoid overwriting
+            print(f"Running backup for epoch {epoch}")
+            save(checkpoint_dir=f"{checkpoint_dir}/backup", prefix=f"backup_{time.strftime('%Y%m%d_%H%M%S', time.localtime())}_{name}", model=model, epoch=adjusted_epoch, optimizer=optimizer, scheduler=scheduler)
+            print()
+
 
     return all_training_losses, all_validation_losses, all_training_accuracies, all_validation_accuracies
