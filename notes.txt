@@ -1,0 +1,29 @@
+Questions for Riccardo
+- At "make centralized model" we need to make just a model as in labs, or rather pre-traing with some batches the server's model, which will then be shared with the rest of the network?
+- Do we need to transform and augment our data? Then we tune using different optimizers. Can we use Adam?
+- What is Dino? What are scores in the table? Can we use DinoV2?
+- not seeing comments
+
+Notes:
+- Normalization, random crop and horizontal flip for train (no vert!)
+- Only normalization for test
+
+Training:
+- Dropout?
+- Drop paths?
+- momentum? weight_decay? nesterov?
+- batch_size
+- Try different schedulers, how can it pass to clients?
+	https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+- SGD only 
+	https://pytorch.org/docs/stable/generated/torch.optim.SGD.html
+
+TODO 
+- Rework codebase
+- Dino discoveries
+- QA Riccardo
+- Details on design of centralized model
+- Which dino
+
+
+
