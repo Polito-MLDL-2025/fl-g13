@@ -75,7 +75,7 @@ def train_one_epoch(dataloader, model, criterion, optimizer, verbose=False):
 
 def train(
     checkpoint_dir,         # Directory where model checkpoints will be saved
-    prefix,                 # Prefix or name for the model checkpoints
+    name,                   # Prefix or name for the model checkpoints
     start_epoch,            # Starting epoch number (useful for resuming training)
     num_epochs,             # Total number of epochs to train the model
     save_every,             # Frequency (in epochs) to save model checkpoints
@@ -121,9 +121,12 @@ def train(
     """
 
     # Generate a random prefix/name for the model if none is provided
-    if not prefix:
-        prefix = generate_goofy_name(checkpoint_dir)
-        print(f"No prefix/name for the model was provided, choosen prefix/name: {prefix}")
+    if not name:
+        name = generate_goofy_name(checkpoint_dir)
+        print(f"No prefix/name for the model was provided, choosen prefix/name: {name}")
+        print()
+    else:
+        print(f"Prefix/name for the model was provided: {name}")
         print()
 
     # Initialize lists if not provided
@@ -194,9 +197,8 @@ def train(
 
         # Save the model checkpoint periodically based on save_every
         if save_every and epoch % save_every == 0:
-            # Calculate the saving epoch number
             # Save the model, optimizer, and scheduler state
-            save(checkpoint_dir, prefix, model, optimizer, scheduler, epoch=adjusted_epoch)
+            save(checkpoint_dir, name, model, epoch=adjusted_epoch)
             print()
 
     return all_training_losses, all_validation_losses, all_training_accuracies, all_validation_accuracies

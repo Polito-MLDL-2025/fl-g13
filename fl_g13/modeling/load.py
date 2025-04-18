@@ -33,7 +33,8 @@ def save(checkpoint_dir: str, prefix: Optional[str], model: nn.Module, epoch: in
     if not prefix:
         prefix = generate_goofy_name()
 
-    filename = os.path.join(checkpoint_dir, f"{prefix}_epoch_{epoch}.pth")
+    model_name = model.__class__.__name__
+    filename = os.path.join(checkpoint_dir, f"{prefix}_{model_name}_epoch_{epoch}.pth")
 
     checkpoint = {
         ModelKeys.EPOCH.value: epoch,
