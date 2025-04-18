@@ -117,7 +117,7 @@ _, _, _, _ = train(
 from fl_g13.modeling import load
 
 # Load the model from the latest checkpoint (a specific file!)
-path = f"{checkpoint_dir}/ditto_TinyCNN_epoch_2.pth"
+path = f"{checkpoint_dir}/TinyCNN/ditto_TinyCNN_epoch_2.pth"
 # Note: make sure to define a _config parameter and a from_config method in the model class
 model2, start_epoch = load(path=path, model_class=TinyCNN, device=device)
 
