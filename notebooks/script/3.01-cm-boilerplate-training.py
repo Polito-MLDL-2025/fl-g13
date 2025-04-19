@@ -33,6 +33,16 @@ class TinyCNN(nn.Module):
         self.conv2 = nn.Conv2d(16, 32, 3, padding=1)
         self.fc1 = nn.Linear(32 * 8 * 8, num_classes)
 
+        # Store configuration for later loading
+        # This is a bit of a hack, but we need to store the number of classes
+        self._config = {
+            "num_classes": num_classes,
+            # In fact, the followings could be avoided as from_config loads only the num_classes
+            "conv1_out_channels": 16,
+            "conv2_out_channels": 32,
+            "fc1_in_features": 32 * 8 * 8,
+        }
+
     def forward(self, x):
         x = F.relu(self.conv1(x))     # -> [B, 16, 32, 32]
         x = F.max_pool2d(x, 2)        # -> [B, 16, 16, 16]
@@ -41,6 +51,11 @@ class TinyCNN(nn.Module):
         x = x.view(x.size(0), -1)     # -> [B, 32*8*8]
         x = self.fc1(x)               # -> [B, 100]
         return x
+
+    # Now we need to be careful to define how to load from config
+    @classmethod
+    def from_config(cls, config):
+        return cls(num_classes=config["num_classes"])
 
 
 checkpoint_dir = "/home/massimiliano/Projects/fl-g13/checkpoints"
@@ -63,15 +78,16 @@ criterion = torch.nn.CrossEntropyLoss()
 
 
 # This will train the model, using an automatically generated name
-train(
+_, _, _, _ = train(
     checkpoint_dir=checkpoint_dir,
-    prefix="", # Will automatically generate a name for the model
+    name="", # Will automatically generate a name for the model
     train_dataloader=train_dataloader,
     val_dataloader=test_dataloader,
     criterion=criterion,
     start_epoch=start_epoch,
     num_epochs=num_epochs,
     save_every=save_every,
+    backup_every=None,
     model=model,
     optimizer=optimizer,
     scheduler=None,
@@ -81,12 +97,15 @@ train(
 
 # This will train again the same model, but with a custom name
 # The epochs will still start from 1
-train(
+# NOTE: If a checkpoint with the exact same model name, 
+# model class and epoch number exists, it will be overwritten!!!
+_, _, _, _ = train(
     checkpoint_dir=checkpoint_dir,
-    prefix="TinyCNN", # Setting a name for the model
+    name="ditto", # Setting a name for the model
     start_epoch=start_epoch,
     num_epochs=num_epochs,
     save_every=save_every,
+    backup_every=None,
     train_dataloader=train_dataloader,
     val_dataloader=test_dataloader,
     model=model, # Use the same model as before (partially pre-trained)
@@ -101,37 +120,32 @@ train(
 
 from fl_g13.modeling import load
 
-# Generate untrained model and optimizer
-model2 = TinyCNN(num_classes=100)
-optimizer2 = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.04)
-criterion2 = torch.nn.CrossEntropyLoss()
-
 # Load the model from the latest checkpoint (a specific file!)
-path = checkpoint_dir + "/TinyCNN_epoch_2.pth"
-start_epoch = load(path=path, model=model2, optimizer=optimizer2, scheduler=None)
+path = f"{checkpoint_dir}/TinyCNN/ditto_TinyCNN_epoch_2.pth"
+# Note: make sure to define a _config parameter and a from_config method in the model class
+model2, start_epoch = load(path=path, model_class=TinyCNN, device=device, verbose=True)
+model2.to(device) # Very Important! Passing device to load DO NOT move the model to the device, but its state dict only!
 
 
 num_epochs = 4
 save_every = 2
 
 # Now we can continue training the model (model2 now!) from the last checkpoint (which has been loaded)
-# Note again: loading is done by the user in the cell above! It is not done automatically!
+# NOTE again: loading is done by the user in the cell above! It is not done automatically!
 # The start_epoch is now 2 (value returned by the load function)
-train(
+_, _, _, _ = train(
     checkpoint_dir=checkpoint_dir,
-    prefix="TinyCNN", # Use the same name as before to continue training!
+    name="ditto", # Use the same name as before to continue training!
     start_epoch=start_epoch, # Now start epoch is not 1 (will resume from where it was left)
     num_epochs=num_epochs, # This is not the number of epochs to reach, but how many to do starting from now!
     save_every=save_every,
+    backup_every=None,
     train_dataloader=train_dataloader,
     val_dataloader=test_dataloader,
     model=model2,
-    criterion=criterion2,
-    optimizer=optimizer2,
+    criterion=criterion, # Use the same criterion as before
+    optimizer=optimizer, # Use the same optimizer as before
     scheduler=None,
     verbose=False,
 )
-
-
-
 

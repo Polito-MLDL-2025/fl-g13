@@ -120,8 +120,8 @@ data: requirements
 	@echo ""
 
 ## Export all notebooks in the notebooks/ directory
-.PHONY: export_notebooks
-export_notebooks: requirements
+.PHONY: export
+export: requirements
 	@echo ""
 	@echo "📤 Exporting all notebooks in 'notebooks/' using nbautoexport..."
 	@echo ""
@@ -129,7 +129,6 @@ export_notebooks: requirements
 	@echo ""
 	@echo "✅ Notebooks exported successfully."
 	@echo ""
-
 
 #################################################################################
 # Self Documenting Commands                                                     #
