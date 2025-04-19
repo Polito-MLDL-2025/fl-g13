@@ -1,122 +1,170 @@
 from enum import Enum
 import glob
 import os
+from typing import Optional, Tuple, Type
 
 import torch
+from torch import nn, optim
+from torch.optim.lr_scheduler import _LRScheduler
 
 from fl_g13.modeling.utils import generate_goofy_name
 
 
 class ModelKeys(Enum):
-    # Enum to define keys used in the checkpoint dictionary
     EPOCH = "epoch"
     MODEL_STATE_DICT = "model_state_dict"
+    MODEL_CLASS = "model_class"
+    CONFIG = "config"
     OPTIMIZER_STATE_DICT = "optimizer_state_dict"
+    OPTIMIZER_CLASS = "optimizer_class"
     SCHEDULER_STATE_DICT = "scheduler_state_dict"
+    SCHEDULER_CLASS = "scheduler_class"
 
 
-def save(checkpoint_dir, prefix, model, optimizer, scheduler=None, epoch=None):
+def save(
+    checkpoint_dir: str,
+    prefix: Optional[str],
+    model: nn.Module,
+    epoch: int,
+    optimizer: Optional[optim.Optimizer] = None,
+    scheduler: Optional[_LRScheduler] = None
+) -> None:
     """
-    Saves the model, optimizer, and optionally scheduler state to a checkpoint file.
+    Saves the model state to a checkpoint file under a subfolder named after the model's class name.
 
     Args:
         checkpoint_dir (str): Directory where the checkpoint file will be saved.
-        prefix (str): Prefix for the checkpoint file name. If None, a random name will be generated.
+        prefix (Optional[str]): Prefix for the checkpoint file name. If None, a random name will be generated.
         model (torch.nn.Module): The model whose state will be saved.
-        optimizer (torch.optim.Optimizer): The optimizer whose state will be saved.
-        scheduler (torch.optim.lr_scheduler._LRScheduler, optional): The learning rate scheduler whose state will be saved. Defaults to None.
-        epoch (int, optional): The current epoch number to include in the checkpoint file name. Defaults to None.
+        epoch (int): The current epoch number to include in the checkpoint file name.
+        optimizer (Optional[Optimizer]): The optimizer to save, if provided.
+        scheduler (Optional[_LRScheduler]): The learning rate scheduler to save, if provided.
 
     Returns:
         None
     """
-    # Ensure the checkpoint directory exists
-    os.makedirs(checkpoint_dir, exist_ok=True)
+    # Get the name of the model class
+    model_name = model.__class__.__name__
 
-    # Generate a prefix if none is provided
+    # Create a directory for saving checkpoints specific to the model
+    model_dir = os.path.join(checkpoint_dir, model_name)
+    os.makedirs(model_dir, exist_ok=True)
+
+    # If no prefix is provided, generate a random one
     if not prefix:
         prefix = generate_goofy_name()
 
-    # Determine the filename based on whether an epoch is provided
-    if not epoch:
-        filename = os.path.join(checkpoint_dir, f"{prefix}.pth")
-    else:
-        filename = os.path.join(checkpoint_dir, f"{prefix}_epoch_{epoch}.pth")
+    # Construct the filename for the checkpoint
+    filename = os.path.join(model_dir, f"{prefix}_{model_name}_epoch_{epoch}.pth")
 
     # Create a dictionary to store the checkpoint data
     checkpoint = {
-        ModelKeys.EPOCH.value: epoch,
-        ModelKeys.MODEL_STATE_DICT.value: model.state_dict(),
-        ModelKeys.OPTIMIZER_STATE_DICT.value: optimizer.state_dict(),
+        ModelKeys.EPOCH.value: epoch,  # Save the current epoch
+        ModelKeys.MODEL_STATE_DICT.value: model.state_dict(),  # Save model parameters
+        ModelKeys.CONFIG.value: model._config,  # Save model configuration
+        ModelKeys.MODEL_CLASS.value: model.__class__.__name__,  # Save model class name
     }
 
-    # Add scheduler state to the checkpoint if provided
+    # If optimizer is provided, save its state and class name
+    if optimizer is not None:
+        checkpoint[ModelKeys.OPTIMIZER_STATE_DICT.value] = optimizer.state_dict()
+        checkpoint[ModelKeys.OPTIMIZER_CLASS.value] = optimizer.__class__.__name__
+
+    # If scheduler is provided, save its state and class name
     if scheduler is not None:
         checkpoint[ModelKeys.SCHEDULER_STATE_DICT.value] = scheduler.state_dict()
+        checkpoint[ModelKeys.SCHEDULER_CLASS.value] = scheduler.__class__.__name__
 
-    # Save the checkpoint to the specified file
+    # Save the checkpoint dictionary to the specified file
     torch.save(checkpoint, filename)
 
-    # Print confirmation of the saved checkpoint
+    # Print confirmation message with the path to the saved checkpoint
     print(f"💾 Saved checkpoint at: {filename}")
 
 
-def load(path, model, optimizer, scheduler=None, device=None):
+def load(
+    path: str,
+    model_class: Type[nn.Module],
+    device: Optional[torch.device] = None,
+    optimizer: Optional[optim.Optimizer] = None,
+    scheduler: Optional[_LRScheduler] = None,
+    verbose: bool = False
+) -> Tuple[nn.Module, int]:
     """
-    Loads a checkpoint into the provided model, optimizer, and optionally a scheduler. 
-    Automatically determines whether the given path is a file (loads the specified file) 
-    or a directory (loads the most recently modified checkpoint file in the directory).
-
-    Raises:
-        FileNotFoundError: If no checkpoint is found at the specified path.
+    Loads a checkpoint into a new model and optionally restores optimizer and scheduler.
 
     Args:
         path (str): Path to the checkpoint file or directory containing checkpoint files.
-        model (torch.nn.Module): The model to load the state into.
-        optimizer (torch.optim.Optimizer): The optimizer to load the state into.
-        scheduler (torch.optim.lr_scheduler._LRScheduler, optional): The scheduler to load the state into. Defaults to None.
-        device (torch.device, optional): The device to map the checkpoint to. Defaults to None.
+        model_class (Type[nn.Module]): The class used to instantiate the model.
+        device (Optional[torch.device]): The device to map the checkpoint to.
+        optimizer (Optional[Optimizer]): Optimizer instance to load state into, if provided.
+        scheduler (Optional[_LRScheduler]): Scheduler instance to load state into, if provided.
 
     Returns:
-        int: The epoch to resume training from.
+        Tuple[nn.Module, int]: The model with restored state and the epoch to resume training from.
     """
     # Check if the path is a directory
     if os.path.isdir(path):
-        # Get all checkpoint files in the directory, sorted by modification time
+        # Get all .pth files in the directory, sorted by modification time (oldest to newest)
         checkpoint_files = sorted(glob.glob(os.path.join(path, "*.pth")), key=os.path.getmtime)
+        
         # Raise an error if no checkpoint files are found
         if not checkpoint_files:
             raise FileNotFoundError(f"No checkpoint found in directory: {path}")
+        
         # Use the most recent checkpoint file
         ckpt_path = checkpoint_files[-1]
-    # Check if the path is a file
+
+    # If path is a file, use it directly as the checkpoint path
     elif os.path.isfile(path):
         ckpt_path = path
-    # Raise an error if the path is neither a file nor a directory
+
+    # If path is neither file nor directory, raise an error
     else:
         raise FileNotFoundError(f"Checkpoint path is neither a file nor a directory: {path}")
 
-    # TODO Could implement that if the path do not ends with _epoch_int then the most recent could be picked (higher epoch)
+    # Load the checkpoint, mapping it to the specified device if given
+    checkpoint = torch.load(ckpt_path, map_location=device) if device else torch.load(ckpt_path)
 
-    # Load the checkpoint, optionally mapping it to a specific device
-    if device:
-        checkpoint = torch.load(ckpt_path, map_location=device)
-    else:
-        checkpoint = torch.load(ckpt_path)
+    # If verbose is enabled, print checkpoint details for debugging
+    if verbose:
+        print(f"🔍 Loading checkpoint from {ckpt_path}")
+        
+        # Print model class info if available
+        if ModelKeys.MODEL_CLASS.value in checkpoint:
+            print(f"📦 Model class in checkpoint: {checkpoint[ModelKeys.MODEL_CLASS.value]}")
+        
+        # Print optimizer class info if available
+        if ModelKeys.OPTIMIZER_CLASS.value in checkpoint:
+            print(f"⚙️ Optimizer class in checkpoint: {checkpoint[ModelKeys.OPTIMIZER_CLASS.value]}")
+        
+        # Print scheduler class info if available
+        if ModelKeys.SCHEDULER_CLASS.value in checkpoint:
+            print(f"📈 Scheduler class in checkpoint: {checkpoint[ModelKeys.SCHEDULER_CLASS.value]}")
+        
+        # Print model configuration info if available
+        if ModelKeys.CONFIG.value in checkpoint:
+            print(f"🔧 Model configuration: {checkpoint[ModelKeys.CONFIG.value]}")
 
-    # Load the model state from the checkpoint
+    # Reconstruct the model from its saved configuration
+    model = model_class.from_config(checkpoint[ModelKeys.CONFIG.value])
+
+    # Load model weights from the checkpoint
     model.load_state_dict(checkpoint[ModelKeys.MODEL_STATE_DICT.value])
-    # Load the optimizer state from the checkpoint
-    optimizer.load_state_dict(checkpoint[ModelKeys.OPTIMIZER_STATE_DICT.value])
-    # Load the scheduler state from the checkpoint if provided and present in the checkpoint
-    if scheduler is not None and ModelKeys.SCHEDULER_STATE_DICT.value in checkpoint:
+
+    # Load optimizer state if an optimizer is provided and the checkpoint contains its state
+    if optimizer and ModelKeys.OPTIMIZER_STATE_DICT.value in checkpoint:
+        optimizer.load_state_dict(checkpoint[ModelKeys.OPTIMIZER_STATE_DICT.value])
+
+    # Load scheduler state if a scheduler is provided and the checkpoint contains its state
+    if scheduler and ModelKeys.SCHEDULER_STATE_DICT.value in checkpoint:
         scheduler.load_state_dict(checkpoint[ModelKeys.SCHEDULER_STATE_DICT.value])
 
-    # Determine the starting epoch from the checkpoint, defaulting to 0 if not present
+    # Determine the epoch to resume from (one after the saved epoch, default to 0 if not found)
     start_epoch = checkpoint.get(ModelKeys.EPOCH.value, 0) + 1
 
-    # Print confirmation of the loaded checkpoint and the resuming epoch
+    # Confirm successful loading
     print(f"✅ Loaded checkpoint from {ckpt_path}, resuming at epoch {start_epoch}")
 
-    # Return the starting epoch as an integer
-    return int(start_epoch)
+    # Return the loaded model and starting epoch
+    return model, start_epoch

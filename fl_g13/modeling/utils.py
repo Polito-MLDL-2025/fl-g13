@@ -1,5 +1,8 @@
 import os
 import random
+import shutil
+import glob
+
 
 # Sample lists of funny adjectives and nouns
 adjectives = [
@@ -127,3 +130,48 @@ def generate_goofy_name(folder_path=None):
     raise RuntimeError(
         f"Failed to generate a unique name after {max_attempts} attempts. All names could be already taken."
     )
+
+
+def backup(path, new_filename=None):
+    """
+    Backups a file to a 'backup' directory located in the same parent directory.
+    If a directory is passed, the most recently modified file is selected.
+    
+    Args:
+        path (str): The path to the file or directory to back up.
+        new_filename (str, optional): New name for the backup file. If not provided, the original name is used.
+        
+    Raises:
+        ValueError: If the provided path is invalid or contains no files.
+    """
+    # Resolve the file to back up
+    if os.path.isfile(path):
+        file_to_backup = path
+    elif os.path.isdir(path):
+        files = glob.glob(os.path.join(path, '*'), recursive=False)
+        files = [f for f in files if os.path.isfile(f)]
+        if not files:
+            raise ValueError(f"No files found in directory: {path}")
+        file_to_backup = max(files, key=os.path.getmtime)
+        print(f"Directory given. Most recent file selected: {file_to_backup}")
+    else:
+        raise ValueError(f"Invalid path: {path}")
+
+    # Extract the directory and original filename
+    dir_name = os.path.dirname(file_to_backup)
+    original_filename = os.path.basename(file_to_backup)
+
+    # Determine final backup filename
+    backup_filename = new_filename if new_filename is not None else original_filename
+
+    # Create the backup directory
+    backup_dir = os.path.join(os.path.dirname(dir_name), 'backup')
+    os.makedirs(backup_dir, exist_ok=True)
+
+    # Define final destination
+    dest_path = os.path.join(backup_dir, backup_filename)
+
+    # Perform the copy
+    shutil.copy2(file_to_backup, dest_path)
+    print(f"Backed up '{file_to_backup}' to '{dest_path}'")
+

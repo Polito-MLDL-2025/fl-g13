@@ -1,13 +1,24 @@
 import time
+from typing import Optional, List, Tuple
 
 import torch
+from torch.utils.data import DataLoader
+from torch.nn import Module
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import _LRScheduler
 
 from fl_g13.modeling.eval import eval
 from fl_g13.modeling.load import save
 from fl_g13.modeling.utils import generate_goofy_name
 
 
-def train_one_epoch(dataloader, model, criterion, optimizer, verbose=False):
+def train_one_epoch(
+    dataloader: DataLoader,
+    model: Module,
+    criterion: Module,
+    optimizer: Optimizer,
+    verbose: bool = False
+) -> Tuple[float, float, List[float]]:
     """
     Train the model for a single epoch.
 
@@ -74,32 +85,34 @@ def train_one_epoch(dataloader, model, criterion, optimizer, verbose=False):
 
 
 def train(
-    checkpoint_dir,         # Directory where model checkpoints will be saved
-    prefix,                 # Prefix or name for the model checkpoints
-    start_epoch,            # Starting epoch number (useful for resuming training)
-    num_epochs,             # Total number of epochs to train the model
-    save_every,             # Frequency (in epochs) to save model checkpoints
-    train_dataloader,       # DataLoader for the training dataset
-    val_dataloader,         # DataLoader for the validation dataset
-    model,                  # The model to be trained
-    criterion,              # Loss function used for training
-    optimizer,              # Optimizer used to update model parameters
-    scheduler=None,         # Learning rate scheduler (optional)
-    verbose=False,          # Whether to print detailed progress during training
-    all_training_losses=None,           # Pre-allocated list to store training losses (optional)
-    all_validation_losses=None,         # Pre-allocated list to store validation losses (optional)
-    all_training_accuracies=None,       # Pre-allocated list to store training accuracies (optional)
-    all_validation_accuracies=None,     # Pre-allocated list to store validation accuracies (optional)
-):
+    checkpoint_dir: str,         # Directory where model checkpoints will be saved
+    name: Optional[str],         # Prefix or name for the model checkpoints
+    start_epoch: int,            # Starting epoch number (useful for resuming training)
+    num_epochs: int,             # Total number of epochs to train the model
+    save_every: int,             # Frequency (in epochs) to save model checkpoints
+    backup_every: int,           # Frequency (in epochs) to backup model checkpoints
+    train_dataloader: DataLoader,       # DataLoader for the training dataset
+    val_dataloader: DataLoader,         # DataLoader for the validation dataset
+    model: Module,                              # The model to be trained
+    criterion: Module,                          # Loss function used for training
+    optimizer: Optimizer,                       # Optimizer used to update model parameters
+    scheduler: Optional[_LRScheduler] = None,   # Learning rate scheduler (optional)
+    verbose: bool = False,                      # Whether to print detailed progress during training
+    all_training_losses: Optional[List[float]] = None,           # Pre-allocated list to store training losses (optional)
+    all_validation_losses: Optional[List[float]] = None,         # Pre-allocated list to store validation losses (optional)
+    all_training_accuracies: Optional[List[float]] = None,       # Pre-allocated list to store training accuracies (optional)
+    all_validation_accuracies: Optional[List[float]] = None,     # Pre-allocated list to store validation accuracies (optional)
+) -> Tuple[List[float], List[float], List[float], List[float]]:
     """
     Train the model for a given number of epochs, periodically saving checkpoints and tracking performance metrics.
     
     Args:
         checkpoint_dir (str): Directory where model checkpoints will be saved.
-        prefix (str): Prefix or name for the model checkpoints. If not provided, a random name will be generated.
+        name (str): Prefix or name for the model checkpoints. If not provided, a random name will be generated.
         start_epoch (int): Starting epoch number (useful for resuming training).
         num_epochs (int): Total number of epochs to train the model.
         save_every (int): Frequency (in epochs) to save model checkpoints.
+        backup_every (int): Frequency (in epochs) to backup model checkpoints.
         train_dataloader (DataLoader): DataLoader for the training dataset.
         val_dataloader (DataLoader): DataLoader for the validation dataset.
         model (torch.nn.Module): The model to be trained.
@@ -121,9 +134,12 @@ def train(
     """
 
     # Generate a random prefix/name for the model if none is provided
-    if not prefix:
-        prefix = generate_goofy_name(checkpoint_dir)
-        print(f"No prefix/name for the model was provided, choosen prefix/name: {prefix}")
+    if not name:
+        name = generate_goofy_name(checkpoint_dir)
+        print(f"No prefix/name for the model was provided, choosen prefix/name: {name}")
+        print()
+    else:
+        print(f"Prefix/name for the model was provided: {name}")
         print()
 
     # Initialize lists if not provided
@@ -194,9 +210,15 @@ def train(
 
         # Save the model checkpoint periodically based on save_every
         if save_every and epoch % save_every == 0:
-            # Calculate the saving epoch number
             # Save the model, optimizer, and scheduler state
-            save(checkpoint_dir, prefix, model, optimizer, scheduler, epoch=adjusted_epoch)
+            save(checkpoint_dir=checkpoint_dir, prefix=name, model=model, epoch=adjusted_epoch, optimizer=optimizer, scheduler=scheduler)
             print()
+
+        if backup_every and epoch % backup_every == 0:
+            # Backup the model, optimizer, and scheduler state to avoid overwriting
+            print(f"Running backup for epoch {epoch}")
+            save(checkpoint_dir=f"{checkpoint_dir}/backup", prefix=f"backup_{time.strftime('%Y%m%d_%H%M%S', time.localtime())}_{name}", model=model, epoch=adjusted_epoch, optimizer=optimizer, scheduler=scheduler)
+            print()
+
 
     return all_training_losses, all_validation_losses, all_training_accuracies, all_validation_accuracies
