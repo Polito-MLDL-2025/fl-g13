@@ -109,7 +109,7 @@ test_dataloader = DataLoader(cifar100_test)
 
 # ## Train Model
 
-from models import BaseDino
+from fl_g13.architectures import BaseDino
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")

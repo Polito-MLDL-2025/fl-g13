@@ -21,7 +21,7 @@ from fl_g13.config import RAW_DATA_DIR
 from fl_g13.modeling import train, eval, save, load, backup
 from fl_g13.dataset import train_test_split
 
-from models import BaseDino
+from fl_g13.architectures import BaseDino
 
 
 # Define preprocessing pipeline
