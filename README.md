@@ -56,7 +56,7 @@ Federated Learning Project, Group 13
 
 ## Project Organization
 
-```
+```text
 ├── LICENSE            <- Open-source license if one is chosen
 ├── Makefile           <- Makefile with convenience commands like `make data` or `make train`
 ├── README.md          <- The top-level README for developers using this project.
@@ -89,6 +89,9 @@ Federated Learning Project, Group 13
     ├── config.py               <- Store useful variables and configuration
     │
     ├── dataset.py              <- Scripts to download or generate data
+    │
+    ├── architectures           <- Classes for models architectures
+    │   └── BaseDino.py          
     │
     └── modeling                
         ├── load.py             <- Code to load models
