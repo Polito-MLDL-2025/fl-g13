@@ -87,12 +87,7 @@ cifar100_train = datasets.CIFAR100(root=RAW_DATA_DIR, train=True, download=True,
 cifar100_test = datasets.CIFAR100(root=RAW_DATA_DIR, train=False, download=True, transform=eval_transform)
 
 
-# Hyper-parameters
-BATCH_SIZE = 64
-LR = 0.001
-
-
-train_dataloader = DataLoader(cifar100_train)
+train_dataloader = DataLoader(cifar100_train) # Inline training (batch_size=1)
 test_dataloader = DataLoader(cifar100_test)
 
 
@@ -114,7 +109,7 @@ test_dataloader = DataLoader(cifar100_test)
 
 # ## Train Model
 
-from models import BaseDino
+from fl_g13.architectures import BaseDino
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
@@ -127,6 +122,7 @@ model.get_config()
 
 
 CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
+LR = 0.001
 
 # Optimizer
 optimizer = optim.SGD(model.parameters(), lr=LR)
@@ -151,6 +147,7 @@ _, _, _, _ = train(
     start_epoch=1, # Try one epoch
     num_epochs=1, # Try one epoch
     save_every=1, # Try one epoch
+    backup_every=None,
     train_dataloader=train_dataloader,
     val_dataloader=test_dataloader,
     model=model, # Use the same model as before (partially pre-trained)
@@ -181,7 +178,8 @@ _, _, _, _ = train(
     name="arceus", # Use the same name, or just a different one if you are afraid of overwriting!
     start_epoch=start_epoch, # Resume from the correct epoch
     num_epochs=3, 
-    save_every=1, 
+    save_every=1,
+    backup_every=None,
     train_dataloader=train_dataloader,
     val_dataloader=test_dataloader,
     model=model, # Use the same model as before (partially pre-trained)

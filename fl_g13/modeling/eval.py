@@ -1,7 +1,14 @@
 import torch
+from torch.utils.data import DataLoader
+from torch.nn import Module
+from typing import List, Tuple
 
-
-def eval(dataloader, model, criterion, verbose=False):
+def eval(
+    dataloader: DataLoader,                      # DataLoader providing the evaluation dataset
+    model: Module,                               # The model to evaluate
+    criterion: Module,                           # Loss function used for evaluation
+    verbose: bool = False                        # If True, prints progress and intermediate results
+) -> Tuple[float, float, List[float]]:
     """
     Evaluate the model's performance on a given dataloader using the specified loss function.
 

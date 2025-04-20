@@ -56,7 +56,7 @@ Federated Learning Project, Group 13
 
 ## Project Organization
 
-```
+```text
 ├── LICENSE            <- Open-source license if one is chosen
 ├── Makefile           <- Makefile with convenience commands like `make data` or `make train`
 ├── README.md          <- The top-level README for developers using this project.
@@ -67,6 +67,10 @@ Federated Learning Project, Group 13
 │   └── raw            <- The original, immutable data dump.
 │
 ├── models             <- Trained and serialized models, model predictions, or model summaries
+│
+├── checkpoints        <- Folder for storning checkpoints created during training (the folder you mount in drive)
+│   └── ModelClass     <- Sub-folder for storing models of a certain class, automaitcally created
+│       └── runName_modelclass_epoch_i.pth
 │
 ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
 │                         the creator's initials, and a short `-` delimited description, e.g.
@@ -85,6 +89,9 @@ Federated Learning Project, Group 13
     ├── config.py               <- Store useful variables and configuration
     │
     ├── dataset.py              <- Scripts to download or generate data
+    │
+    ├── architectures           <- Classes for models architectures
+    │   └── BaseDino.py          
     │
     └── modeling                
         ├── load.py             <- Code to load models
@@ -162,8 +169,13 @@ Federated Learning Project, Group 13
 
 ### **Code Review & Version Control Regulation**
 
+Sure! Here's your updated section with the hint about `make export` and the suggestion to automate it at the end of each notebook:
+
+---
+
 1. **Ensure Reviewability**
     - Commit both `.ipynb` files and their exported `.py` versions to version control.
+
 2. **Use `nbautoexport` Tool**
     - Install with:
 
@@ -171,10 +183,31 @@ Federated Learning Project, Group 13
     nbautoexport install
     nbautoexport configure notebooks
     ```
-    - Then, anytime you want to export a notebook in a python script, run:
+
+    - Then, anytime you want to export a notebook to a Python script, run:
 
     ```bash
     nbautoexport export notebooks/<notebook_name>.ipynb
+    ```
+
+    - Equivalently, you can also run:
+
+    ```bash
+    make export
+    ```
+
+    for convenience — this will export **all** notebooks in the `notebooks/` folder automatically.
+
+    - 💡 **Pro Tip:** Add the following line at the end of each notebook to automatically export it every time you run it:
+
+    ```python
+    !nbautoexport export notebooks/<notebook_name>.ipynb
+    ```
+
+    or just do
+
+    ```python
+    !make export
     ```
 
 #### (PyCharm only) Use a Git Hook or File Watcher
