@@ -53,7 +53,7 @@ def save(
     # Create a directory for saving checkpoints specific to the model
     if with_model_dir:
         checkpoint_dir = os.path.join(checkpoint_dir, model_name)
-        os.makedirs(checkpoint_dir, exist_ok=True)
+    os.makedirs(checkpoint_dir, exist_ok=True)
 
     # If no prefix is provided, generate a random one
     if not prefix:
