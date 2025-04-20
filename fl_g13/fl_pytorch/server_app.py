@@ -12,13 +12,12 @@ from fl_g13.fl_pytorch.task import (
     get_weights,
     set_weights,
 )
-from fl_g13.modeling.test import test_model
-from fl_g13.modeling.ultis import load_or_create_model
+from fl_g13.modeling.eval import eval
+from fl_g13.modeling.load import load_or_create
 
 
 def gen_evaluate_fn(
         testloader: DataLoader,
-        device: torch.device,
         model=None,
         criterion=None,
 ):
@@ -26,9 +25,8 @@ def gen_evaluate_fn(
 
     def evaluate(server_round, parameters_ndarrays, config):
         """Evaluate global model on centralized test set."""
-        net = model
-        set_weights(net, parameters_ndarrays)
-        preds, labels, probs, inputs, test_accuracy, test_loss = test_model(net, testloader, criterion, device=device)
+        set_weights(model, parameters_ndarrays)
+        test_loss, test_accuracy, iteration_losses = eval(testloader, model, criterion)
         return test_loss, {"centralized_accuracy": test_accuracy}
 
     return evaluate
@@ -61,25 +59,33 @@ def get_data_set_default(context: Context):
     return cifar100_test
 
 
-def get_server_app(checkpoint_dir=None, save_every=2,
-                   model=None, optimizer=None, criterion=None,
+def get_server_app(checkpoint_dir,
+                   model_class,
+                   optimizer=None,
+                   criterion=None,
+                   scheduler=None,
+                   save_every=1,
                    get_datatest_fn=get_data_set_default,
                    num_rounds=10,
                    fraction_fit=1.0,  # Sample 100% of available clients for training
                    fraction_evaluate=0.5,  # Sample 50% of available clients for evaluation
-                   min_fit_clients=10,  # Never sample less than 10 clients for training
+                   min_fit_clients=5,  # Never sample less than 10 clients for training
                    min_evaluate_clients=5,  # Never sample less than 5 clients for evaluation
-                   min_available_clients=10,  # Wait until all 10 clients are available
+                   min_available_clients=5,  # Wait until all 10 clients are available
                    device=None,
                    use_wandb=False,
                    evaluate_fn=gen_evaluate_fn,
+                   save_best_model=False
                    ):
-    model, optimizer, start_epoch = load_or_create_model(
-        checkpoint_dir=checkpoint_dir,
-        model=model,
-        optimizer=optimizer,
-    )
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model, start_epoch = load_or_create(
+        path=checkpoint_dir,
+        model_class=model_class,
+        device=device,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        verbose=True,
+    )
 
     def server_fn(context: Context):
         print(f'Continue train model from epoch {start_epoch}')
@@ -114,13 +120,14 @@ def get_server_app(checkpoint_dir=None, save_every=2,
             fraction_evaluate=fraction_evaluate,
             initial_parameters=parameters,
             on_fit_config_fn=on_fit_config,
-            evaluate_fn=evaluate_fn(testloader, device=server_device, model=model, criterion=criterion),
+            evaluate_fn=evaluate_fn(testloader, model=model, criterion=criterion),
             evaluate_metrics_aggregation_fn=weighted_average,
             min_fit_clients=min_fit_clients,  # Never sample less than 10 clients for training
             min_evaluate_clients=min_evaluate_clients,  # Never sample less than 5 clients for evaluation
             min_available_clients=min_available_clients,
             save_every=save_every,
-            start_epoch =start_epoch,
+            start_epoch=start_epoch,
+            save_best_model=save_best_model
         )
         config = ServerConfig(num_rounds=num_rounds, round_timeout=None)
 

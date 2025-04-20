@@ -1,17 +1,16 @@
 """pytorch-example: A Flower / PyTorch app."""
 
-
 import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import ArrayRecord, Context, RecordDict
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from fl_g13.base_experimentation import dataset_handler
+from fl_g13 import dataset as dataset_handler
 from fl_g13.config import RAW_DATA_DIR
 from fl_g13.fl_pytorch.task import get_weights, set_weights
-from fl_g13.modeling.test import test_model
-from fl_g13.modeling.train import train_model
+from fl_g13.modeling.eval import eval
+from fl_g13.modeling.train import train
 
 
 class FlowerClient(NumPyClient):
@@ -23,10 +22,12 @@ class FlowerClient(NumPyClient):
     """
 
     def __init__(
-            self, net, client_state: RecordDict, trainloader, valloader, local_epochs, optimizer=None, criterion=None,
+            self, model, client_state: RecordDict, trainloader, valloader,
+            local_epochs,
+            optimizer=None, criterion=None, scheduler=None,
             device=None
     ):
-        self.net = net
+        self.model = model
         self.client_state = client_state
         self.trainloader = trainloader
         self.valloader = valloader
@@ -36,7 +37,8 @@ class FlowerClient(NumPyClient):
         if criterion is None:
             criterion = torch.nn.CrossEntropyLoss()
         if not optimizer:
-            optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+            optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+        self.scheduler = scheduler
         self.criterion = criterion
         self.optimizer = optimizer
         self.local_layer_name = "classification-head"
@@ -50,32 +52,39 @@ class FlowerClient(NumPyClient):
         """
 
         # Apply weights from global models (the whole model is replaced)
-        set_weights(self.net, parameters)
+        set_weights(self.model, parameters)
 
         # Override weights in classification layer with those this client
         # had at the end of the last fit() round it participated in
         # self._load_layer_weights_from_state()
 
-        train_loss = train_model(checkpoint_dir=None, dataloader=self.trainloader,
-                                 num_epochs=self.local_epochs, save_every=None,
-                                 model=self.net,
-                                 optimizer=self.optimizer,
-                                 loss_fn=self.criterion,
-                                 device=self.device,
-                                 print_batch=False)
+        all_training_losses, _, _, _ = train(checkpoint_dir=None,
+                                             name=None,
+                                             start_epoch=1,
+                                             num_epochs=self.local_epochs,
+                                             save_every=None,
+                                             backup_every=None,
+                                             train_dataloader=self.trainloader,
+                                             val_dataloader=None,
+                                             model=self.model,
+                                             criterion=self.criterion,
+                                             optimizer=self.optimizer,
+                                             scheduler=self.scheduler,
+                                             eval_every=None,
+                                             )
         # Save classification head to context's state to use in a future fit() call
         self._save_layer_weights_to_state()
 
         # Return locally-trained model and metrics
         return (
-            get_weights(self.net),
+            get_weights(self.model),
             len(self.trainloader.dataset),
-            {"train_loss": train_loss},
+            {"train_loss": sum(all_training_losses)},
         )
 
     def _save_layer_weights_to_state(self):
         """Save last layer weights to state."""
-        arr_record = ArrayRecord(self.net.state_dict())
+        arr_record = ArrayRecord(self.model.state_dict())
 
         # Add to RecordDict (replace if already exists)
         self.client_state[self.local_layer_name] = arr_record
@@ -88,7 +97,7 @@ class FlowerClient(NumPyClient):
         state_dict = self.client_state[self.local_layer_name].to_torch_state_dict()
 
         # apply previously saved classification head by this client
-        self.net.load_state_dict(state_dict, strict=True)
+        self.model.load_state_dict(state_dict, strict=True)
 
     def evaluate(self, parameters, config):
         """Evaluate the global model on the local validation set.
@@ -96,12 +105,11 @@ class FlowerClient(NumPyClient):
         Note the classification head is replaced with the weights this client had the
         last time it trained the model.
         """
-        set_weights(self.net, parameters)
+        set_weights(self.model, parameters)
         # Override weights in classification layer with those this client
         # had at the end of the last fit() round it participated in
         self._load_layer_weights_from_state()
-        preds, labels, probs, inputs, test_accuracy, test_loss = test_model(self.net, self.valloader, self.criterion,
-                                                                            device=self.device)
+        test_loss, test_accuracy, _ = eval(self.valloader, self.model, self.criterion)
 
         return test_loss, len(self.valloader.dataset), {"accuracy": test_accuracy}
 
@@ -130,7 +138,8 @@ def load_data_client_default(context: Context):
     return trainloader, valloader
 
 
-def get_client_app(load_data_fn=load_data_client_default, model=None, optimizer=None, criterion=None,device=None,config:dict={'local-epochs':2}):
+def get_client_app(load_data_fn=load_data_client_default, model=None, optimizer=None, criterion=None, device=None,
+                   config: dict = {'local-epochs': 2}):
     def client_fn(context: Context):
         # Load model and data
         # net = model
@@ -146,7 +155,8 @@ def get_client_app(load_data_fn=load_data_client_default, model=None, optimizer=
         # receives the same Context instance (it's a 1:1 mapping)
         client_state = context.state
         return FlowerClient(
-            model, client_state, trainloader, valloader, local_epochs, optimizer=optimizer, criterion=criterion,device=device
+            model, client_state, trainloader, valloader, local_epochs, optimizer=optimizer, criterion=criterion,
+            device=device
         ).to_client()
 
     # Flower ClientApp

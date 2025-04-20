@@ -85,14 +85,14 @@ def train_one_epoch(
 
 
 def train(
-    checkpoint_dir: str,         # Directory where model checkpoints will be saved
+    checkpoint_dir: Optional[str],         # Directory where model checkpoints will be saved
     name: Optional[str],         # Prefix or name for the model checkpoints
     start_epoch: int,            # Starting epoch number (useful for resuming training)
     num_epochs: int,             # Total number of epochs to train the model
-    save_every: int,             # Frequency (in epochs) to save model checkpoints
-    backup_every: int,           # Frequency (in epochs) to backup model checkpoints
+    save_every: Optional[int],             # Frequency (in epochs) to save model checkpoints
+    backup_every: Optional[int],           # Frequency (in epochs) to backup model checkpoints
     train_dataloader: DataLoader,       # DataLoader for the training dataset
-    val_dataloader: DataLoader,         # DataLoader for the validation dataset
+    val_dataloader: Optional[DataLoader],         # DataLoader for the validation dataset
     model: Module,                              # The model to be trained
     criterion: Module,                          # Loss function used for training
     optimizer: Optimizer,                       # Optimizer used to update model parameters
@@ -102,6 +102,7 @@ def train(
     all_validation_losses: Optional[List[float]] = None,         # Pre-allocated list to store validation losses (optional)
     all_training_accuracies: Optional[List[float]] = None,       # Pre-allocated list to store training accuracies (optional)
     all_validation_accuracies: Optional[List[float]] = None,     # Pre-allocated list to store validation accuracies (optional)
+    eval_every: Optional[int] = 1,    #  Frequency (in epochs) to run evaluation model
 ) -> Tuple[List[float], List[float], List[float], List[float]]:
     """
     Train the model for a given number of epochs, periodically saving checkpoints and tracking performance metrics.
@@ -152,11 +153,12 @@ def train(
     if all_validation_accuracies is None:
         all_validation_accuracies = []
 
+    adjusted_end_epoch = start_epoch + num_epochs - 1
     for epoch in range(1, num_epochs + 1):
         
         # Adjust the epoch number for saving checkpoints
         adjusted_epoch = start_epoch + epoch - 1
-        adjusted_end_epoch = start_epoch + num_epochs - 1
+
 
         # Start the timer for the epoch
         start_time = time.time()
@@ -186,21 +188,21 @@ def train(
             f"\t⏳ Elapsed Time: {elapsed_time:.2f}s | ETA: {eta:.2f}s\n"
             f"\t🕒 Completed At: {current_time}"
         )
+        if val_dataloader and eval_every and epoch % eval_every == 0:
+            # Evaluate the model on the validation dataset
+            validation_loss, validation_accuracy, _ = eval(
+                dataloader=val_dataloader, model=model, criterion=criterion
+            )
+            # Append the per-iteration validation losses and accuracy to the total lists
+            all_validation_losses.append(validation_loss)
+            all_validation_accuracies.append(validation_accuracy)
 
-        # Evaluate the model on the validation dataset
-        validation_loss, validation_accuracy, _ = eval(
-            dataloader=val_dataloader, model=model, criterion=criterion
-        )
-        # Append the per-iteration validation losses and accuracy to the total lists
-        all_validation_losses.append(validation_loss)
-        all_validation_accuracies.append(validation_accuracy)
-
-        # Print validation results for the current epoch
-        print(
-            f"🔍 Validation Results:\n"
-            f"\t📉 Validation Loss: {validation_loss:.4f}\n"
-            f"\t🎯 Validation Accuracy: {100 * validation_accuracy:.2f}%"
-        )
+            # Print validation results for the current epoch
+            print(
+                f"🔍 Validation Results:\n"
+                f"\t📉 Validation Loss: {validation_loss:.4f}\n"
+                f"\t🎯 Validation Accuracy: {100 * validation_accuracy:.2f}%"
+            )
 
         print()
 
