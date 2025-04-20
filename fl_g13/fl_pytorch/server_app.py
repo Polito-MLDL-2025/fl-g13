@@ -98,17 +98,6 @@ def get_server_app(checkpoint_dir,
         parameters = ndarrays_to_parameters(ndarrays)
 
         # Prepare dataset for central evaluation
-
-        # This is the exact same dataset as the one donwloaded by the clients via
-        # FlowerDatasets. However, we don't use FlowerDatasets for the server since
-        # partitioning is not needed.
-        # We make use of the "test" split only
-        # global_test_set = load_dataset("zalando-datasets/fashion_mnist")["test"]
-        #
-        # testloader = DataLoader(
-        #     global_test_set.with_transform(apply_eval_transforms),
-        #     batch_size=32,
-        # )
         testloader = get_datatest_fn(context)
         # Define strategy
         strategy = CustomFedAvg(

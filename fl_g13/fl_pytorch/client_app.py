@@ -138,7 +138,11 @@ def load_data_client_default(context: Context):
     return trainloader, valloader
 
 
-def get_client_app(load_data_fn=load_data_client_default, model=None, optimizer=None, criterion=None, device=None,
+def get_client_app(load_data_fn=load_data_client_default,
+                   model=None,
+                   optimizer=None,
+                   criterion=None,
+                   device=None,
                    config: dict = {'local-epochs': 2}):
     def client_fn(context: Context):
         # Load model and data
