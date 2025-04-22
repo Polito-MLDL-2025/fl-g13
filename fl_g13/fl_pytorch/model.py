@@ -1,27 +1,38 @@
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor, optim, device, cuda
 
 
 class Net(nn.Module):
-    """Model (simple CNN adapted for Fashion-MNIST)"""
+    """Model (simple CNN adapted for cifar10)"""
 
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 16, 5)
+    def __init__(self) -> None:
+        super(Net, self).__init__()
+        self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(16, 32, 5)
-        self.fc1 = nn.Linear(32 * 4 * 4, 128)
-        self.fc2 = nn.Linear(128, 10)
+        self.conv2 = nn.Conv2d(6, 16, 5)
+        self.fc1 = nn.Linear(16 * 5 * 5, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 10)
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 32 * 4 * 4)
+        x = x.view(-1, 16 * 5 * 5)
         x = F.relu(self.fc1(x))
-        return self.fc2(x)
-DEFAULT_MODEL = Net
-def get_default_model():
-    return DEFAULT_MODEL
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
 
-def set_default_model(model):
-    DEFAULT_MODEL = model
+
+def get_default_model():
+    return Net()
+
+def get_experiment_setting():
+    """Get the experiment setting."""
+    model = get_default_model()
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    criterion = nn.CrossEntropyLoss()
+    dev = device("cuda:0" if cuda.is_available() else "cpu")
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5, eta_min=0.001)
+    return model, optimizer, criterion, dev, scheduler
