@@ -13,7 +13,7 @@ from fl_g13.config import RAW_DATA_DIR
 
 from torchvision import datasets, transforms
 
-from fl_g13.base_experimentation import dataset_handler
+from fl_g13 import dataset as dataset_handler
 
 import torch
 import torch.nn as nn
@@ -107,7 +107,8 @@ def load_data_client(context: Context):
 
 from fl_g13.fl_pytorch.client_app import get_client_app
 
-client = get_client_app(load_data_client,model=net,optimizer=optimizer,criterion=criterion,device=DEVICE)
+config={'local-epochs':1}
+client = get_client_app(load_data_client,model=net,optimizer=optimizer,criterion=criterion,device=DEVICE,config=config)
 
 
 # # Define the Flower ServerApp
@@ -132,7 +133,7 @@ model_test_path.resolve()
 
 
 num_rounds=2
-save_every =2
+save_every =1
 fraction_fit=1.0  # Sample 100% of available clients for training
 fraction_evaluate=0.5  # Sample 50% of available clients for evaluation
 min_fit_clients=10  # Never sample less than 10 clients for training
@@ -143,7 +144,8 @@ use_wandb=False
 
 
 server = get_server_app(checkpoint_dir=model_test_path.resolve(),
-                        model=net,optimizer=optimizer,criterion=criterion, get_datatest_fn=get_datatest_fn,
+                        model_class=TinyCNN,
+                        optimizer=optimizer,criterion=criterion, get_datatest_fn=get_datatest_fn,
                         num_rounds=num_rounds,
                         fraction_fit=fraction_fit, 
                         fraction_evaluate=fraction_evaluate,  
@@ -184,5 +186,26 @@ run_simulation(
 )
 
 
+server = get_server_app(checkpoint_dir=model_test_path.resolve(),
+                        model_class=TinyCNN,
+                        optimizer=optimizer,criterion=criterion, get_datatest_fn=get_datatest_fn,
+                        num_rounds=num_rounds,
+                        fraction_fit=fraction_fit, 
+                        fraction_evaluate=fraction_evaluate,  
+                        min_fit_clients=min_fit_clients,  
+                        min_evaluate_clients=min_evaluate_clients, 
+                        min_available_clients=min_available_clients, 
+                        device=device,
+                        use_wandb=use_wandb,
+                        save_every=save_every
+                        )
 
+
+# Run simulation second time
+run_simulation(
+    server_app=server,
+    client_app=client,
+    num_supernodes=NUM_CLIENTS,
+    backend_config=backend_config,
+)
 

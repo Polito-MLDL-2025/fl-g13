@@ -14,7 +14,7 @@ from flwr.server.strategy import FedAvg
 
 from fl_g13.fl_pytorch.model import get_default_model
 from fl_g13.fl_pytorch.task import create_run_dir, set_weights
-from fl_g13.modeling.ultis import save_model
+from fl_g13.modeling import save
 
 PROJECT_NAME = "FLOWER-advanced-pytorch"
 
@@ -27,15 +27,20 @@ class SaveModelFedAvg(FedAvg):
     results to W&B if enabled.
     """
 
-    def __init__(self, run_config: UserConfig, use_wandb: bool, model=None, checkpoint=None, save_every=1,start_epoch=1, *args,
+    def __init__(self, run_config: UserConfig, use_wandb: bool,
+                 model=None, checkpoint=None,
+                 save_every=1,
+                 start_epoch=1,
+                 save_best_model = True,
+                 *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
 
         # Create a directory where to save results from this run
-        self.save_path, self.run_dir = create_run_dir(run_config)
         self.use_wandb = use_wandb
         # Initialise W&B if set
         if use_wandb:
+            self.save_path, self.run_dir = create_run_dir(run_config)
             self._init_wandb_project()
 
         # Keep track of best acc
@@ -49,6 +54,7 @@ class SaveModelFedAvg(FedAvg):
         self.checkpoint = checkpoint
         self.save_every = save_every
         self.start_epoch = start_epoch
+        self.save_best_model = save_best_model
 
     def _init_wandb_project(self):
         # init W&B
@@ -74,29 +80,29 @@ class SaveModelFedAvg(FedAvg):
         """
         if accuracy > self.best_acc_so_far:
             self.best_acc_so_far = accuracy
-            logger.log(INFO, "💡 New best global model found: %f", accuracy)
+            logger.log(INFO, f"ROUND {round}💡 New best global model found: %f", accuracy)
             # You could save the parameters object directly.
             # Instead we are going to apply them to a PyTorch
             # model and save the state dict.
             # Converts flwr.common.Parameters to ndarrays
 
             ### Save best model
-
-            # ndarrays = parameters_to_ndarrays(parameters)
-            # net = self.model
-            # set_weights(net, ndarrays)
-            # # Save the PyTorch model
-            # # epoch = self.start_epoch + round - 1
-            # save_model(
-            #     model=self.model,
-            #     checkpoint_dir=self.checkpoint,
-            #     epoch=None,
-            #     prefix_name=self.model.__class__.__name__+"_best_",
-            # )
-
-
-            # file_name = f"model_state_acc_round_{round}.pth"
-            # torch.save(model.state_dict(), self.save_path / file_name)
+            if self.save_best_model:
+                ndarrays = parameters_to_ndarrays(parameters)
+                net = self.model
+                set_weights(net, ndarrays)
+                # Save the PyTorch model
+                epoch = self.start_epoch + round - 1
+                print(f"Saving best centralized model at epoch {epoch}...")
+                filename = f"FL_{self.model.__class__.__name__}_best.pth"
+                save(
+                    checkpoint_dir=self.checkpoint,
+                    prefix="FL",
+                    model=self.model,
+                    epoch=epoch,
+                    filename=filename,
+                    with_model_dir=False
+                )
 
     def aggregate_fit(
             self,
@@ -130,11 +136,12 @@ class SaveModelFedAvg(FedAvg):
                     aggregated_parameters
                 )
                 set_weights(self.model, aggregated_ndarrays)
-                save_model(
-                    model=self.model,
+                save(
                     checkpoint_dir=self.checkpoint,
+                    model=self.model,
+                    prefix="FL",
                     epoch=epoch,
-                    prefix_name=self.model.__class__.__name__,
+                    with_model_dir=False
                 )
 
         return aggregated_parameters, aggregated_metrics
@@ -160,17 +167,7 @@ class SaveModelFedAvg(FedAvg):
 
         # Save model if new best central accuracy is found
         self._update_best_acc(server_round, metrics["centralized_accuracy"], parameters)
-        # ndarrays = parameters_to_ndarrays(parameters)
-        # set_weights(self.model, ndarrays)
 
-        # if self.checkpoint and self.save_every and server_round % self.save_every == 0:
-        #     save_model(
-        #         model=self.model,
-        #         checkpoint_dir=self.checkpoint,
-        #         epoch=server_round,
-        #         prefix_name=self.model.__class__.__name__,
-        #     )
-        
         # Store and log
         self.store_results_and_log(
             server_round=server_round,

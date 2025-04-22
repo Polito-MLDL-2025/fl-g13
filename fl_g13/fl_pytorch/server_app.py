@@ -11,29 +11,26 @@ from fl_g13.fl_pytorch.task import (
     get_weights,
     set_weights,
 )
-from fl_g13.modeling.test import test_model
-from fl_g13.modeling.ultis import load_or_create_model
 from typing import List, Tuple
-from fl_g13.fl_pytorch.model import get_default_model
 from fl_g13.fl_pytorch.datasets import get_transforms
-from fl_g13.fl_pytorch.task import test
+#from fl_g13.fl_pytorch.task import test
 from datasets import load_dataset
+from fl_g13.modeling.eval import eval
+from fl_g13.modeling.load import load_or_create
 
 
 def get_evaluate_fn(
         testloader: DataLoader,
-        device: torch.device,
-        model,
-        criterion,
+        model=None,
+        criterion=None,
 ):
     """Generate the function for centralized evaluation of the global model on full test set. 
     Executed by the server at the end of each round."""
 
     def evaluate(server_round, parameters_ndarrays, config):
-        """Evaluate global model using centralized test set (full not partitioned test set)."""
+        """Evaluate global model on centralized test set."""
         set_weights(model, parameters_ndarrays)
-        # preds, labels, probs, inputs, test_accuracy, test_loss = test_model(model, testloader, criterion, device=device)
-        test_loss, test_accuracy = test(model, testloader, device=device)
+        test_loss, test_accuracy, iteration_losses = eval(testloader, model, criterion)
         return test_loss, {"centralized_accuracy": test_accuracy}
 
     return evaluate
@@ -75,27 +72,32 @@ def handle_fit_metrics(metrics: List[Tuple[int, Metrics]]) -> Metrics:
     return {"avg_train_loss": sum(train_losses) / sum(examples), "avg_drift": sum(train_drifts) / sum(examples)}
 
 
-def get_server_app(
-        model, 
-        optimizer, 
-        criterion,
-        checkpoint_dir=None, 
-        save_every=2,
-        num_rounds=10,
-        fraction_fit=1.0,  # Sample 100% of available clients for training
-        fraction_evaluate=0.5,  # Sample 50% of available clients for evaluation
-        min_fit_clients=10,  # Never sample less than 10 clients for training
-        min_evaluate_clients=5,  # Never sample less than 5 clients for evaluation
-        min_available_clients=10,  # Wait until all 10 clients are available
-        device=None,
-        use_wandb=False,
-    ) -> ServerApp:
-    model, optimizer, start_epoch = load_or_create_model(
-        checkpoint_dir=checkpoint_dir,
-        model=model,
-        optimizer=optimizer,
-    )
+def get_server_app(checkpoint_dir,
+                   model_class,
+                   optimizer=None,
+                   criterion=None,
+                   scheduler=None,
+                   save_every=1,
+                   num_rounds=10,
+                   fraction_fit=1.0,  # Sample 100% of available clients for training
+                   fraction_evaluate=0.5,  # Sample 50% of available clients for evaluation
+                   min_fit_clients=5,  # Never sample less than 10 clients for training
+                   min_evaluate_clients=5,  # Never sample less than 5 clients for evaluation
+                   min_available_clients=5,  # Wait until all 10 clients are available
+                   device=None,
+                   use_wandb=False,
+                   evaluate_fn=get_evaluate_fn,
+                   save_best_model=False
+                   ):
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model, start_epoch = load_or_create(
+        path=checkpoint_dir,
+        model_class=model_class,
+        device=device,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        verbose=True,
+    )
 
     def server_fn(context: Context):
         print(f'Continue train model from epoch {start_epoch}')
@@ -122,7 +124,7 @@ def get_server_app(
             fraction_evaluate=fraction_evaluate,
             initial_parameters=parameters,
             on_fit_config_fn=on_fit_config,
-            evaluate_fn=get_evaluate_fn(testloader, device, model, criterion), 
+            evaluate_fn=get_evaluate_fn(testloader, model, criterion), 
             evaluate_metrics_aggregation_fn=weighted_average,
             min_fit_clients=min_fit_clients, 
             min_evaluate_clients=min_evaluate_clients, 
@@ -130,6 +132,7 @@ def get_server_app(
             save_every=save_every,
             start_epoch =start_epoch,
             fit_metrics_aggregation_fn=handle_fit_metrics,
+            save_best_model=save_best_model,
         )
         config = ServerConfig(num_rounds=number_rounds, round_timeout=None)
 

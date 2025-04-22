@@ -1,18 +1,17 @@
 """pytorch-example: A Flower / PyTorch app."""
 
-
 import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import ArrayRecord, Context, RecordDict
 
 from fl_g13.fl_pytorch.task import get_weights, set_weights
-from fl_g13.modeling.test import test_model
-from fl_g13.modeling.train import train_model
 from fl_g13.fl_pytorch.datasets import load_datasets
-from fl_g13.fl_pytorch.model import get_default_model
-from fl_g13.fl_pytorch.task import train, test
+#from fl_g13.fl_pytorch.task import train, test
 import numpy as np
 from typing import List
+from fl_g13.modeling.eval import eval
+from fl_g13.modeling.train import train
+
 
 class FlowerClient(NumPyClient):
     """A simple client that showcases how to use the state.
@@ -23,30 +22,23 @@ class FlowerClient(NumPyClient):
     """
 
     def __init__(
-        self, 
-        net, 
-        client_state: RecordDict, 
-        trainloader, 
-        valloader, 
-        local_epochs, 
-        optimizer=None, 
-        criterion=None,
-        device=None, 
-        scheduler=None
+            self, model, client_state: RecordDict, trainloader, valloader,
+            local_epochs,
+            optimizer=None, criterion=None, scheduler=None,
+            device=None
     ):
-        self.net = net
+        self.model = model
         self.client_state = client_state
         self.trainloader = trainloader
         self.valloader = valloader
         self.local_epochs = local_epochs
         self.device = device or torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.net.to(self.device)
+        self.model.to(self.device)
         if not criterion:
             criterion = torch.nn.CrossEntropyLoss()
         if not optimizer:
-            optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-        if not scheduler:
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5, eta_min=0.001)
+            optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+        self.scheduler = scheduler
         self.criterion = criterion
         self.optimizer = optimizer
         self.scheduler = scheduler
@@ -67,34 +59,32 @@ class FlowerClient(NumPyClient):
         self.last_global_weights = model_weights_to_vector(parameters)
 
         # Apply weights from global models (the whole local model weights are replaced)
-        set_weights(self.net, parameters)
+        set_weights(self.model, parameters)
 
         # Override weights in classification layer with those this client
         # had at the end of the last fit() round it participated in
         # self._load_layer_weights_from_state()
 
-        # train_loss = train_model(
-        #     checkpoint_dir=None, 
-        #     dataloader=self.trainloader,
-        #     num_epochs=self.local_epochs, 
-        #     save_every=None,
-        #     model=self.net,
-        #     optimizer=self.optimizer,
-        #     loss_fn=self.criterion,
-        #     device=self.device,
-        #     print_batch=False,
-        #     scheduler=self.scheduler,
-        #     lr=lr,
-        # )
-
-        train_loss = train(self.net, self.trainloader, self.local_epochs, self.device)
-
+        all_training_losses, _, _, _ = train(checkpoint_dir=None,
+                                             name=None,
+                                             start_epoch=1,
+                                             num_epochs=self.local_epochs,
+                                             save_every=None,
+                                             backup_every=None,
+                                             train_dataloader=self.trainloader,
+                                             val_dataloader=None,
+                                             model=self.model,
+                                             criterion=self.criterion,
+                                             optimizer=self.optimizer,
+                                             scheduler=self.scheduler,
+                                             eval_every=None,
+                                             )
+        
         updated_weights = get_weights(self.net)
         updated_vector = model_weights_to_vector(updated_weights)
 
         # Client drift (Euclidean)
         drift = np.linalg.norm(updated_vector - self.last_global_weights)
-        
         # Save classification head to context's state to use in a future fit() call
         self._save_layer_weights_to_state()
 
@@ -102,12 +92,12 @@ class FlowerClient(NumPyClient):
         return (
             updated_weights,
             len(self.trainloader.dataset),
-            {"train_loss": train_loss, "drift": drift.tolist()}, # if you have more complex metrics you have to serialize them with json since Metrics value allow only Scalar
+            {"train_loss": sum(all_training_losses), "drift": drift.tolist()}, # if you have more complex metrics you have to serialize them with json since Metrics value allow only Scalar
         )
 
     def _save_layer_weights_to_state(self):
         """Save last layer weights to state."""
-        arr_record = ArrayRecord(self.net.state_dict())
+        arr_record = ArrayRecord(self.model.state_dict())
 
         # Add to RecordDict (replace if already exists)
         self.client_state[self.local_layer_name] = arr_record
@@ -120,7 +110,7 @@ class FlowerClient(NumPyClient):
         state_dict = self.client_state[self.local_layer_name].to_torch_state_dict()
 
         # apply previously saved classification head by this client
-        self.net.load_state_dict(state_dict, strict=True)
+        self.model.load_state_dict(state_dict, strict=True)
 
     def evaluate(self, parameters, config):
         """Evaluate the global model on the local validation set.
@@ -128,13 +118,11 @@ class FlowerClient(NumPyClient):
         Note the classification head is replaced with the weights this client had the
         last time it trained the model.
         """
-        set_weights(self.net, parameters)
+        set_weights(self.model, parameters)
         # Override weights in classification layer with those this client
         # had at the end of the last fit() round it participated in
         self._load_layer_weights_from_state()
-        # preds, labels, probs, inputs, test_accuracy, test_loss = test_model(self.net, self.valloader, self.criterion,
-        #                                                                     device=self.device)
-        test_loss, test_accuracy = test(self.net, self.valloader, self.device)
+        test_loss, test_accuracy, _ = eval(self.valloader, self.model, self.criterion)
 
         return test_loss, len(self.valloader.dataset), {"accuracy": test_accuracy}
 
