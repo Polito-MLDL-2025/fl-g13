@@ -1,7 +1,8 @@
 from enum import Enum
 import glob
 import os
-from typing import Optional, Tuple, Type
+from typing import Optional, Tuple, Type, List, Dict
+import json
 
 import torch
 from torch import nn, optim
@@ -89,6 +90,73 @@ def save(
     # Print confirmation message with the path to the saved checkpoint
     print(f"💾 Saved checkpoint at: {filename}")
 
+def save_loss_and_accuracy(
+    checkpoint_dir: str, 
+    prefix: Optional[str],
+    model: nn.Module,
+    epoch: int,
+    train_losses: List[float],
+    train_accuracies: List[float],
+    train_epochs: List[int],
+    val_losses: Optional[List[float]],
+    val_accuracies: Optional[List[float]],
+    val_epochs: Optional[List[int]],
+    filename: Optional[str] = None,
+    with_model_dir: bool = True,
+):
+    """
+    Saves the training loss and accuracy and the validation loss and accuracy to a json file under 
+        a subfolder named after the model's class name.
+
+    Args:
+        checkpoint_dir (str): Directory where the json file will be saved.
+        prefix (Optional[str]): Prefix for the json file name. If None, a random name will be generated.
+        model (torch.nn.Module): The model whose metrics will be saved.
+        epoch (int): The current epoch number to include in the json file name.
+        train_losses (List[float]): Training losses values.
+        train_accuracies (List[float]): Training accuracies values.
+        train_epochs (List[int]): Epoch number for each training measurement.
+        val_losses (Optional[List[float]]): Validation losses values.
+        val_accuracies (Optional[List[float]]): Validation accuracies values.
+        val_epochs (Optional[List[int]]): Epoch number for each validation measurement.
+        filename (Optional[str]): set filename for save file if provided
+        with_model_dir
+    Returns:
+        None
+    """
+    # Get the name of the model class
+    model_name = model.__class__.__name__
+
+    # Create a directory for saving checkpoints specific to the model
+    if with_model_dir:
+        checkpoint_dir = os.path.join(checkpoint_dir, model_name)
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    # If no prefix is provided, generate a random one
+    if not prefix:
+        prefix = generate_goofy_name()
+
+    # Construct the filename for the checkpoint
+    if not filename:
+        filename = os.path.join(checkpoint_dir, f"{prefix}_{model_name}_epoch_{epoch}.loss_acc.json")
+    else:
+        filename = os.path.join(checkpoint_dir, filename)
+    
+    # Create a dictionary with the data and store in a json file 
+    metrics = {
+        'train_loss': train_losses,
+        'val_loss': val_losses,
+        'train_acc': train_accuracies,
+        'val_acc': val_accuracies,
+        'train_epochs': train_epochs,
+        'val_epochs': val_epochs 
+    }
+    
+    with open(filename, 'w') as f:
+        json.dump(metrics, f, indent = 4)
+        
+    # Print confirmation message with the path to the saved checkpoint
+    print(f"💾 Saved losses and accuracies (training and validation) at: {filename}")
 
 def load(
         path: str,
@@ -215,6 +283,33 @@ def load_or_create(
 
         return model, 1
 
+def load_loss_and_accuracies(
+    path: str,
+    verbose: bool = False
+)-> Dict[str, Optional[List[float|int]]]:
+    """
+    Loads the training losses and accuracies and validation losses and accuracies from a file.
+
+    Args:
+        path (str): Path to the checkpoint file.
+        verbose (bool): Whether to print loading info.
+    Returns:
+        Dict[str, Optional[List[float|int]]]: Dictionary with the metrics. 
+    """
+    # Check if the file exists
+    if not os.path.isfile(path):
+        # raise an error if the file does not exists
+        raise FileNotFoundError(f"Specified path does not exists: {path}")
+    
+    # Load data
+    with open(path, 'r') as f:
+        loaded_metrics = json.load(f)
+    
+    print(f"📈 Loss and Accuracy data correctly loaded")
+    if verbose:
+        print("\tKeys found:", list(loaded_metrics.keys()))
+        
+    return loaded_metrics
 
 def get_model(model_class: Type[nn.Module] | Module):
     # If model_class is already an instance, use it directly
@@ -227,3 +322,40 @@ def get_model(model_class: Type[nn.Module] | Module):
         except TypeError as e:
             raise ValueError("Model class requires a config or arguments for instantiation.") from e
     return model
+
+import matplotlib.pyplot as plt
+
+def plot_metrics(
+    path: str
+):
+    # load metrics
+    metrics = load_loss_and_accuracies(path)
+
+    train_epochs = metrics['train_epochs']
+    val_epochs = metrics.get('val_epochs', [])
+
+    # two plots, separate for loss and accuracy
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Loss
+    ax1.plot(train_epochs, metrics['train_loss'], label='Train Loss', color='tab:blue')
+    if metrics['val_loss']:
+        ax1.plot(val_epochs, metrics['val_loss'], label='Val Loss', color='tab:orange')
+    ax1.set_title('Loss over Epochs')
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Loss')
+    ax1.legend()
+    ax1.grid(True)
+
+    # Accuracy
+    ax2.plot(train_epochs, metrics['train_acc'], label='Train Accuracy', color='tab:green')
+    if metrics['val_acc']:
+        ax2.plot(val_epochs, metrics['val_acc'], label='Val Accuracy', color='tab:red')
+    ax2.set_title('Accuracy over Epochs')
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('Accuracy')
+    ax2.legend()
+    ax2.grid(True)
+
+    plt.tight_layout()
+    plt.show()
