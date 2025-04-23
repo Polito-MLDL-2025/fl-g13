@@ -80,7 +80,7 @@ class FlowerClient(NumPyClient):
                                              eval_every=None,
                                              )
         
-        updated_weights = get_weights(self.net)
+        updated_weights = get_weights(self.model)
         updated_vector = model_weights_to_vector(updated_weights)
 
         # Client drift (Euclidean)
