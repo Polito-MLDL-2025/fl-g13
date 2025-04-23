@@ -8,7 +8,7 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 
 from fl_g13.modeling.eval import eval
-from fl_g13.modeling.load import save
+from fl_g13.modeling.load import save, save_loss_and_accuracy
 from fl_g13.modeling.utils import generate_goofy_name
 
 
@@ -146,11 +146,11 @@ def train(
     # Initialize lists if not provided
     if all_training_losses is None:
         all_training_losses = []
-    if all_validation_losses is None:
+    if val_dataloader and all_validation_losses is None:
         all_validation_losses = []
     if all_training_accuracies is None:
         all_training_accuracies = []
-    if all_validation_accuracies is None:
+    if val_dataloader and all_validation_accuracies is None:
         all_validation_accuracies = []
 
     adjusted_end_epoch = start_epoch + num_epochs - 1
@@ -214,12 +214,45 @@ def train(
         if save_every and epoch % save_every == 0:
             # Save the model, optimizer, and scheduler state
             save(checkpoint_dir=checkpoint_dir, prefix=name, model=model, epoch=adjusted_epoch, optimizer=optimizer, scheduler=scheduler)
+            
+            # Save the train/val loss and train/val accuracy
+            train_epochs = list(range(start_epoch, adjusted_epoch + 1))
+            val_epochs = list(range(start_epoch, adjusted_epoch + 1, eval_every)) if val_dataloader else None
+            
+            save_loss_and_accuracy(
+                checkpoint_dir = checkpoint_dir,
+                prefix = name,
+                model = model,
+                epoch = adjusted_epoch,
+                train_losses = all_training_losses,
+                train_accuracies = all_training_accuracies,
+                train_epochs = train_epochs,
+                val_losses = all_validation_losses,
+                val_accuracies = all_validation_accuracies,
+                val_epochs = val_epochs
+            )
             print()
 
         if backup_every and epoch % backup_every == 0:
             # Backup the model, optimizer, and scheduler state to avoid overwriting
             print(f"Running backup for epoch {epoch}")
             save(checkpoint_dir=f"{checkpoint_dir}/backup", prefix=f"backup_{time.strftime('%Y%m%d_%H%M%S', time.localtime())}_{name}", model=model, epoch=adjusted_epoch, optimizer=optimizer, scheduler=scheduler)
+            
+            # Backup metrics
+            train_epochs = list(range(start_epoch, adjusted_epoch + 1))
+            val_epochs = list(range(start_epoch, adjusted_epoch + 1, eval_every)) if val_dataloader else None
+            save_loss_and_accuracy(
+                checkpoint_dir = f"{checkpoint_dir}/backup",
+                prefix = f"backup_{time.strftime('%Y%m%d_%H%M%S', time.localtime())}_{name}",
+                model = model,
+                epoch = adjusted_epoch,
+                train_losses = all_training_losses,
+                train_accuracies = all_training_accuracies,
+                train_epochs = train_epochs,
+                val_losses = all_validation_losses,
+                val_accuracies = all_validation_accuracies,
+                val_epochs = val_epochs
+            )
             print()
 
 
