@@ -227,9 +227,9 @@ def download_if_not_exists(file_path: str, file_url: str):
 
 
 download_if_not_exists("vision_transformer.py",
-                       "wget https://raw.githubusercontent.com/facebookresearch/dino/refs/heads/main/vision_transformer.py")
+                       "https://raw.githubusercontent.com/facebookresearch/dino/refs/heads/main/vision_transformer.py")
 download_if_not_exists("utils.py",
-                       "wget https://raw.githubusercontent.com/facebookresearch/dino/refs/heads/main/utils.py")
+                       "https://raw.githubusercontent.com/facebookresearch/dino/refs/heads/main/utils.py")
 
 
 # 
