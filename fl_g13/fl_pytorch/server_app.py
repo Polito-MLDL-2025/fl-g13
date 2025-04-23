@@ -62,8 +62,8 @@ def handle_fit_metrics(metrics: List[Tuple[int, Metrics]]) -> Metrics:
     Aggregate application specific metrics computed by clients at each round with .fit()"""
     
     for _, m in metrics:
-        print(f"client train loss: {m["train_loss"]}")
-        print(f"client drift: {m["drift"]}")
+        print(f"client train loss: {m['train_loss']}")
+        print(f"client drift: {m['drift']}")
     
     train_losses = [num_examples * m["train_loss"] for num_examples, m in metrics]
     train_drifts = [num_examples * m["drift"] for num_examples, m in metrics]
