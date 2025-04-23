@@ -125,6 +125,6 @@ class BaseDino(nn.Module):
             head_layers=config.get('head_layers', DEFAULT_HEAD_LAYERS),
             num_classes=config.get('num_classes', DEFAULT_NUM_CLASSES),
             unfreeze_blocks=config.get('unfreeze_blocks', DEFAULT_UNFREEZE_BLOCKS),
-            activation_fn=act,
+            activation=act,
             pretrained=config.get('pretrained', DEFAULT_PRETRAINED),
         )
