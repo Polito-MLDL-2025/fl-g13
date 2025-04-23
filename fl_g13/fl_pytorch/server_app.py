@@ -12,11 +12,12 @@ from fl_g13.fl_pytorch.task import (
     set_weights,
 )
 from typing import List, Tuple
-from fl_g13.fl_pytorch.datasets import get_transforms
+from fl_g13.fl_pytorch.datasets import get_eval_transforms
 #from fl_g13.fl_pytorch.task import test
 from datasets import load_dataset
 from fl_g13.modeling.eval import eval
 from fl_g13.modeling.load import load_or_create
+from torchvision import datasets
 
 
 def get_evaluate_fn(
@@ -86,7 +87,6 @@ def get_server_app(checkpoint_dir,
                    min_available_clients=5,  # Wait until all 10 clients are available
                    device=None,
                    use_wandb=False,
-                   evaluate_fn=get_evaluate_fn,
                    save_best_model=False
                    ):
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -109,10 +109,11 @@ def get_server_app(checkpoint_dir,
         ndarrays = get_weights(model)
         parameters = ndarrays_to_parameters(ndarrays)
 
-        testset = load_dataset("cifar10", split="test")
+        #testset = load_dataset("cifar100", split="test")
+        testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
 
         # load global full testset for central evaluation
-        testloader = DataLoader(testset.with_transform(get_transforms()), batch_size=32)
+        testloader = DataLoader(testset, batch_size=32)
         
         # Define strategy
         strategy = SaveModelFedAvg(

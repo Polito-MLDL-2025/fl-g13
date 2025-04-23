@@ -1,47 +1,61 @@
 from flwr_datasets import FederatedDataset
+from PIL import Image
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from flwr_datasets.partitioner import IidPartitioner, ShardPartitioner
 from flwr_datasets.visualization import plot_label_distributions
 import matplotlib.pyplot as plt
+from torch import stack, tensor, long
+import numpy as np
 
 BATCH_SIZE, NUM_SHARDS_PER_PARTITION = 32, 2
+
+def my_collate(batch):                   # batch è list(dict) con tensor già trasformati
+    imgs  = stack([b["img"] for b in batch]).float()
+    labels= tensor([b["fine_label"] for b in batch], dtype=long)
+    return imgs, labels
+
+def get_eval_transforms():
+    eval_transform = transforms.Compose([
+        transforms.Resize(256), # CIFRA100 is originally 32x32
+        transforms.CenterCrop(224), # But Dino works on 224x224
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
+    ])
+    return eval_transform
 
 def get_transforms():
     """Return a function that apply standard transformations to images."""
 
-    pytorch_transforms = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
-    )
-
     def apply_transforms(batch):
-        # Instead of passing transforms to CIFAR10(..., transform=transform)
-        # we will use this function to dataset.with_transform(apply_transforms)
-        # The transforms object is exactly the same
+        # Applica le trasformazioni alle immagini
+        pytorch_transforms = get_eval_transforms()
         batch["img"] = [pytorch_transforms(img) for img in batch["img"]]
+        batch["fine_label"] = [int(lbl) for lbl in batch["fine_label"]]
+        
         return batch
 
     return apply_transforms
 
 fds = None # Cache the FederatedDataset
 
-def load_datasets(partition_id: int, num_partitions: int, partition: str="iid"):
+def load_datasets(partition_id: int, num_partitions: int, partitionType: str="iid"):
 
     global fds
     if fds is None:
-        if partition == "iid":
+        if partitionType == "iid":
             fds = FederatedDataset(
-                dataset="cifar10",
+                dataset="cifar100",
                 partitioners={
                     "train": IidPartitioner(num_partitions=num_partitions),
                 },
             )
-        elif partition == "shard":
+        elif partitionType == "shard":
             fds = FederatedDataset(
-                dataset="cifar10",
+                dataset="cifar100",
                 partitioners={
                     "train": ShardPartitioner(
-                        num_partitions=num_partitions, partition_by="label", num_shards_per_partition=NUM_SHARDS_PER_PARTITION
+                        num_partitions=num_partitions, partition_by="fine_label", num_shards_per_partition=NUM_SHARDS_PER_PARTITION
                     )
                 },
             )
@@ -54,9 +68,9 @@ def load_datasets(partition_id: int, num_partitions: int, partition: str="iid"):
     # Create train/val for each partition and wrap it into DataLoader
     partition_train_test = partition_train_test.with_transform(get_transforms())
     trainloader = DataLoader(
-        partition_train_test["train"], batch_size=BATCH_SIZE, shuffle=True
+        partition_train_test["train"], batch_size=BATCH_SIZE, shuffle=True, collate_fn=my_collate
     )
-    valloader = DataLoader(partition_train_test["test"], batch_size=BATCH_SIZE) # local validation set partition loader for each client
+    valloader = DataLoader(partition_train_test["test"], batch_size=BATCH_SIZE, collate_fn=my_collate) # local validation set partition loader for each client
     return trainloader, valloader
 
 
@@ -65,7 +79,7 @@ def show_partition_distribution(partitioner):
 
     plot_label_distributions(
         partitioner,
-        label_name="label",
+        label_name="fine_label",
         plot_type="bar",
         size_unit="absolute",
         partition_id_axis="x",
@@ -77,7 +91,7 @@ def show_partition_distribution(partitioner):
 
     plot_label_distributions(
         partitioner,
-        label_name="label",
+        label_name="fine_label",
         plot_type="bar",
         size_unit="percent",
         partition_id_axis="x",
@@ -89,7 +103,7 @@ def show_partition_distribution(partitioner):
 
     plot_label_distributions(
         partitioner,
-        label_name="label",
+        label_name="fine_label",
         plot_type="heatmap",
         size_unit="absolute",
         partition_id_axis="x",
@@ -101,7 +115,7 @@ def show_partition_distribution(partitioner):
 
     plot_label_distributions(
         partitioner,
-        label_name="label",
+        label_name="fine_label",
         plot_type="heatmap",
         size_unit="percent",
         partition_id_axis="x",

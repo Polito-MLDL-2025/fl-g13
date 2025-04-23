@@ -144,7 +144,7 @@ def get_client_app(
         """Create a Flower client."""
         partition_id = context.node_config["partition-id"] # assigned at runtime
         num_partitions = context.node_config["num-partitions"]
-        trainloader, valloader = load_datasets(partition_id, num_partitions, partition)
+        trainloader, valloader = load_datasets(partition_id, num_partitions, partitionType=partition)
 
         # Return Client instance
         # We pass the state to persist information across
