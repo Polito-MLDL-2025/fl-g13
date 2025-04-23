@@ -11,12 +11,16 @@
 - not seeing comments
 
 ### Notes
-- Transformations to use:
-	- Normalization
-	- Random Crop
-	- Horizontal Flip (no vert!) 
-	- (Only normalization for Test)
-- Try different batch_size
+-Cross validation
+	X Try different learning_rates -> done by the scheduler
+	- Try different batch_size -> 64, 128, 256
+	- Try different layer_size -> 1024, 2048
+	- Try different number_of_layers -> 3, 5, 8
+X Transformations to use:
+	X Normalization
+	X Random Crop
+	X Horizontal Flip (no vert!) 
+	X (Only normalization for Test)
 X Optimizer? SGD
 X Scheduler? CosineAnihilatorWarmRestart
 X Dropout? Yes

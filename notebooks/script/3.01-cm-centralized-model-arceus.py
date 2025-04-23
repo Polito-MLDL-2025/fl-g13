@@ -21,7 +21,7 @@ from fl_g13.config import RAW_DATA_DIR
 from fl_g13.modeling import train, eval, save, load, backup
 from fl_g13.dataset import train_test_split
 
-from models import BaseDino
+from fl_g13.architectures import BaseDino
 
 
 # Define preprocessing pipeline
@@ -51,17 +51,15 @@ print(f"Validation dataset size: {len(val_dataset)}")
 print(f"Test dataset size: {len(test_dataset)}")
 
 
-# Move to CUDA
+# Settings
+CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# Settings
-CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
-name = "giratina"
 start_epoch=1
-num_epochs=50
-save_every=5
-backup_every=15
+num_epochs=30
+save_every=3
+backup_every=10
 
 # Hyper-parameters
 BATCH_SIZE = 128
@@ -72,12 +70,9 @@ train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True
 val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-# Model
-model = BaseDino(head_layers=3, head_hidden_size=1024, dropout_rate=0.15)
-model.to(device)
-print(f"Model: {model}")
-
 # Optimizer, scheduler, and loss function
+model = BaseDino()
+model.to(device)
 optimizer = SGD(model.parameters(), lr=LR)
 scheduler = CosineAnnealingWarmRestarts(
     optimizer, 
@@ -87,8 +82,17 @@ scheduler = CosineAnnealingWarmRestarts(
 )
 criterion = CrossEntropyLoss()
 
-
-print(f"Model head: {model.net.head}")
+# Model loading (uncomment to properly overwrite)
+model, start_epoch = load(
+    f"{CHECKPOINT_DIR}/BaseDino/arceus_BaseDino_epoch_80.pth",
+    model_class=BaseDino,
+    device=device,
+    optimizer=optimizer,
+    scheduler=scheduler,
+    verbose=True
+)
+model.to(device)
+print(f"\nModel: {model}")
 
 
 # Preallocated lists: if the training interrupts, it will still save their values
@@ -96,6 +100,8 @@ all_training_losses=[]       # Pre-allocated list for training losses
 all_validation_losses=[]     # Pre-allocated list for validation losses
 all_training_accuracies=[]   # Pre-allocated list for training accuracies
 all_validation_accuracies=[] # Pre-allocated list for validation accuracies
+
+name = "arceus"
 
 try:
     _, _, _, _ = train(
@@ -106,7 +112,7 @@ try:
         save_every=save_every,
         backup_every=backup_every,
         train_dataloader=train_dataloader,
-        val_dataloader=test_dataloader,
+        val_dataloader=val_dataloader,
         model=model,
         criterion=criterion,
         optimizer=optimizer,
@@ -126,7 +132,7 @@ except Exception as e:
 
 finally:
     # This always runs no matter what (hopefully)
-    backup(f"{CHECKPOINT_DIR}/{name}") # Backup the final checkpoint
+    #backup(f"{CHECKPOINT_DIR}") # Backup the final checkpoint
 
 
 import matplotlib.pyplot as plt
