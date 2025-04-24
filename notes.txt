@@ -3,6 +3,8 @@
 29/04 Questions for Riccardo
 - Does it make sense to do a dropout also on frozen layers?
 - Can we apply transformations on validation set?
+- Is it ok to overfitt the training if the validation is still increasing?
+- Limit in number of parameters? 
 
 15/04 Questions for Riccardo
 - At "make centralized model" we need to make just a model as in labs, or rather pre-traing with some batches the server's model, which will then be shared with the rest of the network?
