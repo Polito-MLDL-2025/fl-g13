@@ -38,10 +38,6 @@ class SaveModelFedAvg(FedAvg):
 
         # Create a directory where to save results from this run
         self.use_wandb = use_wandb
-        # Initialise W&B if set
-        if use_wandb:
-            self.save_path, self.run_dir = create_run_dir(run_config)
-            self._init_wandb_project()
 
         # Keep track of best acc
         self.best_acc_so_far = 0.0
@@ -55,6 +51,10 @@ class SaveModelFedAvg(FedAvg):
         self.save_every = save_every
         self.start_epoch = start_epoch
         self.save_best_model = save_best_model
+        # Initialise W&B if set
+        if use_wandb:
+            self.save_path, self.run_dir = create_run_dir(run_config)
+            self._init_wandb_project()
 
     def _init_wandb_project(self):
         # init W&B
