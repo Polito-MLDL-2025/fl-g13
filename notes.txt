@@ -14,12 +14,18 @@
 - What is Dino? What are scores in the table? Can we use DinoV2?
 - not seeing comments
 
+### Guidelines on final model
+- Few trainable parameters
+- Use same normalization as ImageNet
+- Use same transformations as Dino
+- No fancy params: weight decay, momentum, warm restart, ...
+
 ### Notes
 -Cross validation
 	X Try different learning_rates -> done by the scheduler
-	- Try different batch_size -> 64, 128, 256
-	- Try different layer_size -> 1024, 2048
-	- Try different number_of_layers -> 3, 5, 8
+	X Try different batch_size -> 64, 128, 256
+	X Try different layer_size -> 1024, 2048
+	X Try different number_of_layers -> 3, 5, 8
 X Transformations to use:
 	X Normalization
 	X Random Crop
@@ -27,6 +33,6 @@ X Transformations to use:
 	X (Only normalization for Test)
 X Optimizer? SGD
 X Scheduler? CosineAnihilatorWarmRestart
-X Dropout? Yes
+X Dropout? No
 X Drop paths? No
 X momentum? weight_decay? nesterov? No
