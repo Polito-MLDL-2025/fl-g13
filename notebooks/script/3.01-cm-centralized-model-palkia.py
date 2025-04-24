@@ -57,10 +57,10 @@ print(f"Using device: {device}")
 
 # Settings
 CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
-name = "giratina"
+name = "palkia"
 start_epoch=1
-num_epochs=50
-save_every=5
+num_epochs=80
+save_every=8
 backup_every=10
 
 # Hyper-parameters
@@ -73,21 +73,21 @@ val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 # Model
-model = BaseDino(head_layers=7, head_hidden_size=1024, dropout_rate=0.0)
+model = BaseDino(head_layers=5, head_hidden_size=1024, dropout_rate=0.0, unfreeze_blocks=1)
 model.to(device)
 # Optimizer, scheduler, and loss function
 optimizer = SGD(model.parameters(), lr=LR)
 scheduler = CosineAnnealingWarmRestarts(
     optimizer, 
-    T_0=10,           # First restart after 10 epochs
+    T_0=12,           # First restart after 12 epochs
     T_mult=2,        # Double the interval between restarts each time
-    eta_min=1e-5     # Minimum learning rate after annealing
+    eta_min=1e-6     # Minimum learning rate after annealing
 )
 criterion = CrossEntropyLoss()
 
 # Model loading (uncomment to properly overwrite)
 model, start_epoch = load(
-    f"{CHECKPOINT_DIR}/BaseDino/giratina_BaseDino_epoch_50.pth",
+    f"{CHECKPOINT_DIR}/BaseDino/palkia_BaseDino_epoch_48.pth",
     model_class=BaseDino,
     device=device,
     optimizer=optimizer,
@@ -95,7 +95,6 @@ model, start_epoch = load(
     verbose=True
 )
 model.to(device)
-load
 
 print(f"\nModel: {model}")
 
