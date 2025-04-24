@@ -136,7 +136,9 @@ def get_client_app(
         criterion=None,
         device=None, 
         partition="iid",
-        local_epochs=1,
+        local_epochs=4,
+        batch_size=50,
+        num_shards_per_partition=2,
     ) -> ClientApp:
     """Create a Flower client app."""
 
@@ -144,7 +146,13 @@ def get_client_app(
         """Create a Flower client."""
         partition_id = context.node_config["partition-id"] # assigned at runtime
         num_partitions = context.node_config["num-partitions"]
-        trainloader, valloader = load_datasets(partition_id, num_partitions, partitionType=partition)
+        trainloader, valloader = load_datasets(
+            partition_id, 
+            num_partitions, 
+            partitionType=partition,
+            batch_size=batch_size,
+            num_shards_per_partition=num_shards_per_partition,
+        )
 
         # Return Client instance
         # We pass the state to persist information across

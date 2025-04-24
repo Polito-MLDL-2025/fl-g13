@@ -16,7 +16,7 @@ from fl_g13.fl_pytorch.model import get_default_model
 from fl_g13.fl_pytorch.task import create_run_dir, set_weights
 from fl_g13.modeling import save
 
-PROJECT_NAME = "FLOWER-advanced-pytorch"
+PROJECT_NAME = "CIFAR100_FL_experiment"
 
 
 class SaveModelFedAvg(FedAvg):
@@ -58,7 +58,14 @@ class SaveModelFedAvg(FedAvg):
 
     def _init_wandb_project(self):
         # init W&B
-        wandb.init(project=PROJECT_NAME, name=f"{str(self.run_dir)}-ServerApp")
+        wandb.init(
+            project=PROJECT_NAME, 
+            name=f"{self.model.__class__}-ServerApp",
+            config={
+                "batch_size": 32,
+                "partition": "iid"
+            },
+        )
 
     def _store_results(self, tag: str, results_dict):
         """Store results in dictionary, then save as JSON."""

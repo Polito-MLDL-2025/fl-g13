@@ -1,16 +1,16 @@
 from flwr_datasets import FederatedDataset
-from PIL import Image
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from flwr_datasets.partitioner import IidPartitioner, ShardPartitioner
 from flwr_datasets.visualization import plot_label_distributions
 import matplotlib.pyplot as plt
 from torch import stack, tensor, long
-import numpy as np
+from typing import Tuple
 
 BATCH_SIZE, NUM_SHARDS_PER_PARTITION = 32, 2
 
-def my_collate(batch):                   # batch è list(dict) con tensor già trasformati
+def my_collate(batch):
+    """Custom collate function to handle the batch of data. Necessary to iterate over the dataset."""
     imgs  = stack([b["img"] for b in batch]).float()
     labels= tensor([b["fine_label"] for b in batch], dtype=long)
     return imgs, labels
@@ -28,7 +28,6 @@ def get_transforms():
     """Return a function that apply standard transformations to images."""
 
     def apply_transforms(batch):
-        # Applica le trasformazioni alle immagini
         pytorch_transforms = get_eval_transforms()
         batch["img"] = [pytorch_transforms(img) for img in batch["img"]]
         batch["fine_label"] = [int(lbl) for lbl in batch["fine_label"]]
@@ -39,23 +38,32 @@ def get_transforms():
 
 fds = None # Cache the FederatedDataset
 
-def load_datasets(partition_id: int, num_partitions: int, partitionType: str="iid"):
+def load_datasets(
+        partition_id: int, 
+        num_partitions: int,
+        dataset: str="cifar100",
+        partitionType: str="iid", 
+        batch_size: int=BATCH_SIZE,
+        num_shards_per_partition: int=NUM_SHARDS_PER_PARTITION
+    ) -> Tuple[DataLoader, DataLoader]:
 
     global fds
     if fds is None:
         if partitionType == "iid":
             fds = FederatedDataset(
-                dataset="cifar100",
+                dataset=dataset,
                 partitioners={
                     "train": IidPartitioner(num_partitions=num_partitions),
                 },
             )
         elif partitionType == "shard":
             fds = FederatedDataset(
-                dataset="cifar100",
+                dataset=dataset,
                 partitioners={
                     "train": ShardPartitioner(
-                        num_partitions=num_partitions, partition_by="fine_label", num_shards_per_partition=NUM_SHARDS_PER_PARTITION
+                        num_partitions=num_partitions, 
+                        partition_by="fine_label", 
+                        num_shards_per_partition=num_shards_per_partition
                     )
                 },
             )
@@ -68,9 +76,9 @@ def load_datasets(partition_id: int, num_partitions: int, partitionType: str="ii
     # Create train/val for each partition and wrap it into DataLoader
     partition_train_test = partition_train_test.with_transform(get_transforms())
     trainloader = DataLoader(
-        partition_train_test["train"], batch_size=BATCH_SIZE, shuffle=True, collate_fn=my_collate
+        partition_train_test["train"], batch_size=batch_size, shuffle=True, collate_fn=my_collate
     )
-    valloader = DataLoader(partition_train_test["test"], batch_size=BATCH_SIZE, collate_fn=my_collate) # local validation set partition loader for each client
+    valloader = DataLoader(partition_train_test["test"], batch_size=batch_size, collate_fn=my_collate) # local validation set partition loader for each client
     return trainloader, valloader
 
 

@@ -1,7 +1,8 @@
+from typing import Type
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import Tensor, optim, device, cuda
-from fl_g13.architectures import BaseDino
+from torch import Tensor, optim, device, cuda, nn
+from fl_g13.modeling.load import load_or_create, get_model
 
 
 class Net(nn.Module):
@@ -30,15 +31,12 @@ class Net(nn.Module):
 def get_default_model():
     return Net()
 
-def get_experiment_setting(debug=False):
+def get_experiment_setting(checkpoint_dir: str, model_class: Type[nn.Module] | nn.Module):
     """Get the experiment setting."""
-    if debug:
-        model = Net()
-    else:
-        model = BaseDino()
+    model = get_model(model_class)
     optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
     criterion = nn.CrossEntropyLoss()
     dev = device("cuda:0" if cuda.is_available() else "cpu")
-    model.to(dev)
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=8, T_mult=2, eta_min=0.001)
+    #model, _ = load_or_create(checkpoint_dir, model_class, dev, optimizer, scheduler)
     return model, optimizer, criterion, dev, scheduler
