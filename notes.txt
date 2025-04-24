@@ -1,6 +1,6 @@
 ### Questions
 
-29/04 Questions for Riccardo
+06/05 Questions for Riccardo
 - Does it make sense to do a dropout also on frozen layers?
 - Is it ok to overfitt the training if the validation is still increasing?
 - Should we use test in the valudation phase? Or rather split a validation set from the train?
