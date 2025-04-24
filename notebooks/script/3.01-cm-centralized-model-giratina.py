@@ -18,7 +18,7 @@ from torchvision import models
 from torchvision.transforms import Compose, Resize, CenterCrop, RandomCrop, RandomHorizontalFlip, RandomVerticalFlip, Normalize, ToTensor
 
 from fl_g13.config import RAW_DATA_DIR
-from fl_g13.modeling import train, eval, save, load, backup
+from fl_g13.modeling import train, eval, save, load, backup, load_loss_and_accuracies, save_loss_and_accuracy
 from fl_g13.dataset import train_test_split
 
 from fl_g13.architectures import BaseDino
@@ -95,9 +95,16 @@ model, start_epoch = load(
     verbose=True
 )
 model.to(device)
-load
+loaded_metrics = load_loss_and_accuracies(path=f"{CHECKPOINT_DIR}/BaseDino/giratina_BaseDino_epoch_50.loss_acc.json")
 
 print(f"\nModel: {model}")
+
+
+# Preallocated lists: if the training interrupts, it will still save their values
+all_training_losses=loaded_metrics["train_loss"]       # Pre-allocated list for training losses
+all_validation_losses=loaded_metrics["val_loss"]       # Pre-allocated list for validation losses
+all_training_accuracies=loaded_metrics["train_acc"]    # Pre-allocated list for training accuracies
+all_validation_accuracies=loaded_metrics["val_acc"]    # Pre-allocated list for validation accuracies
 
 
 # Evaluate the model on the validation dataset
@@ -109,12 +116,6 @@ print(
     f"\t🎯 Test Accuracy: {100 * test_accuracy:.2f}%"
 )
 
-
-# Preallocated lists: if the training interrupts, it will still save their values
-all_training_losses=[]       # Pre-allocated list for training losses
-all_validation_losses=[]     # Pre-allocated list for validation losses
-all_training_accuracies=[]   # Pre-allocated list for training accuracies
-all_validation_accuracies=[] # Pre-allocated list for validation accuracies
 
 try:
     _, _, _, _ = train(
