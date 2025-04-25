@@ -95,24 +95,24 @@ all_validation_losses=[]       # Pre-allocated list for validation losses
 all_training_accuracies=[]    # Pre-allocated list for training accuracies
 all_validation_accuracies=[]    # Pre-allocated list for validation accuracies
 
-# # Model loading (uncomment to properly overwrite)
-# loading_epoch = 50
-# model, start_epoch = load(
-#     f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
-#     model_class=BaseDino,
-#     device=device,
-#     optimizer=optimizer,
-#     scheduler=scheduler,
-#     verbose=True
-# )
-# model.to(device)
-# loaded_metrics = load_loss_and_accuracies(path=f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.loss_acc.json")
+# Model loading (uncomment to properly overwrite)
+loading_epoch = 60
+model, start_epoch = load(
+    f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
+    model_class=BaseDino,
+    device=device,
+    optimizer=optimizer,
+    scheduler=scheduler,
+    verbose=True
+)
+model.to(device)
+loaded_metrics = load_loss_and_accuracies(path=f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.loss_acc.json")
 
-# # Preallocated lists: if the training interrupts, it will still save their values (uncomment to properly load and overwrite)
-# all_training_losses=loaded_metrics["train_loss"]       # Pre-allocated list for training losses
-# all_validation_losses=loaded_metrics["val_loss"]       # Pre-allocated list for validation losses
-# all_training_accuracies=loaded_metrics["train_acc"]    # Pre-allocated list for training accuracies
-# all_validation_accuracies=loaded_metrics["val_acc"]    # Pre-allocated list for validation accuracies
+# Preallocated lists: if the training interrupts, it will still save their values (uncomment to properly load and overwrite)
+all_training_losses=loaded_metrics["train_loss"]       # Pre-allocated list for training losses
+all_validation_losses=loaded_metrics["val_loss"]       # Pre-allocated list for validation losses
+all_training_accuracies=loaded_metrics["train_acc"]    # Pre-allocated list for training accuracies
+all_validation_accuracies=loaded_metrics["val_acc"]    # Pre-allocated list for validation accuracies
 
 print(f"\nModel: {model}")
 
@@ -178,6 +178,91 @@ print(
     f"\t📉 Test Loss: {test_loss:.4f}\n"
     f"\t🎯 Test Accuracy: {100 * test_accuracy:.2f}%"
 )
+
+
+# ## Model Editing
+
+from torch.utils.data import Subset
+
+def extract_images_by_label(dataset, target_labels):
+    target_labels = set(target_labels)
+    matching_indices = [i for i in range(len(dataset)) if dataset[i][1] in target_labels]
+    return Subset(dataset, matching_indices)
+
+
+def train_task_model(labels, task_name):
+    def extract_subclass(dataset, ):
+        return extract_images_by_label(dataset, labels)
+
+    # Subsets
+    task_train_dataset = extract_subclass(cifar100_train)
+    task_test_dataset = extract_subclass(cifar100_test)
+
+    print("Lenght train dataset: ", len(task_train_dataset))
+    print("Lenght test  dataset: ", len(task_test_dataset))
+
+    # Dataloaders
+    task_train_dataloader = DataLoader(task_train_dataset, batch_size=64, shuffle=True)
+    task_test_dataloader = DataLoader(task_test_dataset, batch_size=64, shuffle=False)
+
+    # Load the original model
+    loading_epoch = 60
+    original_model, _ = load(
+        f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
+        model_class=BaseDino,
+        device=device,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        verbose=True
+    )
+    original_model.to(device)
+
+    # Define the task model as the original one
+    task_model, _ = load(
+        f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
+        model_class=BaseDino,
+        device=device,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        verbose=True
+    )
+    task_model.to(device)    
+    task_optimizer = SGD(task_model.parameters(), lr=1e-5)
+
+    # Train the task model
+    _, _, _, _ = train(
+        checkpoint_dir=CHECKPOINT_DIR,
+        name=f"{name}_{task_name}",
+        start_epoch=1,
+        num_epochs=15,
+        save_every=5,
+        backup_every=None,
+        train_dataloader=task_train_dataloader,
+        val_dataloader=task_test_dataloader,
+        model=task_model,
+        criterion=criterion,
+        optimizer=task_optimizer,
+        scheduler=None,
+        verbose=False,
+    )
+
+    return original_model, task_model
+
+
+original_model, task_model = train_task_model([0], "apple")
+
+
+# Compute the task vector
+task_vector = {}
+for (name1, param1), (name2, param2) in zip(original_model.named_parameters(), task_model.named_parameters()):
+    if name1 != name2:
+        raise ValueError(f"Parameter names do not match: {name1} vs {name2}")
+    task_vector[name1] = param2.data - param1.data
+
+# Example: print the last few entries of the task vector
+for param_name, diff in task_vector.items():
+    if torch.any(diff != 0):
+        print(f"{param_name}: {diff.shape}")
 
 
 
