@@ -31,16 +31,16 @@ train_transform = Compose([
     RandomCrop(224), # But Dino works on 224x224
     RandomHorizontalFlip(),
     ToTensor(),
-    #Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
-    Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+    #Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]), # CIFRAR100 Train stats
+    Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]) # Use ImageNet stats
 ])
 
 eval_transform = Compose([
     Resize(256), # CIFRA100 is originally 32x32
     CenterCrop(224), # But Dino works on 224x224
     ToTensor(),
-    #Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
-    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    #Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]), # CIFRAR100 Train stats
+    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]), # Use ImageNet stats
 ])
 
 cifar100_train = datasets.CIFAR100(root=RAW_DATA_DIR, train=True, download=True, transform=train_transform)
@@ -78,15 +78,15 @@ test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 # Model
 model = BaseDino(head_layers=5, head_hidden_size=512, dropout_rate=0.0, unfreeze_blocks=1)
 model.to(device)
+
 # Optimizer, scheduler, and loss function
 mask = [torch.ones_like(p, device=p.device) for p in model.parameters()] # Must be done AFTER the model is moved to CUDA
-print(mask)
 optimizer = SparseSGDM(model.parameters(), mask=mask, lr=LR)
 scheduler = CosineAnnealingWarmRestarts(
     optimizer, 
     T_0=15,          # First restart after 12 epochs
     T_mult=2,        # Double the interval between restarts each time
-    eta_min=1e-6     # Minimum learning rate after annealing
+    eta_min=1e-7     # Minimum learning rate after annealing
 )
 criterion = CrossEntropyLoss()
 
@@ -96,8 +96,9 @@ all_training_accuracies=[]    # Pre-allocated list for training accuracies
 all_validation_accuracies=[]    # Pre-allocated list for validation accuracies
 
 # # Model loading (uncomment to properly overwrite)
+# loading_epoch = 50
 # model, start_epoch = load(
-#     f"{CHECKPOINT_DIR}/BaseDino/uxie_BaseDino_epoch_x.pth",
+#     f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
 #     model_class=BaseDino,
 #     device=device,
 #     optimizer=optimizer,
@@ -105,9 +106,9 @@ all_validation_accuracies=[]    # Pre-allocated list for validation accuracies
 #     verbose=True
 # )
 # model.to(device)
-# loaded_metrics = load_loss_and_accuracies(path=f"{CHECKPOINT_DIR}/BaseDino/uxie_BaseDino_epoch_x.loss_acc.json")
+# loaded_metrics = load_loss_and_accuracies(path=f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.loss_acc.json")
 
-# Preallocated lists: if the training interrupts, it will still save their values
+# # Preallocated lists: if the training interrupts, it will still save their values (uncomment to properly load and overwrite)
 # all_training_losses=loaded_metrics["train_loss"]       # Pre-allocated list for training losses
 # all_validation_losses=loaded_metrics["val_loss"]       # Pre-allocated list for validation losses
 # all_training_accuracies=loaded_metrics["train_acc"]    # Pre-allocated list for training accuracies
