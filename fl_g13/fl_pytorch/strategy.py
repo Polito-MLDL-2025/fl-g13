@@ -170,12 +170,12 @@ class SaveModelFedAvg(FedAvg):
 
         if self.use_wandb:
             # Log centralized loss and metrics to W&B
-            wandb.log(results_dict, step=server_round)
+            wandb.log(results_dict, step=self.start_epoch + server_round)
         else:
             # Store results and save to disk
             self._store_results(
                 tag=tag,
-                results_dict={"round": server_round, **results_dict},
+                results_dict={"round": self.start_epoch + server_round, **results_dict},
             )
 
     def evaluate(self, server_round, parameters):

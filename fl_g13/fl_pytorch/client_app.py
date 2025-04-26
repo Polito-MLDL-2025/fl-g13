@@ -24,7 +24,7 @@ class FlowerClient(NumPyClient):
     def __init__(
             self, model, client_state: RecordDict, trainloader, valloader,
             local_epochs,
-            optimizer=None, criterion=None, scheduler=None,
+            optimizer: torch.optim.Optimizer=None, criterion=None, scheduler=None,
             device=None
     ):
         self.model = model
@@ -53,8 +53,11 @@ class FlowerClient(NumPyClient):
         training and used the next time this client participates.
         """
 
-        # config is a dict with the configuration metrics elaborated by strategy's on_fit_config_fn callback
-        lr = config.get("lr")
+        # lr decay per round as indicated in paper [10]. For more complex strategies you can use server .on_fit_config
+        # round = config["round"]
+
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] *= 0.99
 
         self.last_global_weights = model_weights_to_vector(parameters)
 

@@ -24,11 +24,21 @@ def get_eval_transforms():
     ])
     return eval_transform
 
+def get_train_transforms():
+    train_transform = transforms.Compose([
+        transforms.Resize(256),  # CIFRA100 is originally 32x32
+        transforms.RandomCrop(224),  # But Dino works on 224x224
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
+    ])
+    return train_transform
+
 def get_transforms():
     """Return a function that apply standard transformations to images."""
 
     def apply_transforms(batch):
-        pytorch_transforms = get_eval_transforms()
+        pytorch_transforms = get_train_transforms()
         batch["img"] = [pytorch_transforms(img) for img in batch["img"]]
         batch["fine_label"] = [int(lbl) for lbl in batch["fine_label"]]
         

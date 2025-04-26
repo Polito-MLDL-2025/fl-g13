@@ -40,11 +40,8 @@ def get_evaluate_fn(
 def on_fit_config(server_round: int) -> Metrics:
     """Allow communication from server to client.
     Construct `config` that clients receive when running `fit()`"""
-    lr = 0.1
-    # Enable a simple form of learning rate decay
-    if server_round > 10:
-        lr /= 2
-    return {"lr": lr}
+
+    return {"round": server_round}
 
 
 # Define metric aggregation function

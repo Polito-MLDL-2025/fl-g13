@@ -34,7 +34,7 @@ def get_default_model():
 def get_experiment_setting(checkpoint_dir: str, model_class: Type[nn.Module] | nn.Module):
     """Get the experiment setting."""
     model = get_model(model_class)
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.SGD(model.parameters(), lr=0.25, momentum=0.9)
     criterion = nn.CrossEntropyLoss()
     dev = device("cuda:0" if cuda.is_available() else "cpu")
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=8, T_mult=2, eta_min=0.001)
