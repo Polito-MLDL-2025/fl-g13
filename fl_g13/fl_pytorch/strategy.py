@@ -33,6 +33,7 @@ class SaveModelFedAvg(FedAvg):
                  save_every=1,
                  start_epoch=1,
                  save_best_model = True,
+                 wandb_config=None,
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
@@ -52,7 +53,7 @@ class SaveModelFedAvg(FedAvg):
         self.save_every = save_every
         self.start_epoch = start_epoch
         self.save_best_model = save_best_model
-        self.run_config = run_config
+        self.wandb_config = wandb_config
         # Initialise W&B if set
         if use_wandb:
             self.save_path, self.run_dir = create_run_dir(run_config)
@@ -73,8 +74,8 @@ class SaveModelFedAvg(FedAvg):
         # init W&B
         wandb.init(
             project=PROJECT_NAME, 
-            name=f"{self.model.__class__.__name__}",
-            config=self.run_config,
+            name=f"{self.model.__class__.__name__}-{self.wandb_config["partition"]}",
+            config=self.wandb_config,
             id=run_id,
             resume="allow",
         )
@@ -170,12 +171,12 @@ class SaveModelFedAvg(FedAvg):
 
         if self.use_wandb:
             # Log centralized loss and metrics to W&B
-            wandb.log(results_dict, step=self.start_epoch + server_round)
+            wandb.log(results_dict, step=self.start_epoch + server_round - 1)
         else:
             # Store results and save to disk
             self._store_results(
                 tag=tag,
-                results_dict={"round": self.start_epoch + server_round, **results_dict},
+                results_dict={"round": self.start_epoch + server_round - 1, **results_dict},
             )
 
     def evaluate(self, server_round, parameters):

@@ -84,7 +84,8 @@ def get_server_app(checkpoint_dir,
                    min_available_clients=100,  # Wait until all 100 clients are available
                    device=None,
                    use_wandb=False,
-                   save_best_model=False
+                   save_best_model=False,
+                   wandb_config=None,
                    ):
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, start_epoch = load_or_create(
@@ -131,6 +132,7 @@ def get_server_app(checkpoint_dir,
             start_epoch =start_epoch,
             fit_metrics_aggregation_fn=handle_fit_metrics,
             save_best_model=save_best_model,
+            wandb_config=wandb_config,
         )
         config = ServerConfig(num_rounds=number_rounds, round_timeout=None)
 

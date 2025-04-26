@@ -53,12 +53,6 @@ class FlowerClient(NumPyClient):
         training and used the next time this client participates.
         """
 
-        # lr decay per round as indicated in paper [10]. For more complex strategies you can use server .on_fit_config
-        # round = config["round"]
-
-        for param_group in self.optimizer.param_groups:
-            param_group['lr'] *= 0.99
-
         self.last_global_weights = model_weights_to_vector(parameters)
 
         # Apply weights from global models (the whole local model weights are replaced)
