@@ -74,7 +74,7 @@ class SaveModelFedAvg(FedAvg):
         # init W&B
         wandb.init(
             project=PROJECT_NAME, 
-            name=f"{self.model.__class__.__name__}-{self.wandb_config["partition"]}",
+            name=f"{self.model.__class__.__name__}-{self.wandb_config['partition']}",
             config=self.wandb_config,
             id=run_id,
             resume="allow",
