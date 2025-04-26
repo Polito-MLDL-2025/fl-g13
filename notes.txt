@@ -9,6 +9,7 @@
 	Or we should rather focus on having decent accuracy with a small enough model and then move on?
 	Just asking because some people may struggle to do many epochs or try different set of hyperparameters since Colab limitations
 - Limit the number of parameters?
+- Mask is calculated at Client or Server level?
 
 15/04 Questions for Riccardo
 - At "make centralized model" we need to make just a model as in labs, or rather pre-traing with some batches the server's model, which will then be shared with the rest of the network?
