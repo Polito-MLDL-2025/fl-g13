@@ -1,8 +1,9 @@
 """pytorch-example: A Flower / PyTorch app."""
 
-import json
+import os, json
 from logging import INFO
 from typing import Union, Optional
+from pathlib import Path
 
 import flwr
 import numpy as np
@@ -51,20 +52,31 @@ class SaveModelFedAvg(FedAvg):
         self.save_every = save_every
         self.start_epoch = start_epoch
         self.save_best_model = save_best_model
+        self.run_config = run_config
         # Initialise W&B if set
         if use_wandb:
             self.save_path, self.run_dir = create_run_dir(run_config)
             self._init_wandb_project()
 
     def _init_wandb_project(self):
+        
+        # save or read run_id to be able to resume the run
+        run_id_path = Path.cwd() / "wandb_run_id.txt"
+        if os.path.exists(run_id_path):
+            with open(run_id_path, "r") as f:
+                run_id = f.read().strip()
+        else:
+            run_id = wandb.util.generate_id()
+            with open(run_id_path, "w") as f:
+                f.write(run_id)
+        
         # init W&B
         wandb.init(
             project=PROJECT_NAME, 
-            name=f"{self.model.__class__}-ServerApp",
-            config={
-                "batch_size": 32,
-                "partition": "iid"
-            },
+            name=f"{self.model.__class__.__name__}",
+            config=self.run_config,
+            id=run_id,
+            resume="allow",
         )
 
     def _store_results(self, tag: str, results_dict):
