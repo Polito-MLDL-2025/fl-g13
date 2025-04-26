@@ -1,5 +1,6 @@
 import time
 from typing import Optional, List, Tuple
+from tqdm import tqdm
 
 import torch
 from torch.utils.data import DataLoader
@@ -17,7 +18,7 @@ def train_one_epoch(
     model: Module,
     criterion: Module,
     optimizer: Optimizer,
-    verbose: bool = False
+    verbose: int = 1
 ) -> Tuple[float, float, List[float]]:
     """
     Train the model for a single epoch.
@@ -27,7 +28,7 @@ def train_one_epoch(
         model (torch.nn.Module): The model to be trained.
         criterion (torch.nn.Module): Loss function used for training.
         optimizer (torch.optim.Optimizer): Optimizer to update model parameters.
-        verbose (bool, optional): If True, prints progress every 10 batches. Defaults to False.
+        verbose (int, optional): Verbosity level for progress display. Defaults to 1.
 
     Returns:
         tuple: A tuple containing:
@@ -40,11 +41,20 @@ def train_one_epoch(
     # Set the model to training mode
     model.train()
 
+    # Set the for loop iterator according to the verbose flag
+    if verbose == 1:
+        # Default, use tqdm with progress bar
+        batch_iterator = tqdm(dataloader, desc = 'Training progress', unit = 'batch')
+    else:
+        # No progress bar
+        batch_iterator = dataloader
+
     # Initialize variables to track total loss, correct predictions, total samples, and per-iteration losses
     total_loss, correct, total = 0.0, 0, 0
     iteration_losses = []
+    total_batches = len(dataloader)
 
-    for batch_idx, (X, y) in enumerate(dataloader):
+    for batch_idx, (X, y) in enumerate(batch_iterator):
         # Move input data and labels to the same device as the model
         X, y = X.to(device), y.to(device)
         # Zero the gradients for the optimizer
@@ -74,11 +84,11 @@ def train_one_epoch(
         correct += batch_correct
         total += batch_total
 
-        # Print progress every 10 batches if verbose is enabled
-        if verbose and batch_idx % 10 == 0:
-            print(f"  ↳ Batch {batch_idx + 1}/{len(dataloader)} | Loss: {loss.item():.4f}")
+        # Verbose == 2 print progress every 10 batches
+        if verbose == 2 and (batch_idx + 1) % 10 == 0:
+            print(f"  ↳ Batch {batch_idx + 1}/{total_batches} | Loss: {loss.item():.4f}")
     # Compute the average training loss for the epoch
-    training_loss = total_loss / len(dataloader)
+    training_loss = total_loss / total_batches
     # Compute the training accuracy for the epoch
     training_accuracy = correct / total
     return training_loss, training_accuracy, iteration_losses
@@ -97,7 +107,7 @@ def train(
     criterion: Module,                          # Loss function used for training
     optimizer: Optimizer,                       # Optimizer used to update model parameters
     scheduler: Optional[_LRScheduler] = None,   # Learning rate scheduler (optional)
-    verbose: bool = False,                      # Whether to print detailed progress during training
+    verbose: int = 1,                      # Verbosity level
     all_training_losses: Optional[List[float]] = None,           # Pre-allocated list to store training losses (optional)
     all_validation_losses: Optional[List[float]] = None,         # Pre-allocated list to store validation losses (optional)
     all_training_accuracies: Optional[List[float]] = None,       # Pre-allocated list to store training accuracies (optional)
@@ -120,7 +130,7 @@ def train(
         criterion (torch.nn.Module): Loss function used for training.
         optimizer (torch.optim.Optimizer): Optimizer used to update model parameters.
         scheduler (torch.optim.lr_scheduler._LRScheduler, optional): Learning rate scheduler (optional). Defaults to None.
-        verbose (bool, optional): Whether to print detailed progress during training. Defaults to False.
+        verbose (int, optional): Verbosity level for progress display. Defaults to 1.
         all_training_losses (list, optional): Pre-allocated list to store training losses (optional). Defaults to None.
         all_validation_losses (list, optional): Pre-allocated list to store validation losses (optional). Defaults to None.
         all_training_accuracies (list, optional): Pre-allocated list to store training accuracies (optional). Defaults to None.
@@ -191,7 +201,7 @@ def train(
         if val_dataloader and eval_every and epoch % eval_every == 0:
             # Evaluate the model on the validation dataset
             validation_loss, validation_accuracy, _ = eval(
-                dataloader=val_dataloader, model=model, criterion=criterion
+                dataloader=val_dataloader, model=model, criterion=criterion, verbose=verbose
             )
             # Append the per-iteration validation losses and accuracy to the total lists
             all_validation_losses.append(validation_loss)
