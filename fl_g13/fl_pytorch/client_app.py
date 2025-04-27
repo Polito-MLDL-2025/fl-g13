@@ -136,6 +136,7 @@ def get_client_app(
         local_epochs=4,
         batch_size=50,
         num_shards_per_partition=2,
+        scheduler=None,
     ) -> ClientApp:
     """Create a Flower client app."""
 
@@ -163,7 +164,9 @@ def get_client_app(
             valloader, 
             local_epochs, 
             optimizer=optimizer, 
-            criterion=criterion,device=device
+            criterion=criterion,
+            device=device,
+            scheduler=scheduler,
         ).to_client()
     
     app = ClientApp(client_fn=client_fn)

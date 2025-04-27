@@ -137,24 +137,26 @@ class SaveModelFedAvg(FedAvg):
             server_round, results, failures
         )
 
-        if "avg_drift" in aggregated_metrics:
-            avg_drift = aggregated_metrics["avg_drift"]
-            print(f"[Round {server_round}] Avg Client Drift: {avg_drift:.4f}")
-            self.store_results_and_log(
-                server_round=server_round,
-                tag="client_fit",
-                results_dict={"avg_drift": avg_drift, **aggregated_metrics},
-            )
-
         if aggregated_parameters is not None:
             epoch = self.start_epoch + server_round - 1
+            # Convert `Parameters` to `list[np.ndarray]`
+            aggregated_ndarrays: list[np.ndarray] = parameters_to_ndarrays(
+                aggregated_parameters
+            )
+            global_norm = np.linalg.norm(aggregated_ndarrays)
+            if "avg_drift" in aggregated_metrics:
+                avg_drift = aggregated_metrics["avg_drift"]
+                print(f"[Round {server_round}] Avg Client Drift: {avg_drift:.4f}")
+                relative_drift = avg_drift / (global_norm + 1e-8) # Avoid division by zero
+                print(f"[Round {server_round}] Relative Client Drift: {relative_drift:.4f}")
+                self.store_results_and_log(
+                    server_round=server_round,
+                    tag="client_fit",
+                    results_dict={"avg_drift": avg_drift, "relative_drift": relative_drift, **aggregated_metrics},
+                )
             if self.checkpoint and self.save_every and epoch % self.save_every == 0:
                 print(f"Saving centralized model epoch {epoch} aggregated_parameters...")
 
-                # Convert `Parameters` to `list[np.ndarray]`
-                aggregated_ndarrays: list[np.ndarray] = parameters_to_ndarrays(
-                    aggregated_parameters
-                )
                 set_weights(self.model, aggregated_ndarrays)
                 save(
                     checkpoint_dir=self.checkpoint,
