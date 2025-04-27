@@ -143,7 +143,8 @@ class SaveModelFedAvg(FedAvg):
             aggregated_ndarrays: list[np.ndarray] = parameters_to_ndarrays(
                 aggregated_parameters
             )
-            global_norm = np.linalg.norm(aggregated_ndarrays)
+            flat_array = np.concatenate([arr.flatten() for arr in aggregated_ndarrays])
+            global_norm = np.linalg.norm(flat_array)
             if "avg_drift" in aggregated_metrics:
                 avg_drift = aggregated_metrics["avg_drift"]
                 print(f"[Round {server_round}] Avg Client Drift: {avg_drift:.4f}")
