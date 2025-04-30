@@ -1,6 +1,6 @@
 ## Todo
 
-- [ ] Clean codebase
+- [X] Clean codebase
     X rename modeling/ultis in modeling/utlis
     X remove references, docs?
     X remove plots.py, features.py?
@@ -17,8 +17,8 @@
     X add comments
     X reorder parameters signature
     X resedisgn train save and load signatures
-    - typing parameter in fl_g13 code
-    - plots of loss, stats and similar
+    X typing parameter in fl_g13 code
+    [ ] plots of loss, stats and similar
         X lossi and acci (list of losses to plot later)
         - plot image maps of activations in neurons
         - plot saturations plots of activation layers
