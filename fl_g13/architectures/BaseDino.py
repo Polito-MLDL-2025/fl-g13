@@ -31,17 +31,17 @@ class BaseDino(nn.Module):
     ):
         super().__init__()
         # Load pretrained DINO model backbone (e.g., dino_vits16, dino_vits8)
-        net = torch.hub.load('facebookresearch/dino:main', variant, pretrained=pretrained)
+        backbone = torch.hub.load('facebookresearch/dino:main', variant, pretrained=pretrained)
         
         # Add dropout to attention and MLP modules
-        for block in net.blocks:
+        for block in backbone.blocks:
             block.attn.attn_drop = nn.Dropout(p=dropout_rate)
             block.attn.proj_drop = nn.Dropout(p=dropout_rate)
             block.mlp.drop = nn.Dropout(p=dropout_rate)
 
         # Build classification head
         # Get the output logits from the LayerNorm (as head is Identity() by now)
-        input_dim = net.norm.normalized_shape[0]
+        input_dim = backbone.norm.normalized_shape[0]
         layers = []
         curr_dim = input_dim
         for _ in range(head_layers):
@@ -55,22 +55,26 @@ class BaseDino(nn.Module):
         # Initialize head weights
         self.init_weights(head)
 
-        # Replace the head with the new head
-        net.head = head
-
-        # Freeze all parameters in the network
-        for param in net.parameters():
+        # Freeze all parameters in the backbone
+        for param in backbone.parameters():
             param.requires_grad = False
 
         # Unfreeze the last `unfreeze_blocks` transformer blocks and LayerNorm
-        for param in net.blocks[-unfreeze_blocks:].parameters():
-            param.requires_grad = True
+        if unfreeze_blocks > 0:
+            for param in backbone.blocks[-unfreeze_blocks:].parameters():
+                param.requires_grad = True
         
-        # Make LayerNorm fine-tunable
-        for param in net.norm.parameters():
+            # Make LayerNorm fine-tunable
+            for param in backbone.norm.parameters():
+                param.requires_grad = True
+
+        # Make head fine-tunable
+        for param in head.parameters():
             param.requires_grad = True
 
-        self.net = net  # Save the network as self.net
+        # Save the backbone and head
+        self.backbone = backbone
+        self.head = head
 
         # Store configuration
         self._config = {
@@ -94,7 +98,11 @@ class BaseDino(nn.Module):
         head.apply(init)
 
     def forward(self, x):
-        return self.net(x)
+        # Extract features with the DINO backbone
+        feat = self.backbone(x)
+        # Feed forward the MLP
+        out = self.head(feat)
+        return out
 
     def get_config(self) -> dict:
         """Return the config dict to reconstruct this model."""
