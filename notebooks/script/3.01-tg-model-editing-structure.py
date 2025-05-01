@@ -10,6 +10,8 @@ from torch.nn import CrossEntropyLoss
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
+import numpy as np
+
 from fl_g13.config import RAW_DATA_DIR, PROJ_ROOT
 
 from fl_g13.modeling import train, load, eval, plot_metrics, get_preprocessing_pipeline
@@ -109,6 +111,10 @@ def compute_score_per_classes(model, classes, classes_dataloaders):
     for cls in classes:
         print(f"Computing scores for class {cls}")
         scores = fisher_scores(classes_dataloaders[cls], model)
+        # Ensure the scores dictionary has entries for all model parameters
+        for name, param in model.named_parameters():
+            if name not in scores:
+                scores[name] = torch.ones_like(param)
         score_per_class[cls] = scores
 
     return score_per_class
