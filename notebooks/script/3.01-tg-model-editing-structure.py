@@ -16,7 +16,7 @@ from fl_g13.modeling import load, eval, plot_metrics, get_preprocessing_pipeline
 
 from fl_g13.architectures import BaseDino
 
-from fl_g13.editing import SparseSGDM, per_class_accuracy, get_worst_classes, build_per_class_dataloaders, fisher_scores
+from fl_g13.editing import SparseSGDM, per_class_accuracy, get_worst_classes, build_per_class_dataloaders, fisher_scores, create_gradiend_mask
 
 
 train_dataset, val_dataset, test_dataset = get_preprocessing_pipeline(RAW_DATA_DIR)
@@ -96,17 +96,35 @@ print(f"Worst classes: {worst_classes}")
 classes_dataloaders = build_per_class_dataloaders(train_dataset, worst_classes)
 
 
+worst_classes = [35, 2]
+
+
 # ## Compute Fisher Sentitivity (per-class)
 
 def compute_score_per_classes(model, classes, classes_dataloaders):
     score_per_class = {}
 
     for cls in classes:
-        print(f"Computing Fisher for class {cls}")
-        scores = fisher_scores(model, classes_dataloaders[cls])
+        print(f"Computing scores for class {cls}")
+        scores = fisher_scores(classes_dataloaders[cls], model)
         score_per_class[cls] = scores
 
     return score_per_class
 
 scores_per_class = compute_score_per_classes(model, worst_classes, classes_dataloaders)
+
+
+# ## Create Gradient Masks
+
+def compute_masks_per_classes(classes, scores_per_class):
+    masks_per_class = {}
+
+    for cls in classes:
+        # print(f"Computing Mask for class {cls}")
+        mask = create_gradiend_mask(scores_per_class[cls])
+        masks_per_class[cls] = mask
+
+    return masks_per_class
+
+masks_per_class = compute_masks_per_classes(worst_classes, scores_per_class)
 
