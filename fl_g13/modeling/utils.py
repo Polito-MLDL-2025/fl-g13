@@ -3,6 +3,10 @@ import random
 import shutil
 import glob
 
+from torchvision.transforms import Compose, Resize, CenterCrop, RandomCrop, RandomHorizontalFlip, Normalize, ToTensor
+from torchvision import datasets
+from fl_g13.dataset import train_test_split
+
 
 # Sample lists of funny adjectives and nouns
 adjectives = [
@@ -175,3 +179,27 @@ def backup(path, new_filename=None):
     shutil.copy2(file_to_backup, dest_path)
     print(f"Backed up '{file_to_backup}' to '{dest_path}'")
 
+def get_preprocessing_pipeline(data_dir):
+    # Define preprocessing pipeline
+    train_transform = Compose([
+        Resize(256), # CIFRA100 is originally 32x32
+        RandomCrop(224), # But Dino works on 224x224
+        RandomHorizontalFlip(),
+        ToTensor(),
+        Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]) # ImageNet stats
+    ])
+
+    eval_transform = Compose([
+        Resize(256), # CIFRA100 is originally 32x32
+        CenterCrop(224), # But Dino works on 224x224
+        ToTensor(),
+        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]), # ImageNet stats
+    ])
+
+    cifar100_train = datasets.CIFAR100(root=data_dir, train=True, download=True, transform=train_transform)
+    cifar100_test = datasets.CIFAR100(root=data_dir, train=False, download=True, transform=eval_transform)
+
+    train_dataset, val_dataset = train_test_split(cifar100_train, 0.8, random_state=None)
+    test_dataset = cifar100_test
+
+    return train_dataset, val_dataset, test_dataset
