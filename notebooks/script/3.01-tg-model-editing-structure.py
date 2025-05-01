@@ -96,9 +96,6 @@ print(f"Worst classes: {worst_classes}")
 classes_dataloaders = build_per_class_dataloaders(train_dataset, worst_classes)
 
 
-worst_classes = [35, 2]
-
-
 # ## Compute Fisher Sentitivity (per-class)
 
 def compute_score_per_classes(model, classes, classes_dataloaders):
