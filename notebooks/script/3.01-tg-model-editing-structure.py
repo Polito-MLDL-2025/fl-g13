@@ -1,0 +1,97 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+get_ipython().run_line_magic('load_ext', 'autoreload')
+get_ipython().run_line_magic('autoreload', '2')
+
+
+import torch
+from torch.nn import CrossEntropyLoss
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import DataLoader
+
+from fl_g13.config import RAW_DATA_DIR, PROJ_ROOT
+
+from fl_g13.modeling import load, eval, plot_metrics, get_preprocessing_pipeline
+
+from fl_g13.architectures import BaseDino
+
+from fl_g13.editing import SparseSGDM, per_class_accuracy, get_worst_classes, build_per_class_dataloaders
+
+
+train_dataset, val_dataset, test_dataset = get_preprocessing_pipeline(RAW_DATA_DIR)
+
+print(f"Train dataset size: {len(train_dataset)}")
+print(f"Validation dataset size: {len(val_dataset)}")
+print(f"Test dataset size: {len(test_dataset)}")
+
+
+# # Define the model to edit
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
+CHECKPOINT_DIR = str(PROJ_ROOT / 'checkpoints')
+model_name = 'yamask'
+
+# Empty model
+# Will be replaced with the already trained model from the checkpoint
+model = BaseDino(head_layers=5, head_hidden_size=512, dropout_rate=0.0, unfreeze_blocks=1)
+model.to(device)
+
+# Hyper-parameters
+BATCH_SIZE = 128
+LR = 1e-3
+
+# Dataloaders
+train_dataloader = DataLoader(train_dataset, batch_size = BATCH_SIZE, shuffle = True)
+val_dataloader = DataLoader(val_dataset, batch_size = BATCH_SIZE, shuffle = False)
+test_dataloader = DataLoader(test_dataset, batch_size = BATCH_SIZE, shuffle = False)
+
+# Create a dummy mask for SparseSGDM
+mask = [torch.ones_like(p, device = p.device) for p in model.parameters()] # Must be done AFTER the model is moved to the device
+# Optimizer, scheduler, and loss function
+optimizer = SparseSGDM(model.parameters(), mask = mask, lr = LR)
+scheduler = CosineAnnealingLR(optimizer = optimizer, T_max = 20, eta_min = 1e-5)
+criterion = CrossEntropyLoss()
+
+# Load the model
+model, _ = load(
+    path = f'{CHECKPOINT_DIR}/Editing/{model_name}.pth',
+    model_class = BaseDino,
+    optimizer = optimizer,
+    scheduler = scheduler,
+    device = device
+)
+model.to(device) # manually move the model to the device
+print(f'\nModel {model_name} loaded from checkpoint.')
+
+
+# Compute test accuracy
+test_loss, test_accuracy, _ = eval(test_dataloader, model, criterion)
+
+print(f'Test loss: {test_loss:.3f}')
+print(f'Test accuracy: {100*test_accuracy:.2f}%')
+
+# Plot training results
+plot_metrics(path = f"{CHECKPOINT_DIR}/Editing/{model_name}.loss_acc.json")
+
+
+# # Model editing
+
+# ## Compute per-class accuracy
+# Find the class in which the model is underperforming
+
+class_acc = per_class_accuracy(test_dataloader, model)
+print(f'Class accuracy (first 10 classes): {class_acc[:10]}') # Output preview
+
+
+N_worst = 3 # How many classes to fine-tune
+worst_classes = get_worst_classes(class_acc, N_worst)
+print(f"Worst classes: {worst_classes}")
+
+
+# Note that the batch size in this case is 32 by default
+# Since the dataloaders are specific to the classes, a smaller batch size is better
+classes_dataloaders = build_per_class_dataloaders(train_dataset, worst_classes)
+
