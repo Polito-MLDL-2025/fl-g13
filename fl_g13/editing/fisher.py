@@ -56,27 +56,3 @@ def fisher_scores(
         fisher_scores[name] /= total_batches
 
     return fisher_scores
-
-def create_gradiend_mask(class_score, sparsity = 0.2):
-    """
-    class_score: dict of {param_name: tensor}
-    sparsity: fraction of parameters to keep editable (lowest scores values)
-
-    Returns: dict {param_name: binary_mask_tensor}
-    """
-    gradient_mask = {}
-
-    for name, scores in class_score.items():
-        scores_flat = scores.view(-1)
-        k = int(len(scores_flat) * sparsity)
-
-        if k == 0:
-            # Prevent empty mask
-            mask = torch.zeros_like(scores, dtype = torch.float)
-        else:
-            threshold, _ = torch.kthvalue(scores_flat, k)
-            mask = (scores <= threshold).to(dtype = torch.float)
-
-        gradient_mask[name] = mask
-
-    return gradient_mask

@@ -12,11 +12,14 @@ from torch.utils.data import DataLoader
 
 from fl_g13.config import RAW_DATA_DIR, PROJ_ROOT
 
-from fl_g13.modeling import load, eval, plot_metrics, get_preprocessing_pipeline
+from fl_g13.modeling import train, load, eval, plot_metrics, get_preprocessing_pipeline
 
 from fl_g13.architectures import BaseDino
 
-from fl_g13.editing import SparseSGDM, per_class_accuracy, get_worst_classes, build_per_class_dataloaders, fisher_scores, create_gradiend_mask
+from fl_g13.editing import SparseSGDM
+from fl_g13.editing import per_class_accuracy, get_worst_classes, build_per_class_dataloaders
+from fl_g13.editing import fisher_scores
+from fl_g13.editing import create_gradiend_mask, mask_dict_to_list
 
 
 train_dataset, val_dataset, test_dataset = get_preprocessing_pipeline(RAW_DATA_DIR)
@@ -33,6 +36,8 @@ print(f"Using device: {device}")
 
 CHECKPOINT_DIR = str(PROJ_ROOT / 'checkpoints')
 model_name = 'yamask'
+model_checkpoint_path = f'{CHECKPOINT_DIR}/Editing/{model_name}.pth'
+model_metrics_path = f'{CHECKPOINT_DIR}/Editing/{model_name}.loss_acc.json'
 
 # Empty model
 # Will be replaced with the already trained model from the checkpoint
@@ -57,7 +62,7 @@ criterion = CrossEntropyLoss()
 
 # Load the model
 model, _ = load(
-    path = f'{CHECKPOINT_DIR}/Editing/{model_name}.pth',
+    path = model_checkpoint_path,
     model_class = BaseDino,
     optimizer = optimizer,
     scheduler = scheduler,
@@ -74,7 +79,7 @@ print(f'Test loss: {test_loss:.3f}')
 print(f'Test accuracy: {100*test_accuracy:.2f}%')
 
 # Plot training results
-plot_metrics(path = f"{CHECKPOINT_DIR}/Editing/{model_name}.loss_acc.json")
+plot_metrics(path = model_metrics_path)
 
 
 # # Model editing
@@ -124,4 +129,18 @@ def compute_masks_per_classes(classes, scores_per_class):
     return masks_per_class
 
 masks_per_class = compute_masks_per_classes(worst_classes, scores_per_class)
+
+
+# Convert the masks to a list, as required by SparseSGDM
+def convert_masks_to_list(classes, masks_per_class):
+    masks_lists = {}
+
+    for cls in classes:
+        # print(f"Computing Mask for class {cls}")
+        mask = mask_dict_to_list(masks_per_class[cls])
+        masks_lists[cls] = mask
+
+    return masks_lists
+
+masks_list = convert_masks_to_list(worst_classes, masks_per_class)
 
