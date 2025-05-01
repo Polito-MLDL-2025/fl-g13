@@ -16,7 +16,7 @@ from fl_g13.modeling import load, eval, plot_metrics, get_preprocessing_pipeline
 
 from fl_g13.architectures import BaseDino
 
-from fl_g13.editing import SparseSGDM, per_class_accuracy, get_worst_classes, build_per_class_dataloaders
+from fl_g13.editing import SparseSGDM, per_class_accuracy, get_worst_classes, build_per_class_dataloaders, fisher_scores
 
 
 train_dataset, val_dataset, test_dataset = get_preprocessing_pipeline(RAW_DATA_DIR)
@@ -83,7 +83,7 @@ plot_metrics(path = f"{CHECKPOINT_DIR}/Editing/{model_name}.loss_acc.json")
 # Find the class in which the model is underperforming
 
 class_acc = per_class_accuracy(test_dataloader, model)
-print(f'Class accuracy (first 10 classes): {class_acc[:10]}') # Output preview
+print(f'\nClass accuracy (first 10 classes): {class_acc[:10]}') # Output preview
 
 
 N_worst = 3 # How many classes to fine-tune
@@ -94,4 +94,19 @@ print(f"Worst classes: {worst_classes}")
 # Note that the batch size in this case is 32 by default
 # Since the dataloaders are specific to the classes, a smaller batch size is better
 classes_dataloaders = build_per_class_dataloaders(train_dataset, worst_classes)
+
+
+# ## Compute Fisher Sentitivity (per-class)
+
+def compute_score_per_classes(model, classes, classes_dataloaders):
+    score_per_class = {}
+
+    for cls in classes:
+        print(f"Computing Fisher for class {cls}")
+        scores = fisher_scores(model, classes_dataloaders[cls])
+        score_per_class[cls] = scores
+
+    return score_per_class
+
+scores_per_class = compute_score_per_classes(model, worst_classes, classes_dataloaders)
 
