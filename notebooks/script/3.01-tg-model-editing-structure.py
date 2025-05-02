@@ -150,3 +150,73 @@ def convert_masks_to_list(classes, masks_per_class):
 
 masks_list = convert_masks_to_list(worst_classes, masks_per_class)
 
+
+# ## Fine tune the model on the choosen classes
+
+def fine_tuned_model(class_to_fine_tune, train_dataloader, mask, optimizer, scheduler, criterion, epochs = 10, verbose = 1):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Load the model
+    new_model, _ = load(
+        path = model_checkpoint_path,
+        model_class = BaseDino,
+        optimizer = optimizer,
+        scheduler = scheduler,
+        device = device
+    )
+    new_model.to(device) # manually move the model to the device
+
+    # Create a new SparseSGDM optimizer
+    new_optimizer = SparseSGDM(new_model.parameters(), mask = mask, lr = LR)
+
+    _, _, _, _ = train(
+        checkpoint_dir = CHECKPOINT_DIR,
+        name = f'{model_name}_{class_to_fine_tune}',
+        start_epoch = 1,
+        num_epochs = epochs,
+        save_every = epochs,
+        backup_every = None,
+        train_dataloader = train_dataloader,
+        val_dataloader = None,
+        model = new_model,
+        criterion = criterion,
+        optimizer = new_optimizer,
+        scheduler = None, # No scheduler needed, too few epochs
+        verbose = verbose
+    )
+
+    # Compute per-class accuracy
+    class_acc = per_class_accuracy(test_dataloader, new_model)
+
+    return class_acc
+
+# Fine-tune the model on the worst classes
+for cls in worst_classes:
+    print(f"Fine-tuning model on class {cls}")
+
+    # Get the dataloaders for the current class
+    train_dataloader = classes_dataloaders[cls]
+
+    # Get the mask for the current class
+    mask = masks_list[cls]
+
+    # Fine-tune the model
+    new_class_acc = fine_tuned_model(
+        class_to_fine_tune = cls,
+        train_dataloader = train_dataloader,
+        mask = mask,
+        optimizer = optimizer,
+        scheduler = scheduler,
+        criterion = criterion
+    )
+
+    # Compare results with the original model
+    new_test_accuracy = np.mean(new_class_acc)
+
+    print(f'\nTest accuracy: {100*new_test_accuracy:.2f}% (original: {100*test_accuracy:.2f}%)')
+    # Print print accuracy for the specific class
+    print(f'Accuracy for class {cls}: {100*new_class_acc[cls]:.2f}% (original: {100*class_acc[cls]:.2f}%)')
+    # Print other classes accuracy if the new model is worse than the original
+    count = sum([1 for i in range(len(new_class_acc)) if new_class_acc[i] < class_acc[i] and i != cls])
+    print(f'New model is worse in {count} classes, wrt the original model\n\n')
+
