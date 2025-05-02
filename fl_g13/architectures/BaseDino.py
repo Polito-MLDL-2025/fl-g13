@@ -52,9 +52,6 @@ class BaseDino(nn.Module):
         layers.append(nn.Linear(curr_dim, num_classes))
         head = nn.Sequential(*layers)
 
-        # Initialize head weights
-        self.init_weights(head)
-
         # Freeze all parameters in the backbone
         for param in backbone.parameters():
             param.requires_grad = False
@@ -87,15 +84,6 @@ class BaseDino(nn.Module):
             'activation_fn': activation.__name__,
             'pretrained': pretrained
         }
-
-    def init_weights(self, head):
-        """Function to initialize weights for the head layers"""
-        def init(layer):
-            if isinstance(layer, nn.Linear):
-                nn.init.xavier_uniform_(layer.weight)
-                if layer.bias is not None:
-                    nn.init.zeros_(layer.bias)
-        head.apply(init)
 
     def forward(self, x):
         # Extract features with the DINO backbone
