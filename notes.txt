@@ -1,11 +1,6 @@
-### Tuesday
+### Reminders
 
-- State of centralized baseline
-- Explain SparseSGDM
-- Show task vector
-- Clean old models, decide the best -> another training?
-- Discuss what is missing in the FedLearning baseline
-- Discuss how to implement Model Editing in FedLearning
+- DO NOT FORGET TO TRAIN ON THE WHOLE DATASET BEFORE REALISING!
 
 ### Questions
 
