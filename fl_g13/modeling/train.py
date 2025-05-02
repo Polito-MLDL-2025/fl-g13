@@ -84,9 +84,10 @@ def train_one_epoch(
         correct += batch_correct
         total += batch_total
 
-        # Verbose == 2 print progress every 10 batches
-        if verbose == 2 and (batch_idx + 1) % 10 == 0:
+        # Verbose == 2 print progress every 10 batches, else every batch
+        if verbose > 1 and (batch_idx + 1) % (10 if verbose == 2 else 1) == 0:
             print(f"  ↳ Batch {batch_idx + 1}/{total_batches} | Loss: {loss.item():.4f}")
+            
     # Compute the average training loss for the epoch
     training_loss = total_loss / total_batches
     # Compute the training accuracy for the epoch
