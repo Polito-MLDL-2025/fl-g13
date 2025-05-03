@@ -114,7 +114,7 @@ def compute_score_per_classes(model, classes, classes_dataloaders):
         # Ensure the scores dictionary has entries for all model parameters
         for name, param in model.named_parameters():
             if name not in scores:
-                scores[name] = torch.ones_like(param)
+                scores[name] = torch.zeros_like(param)
         score_per_class[cls] = scores
 
     return score_per_class
