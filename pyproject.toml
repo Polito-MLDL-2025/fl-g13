@@ -25,20 +25,31 @@ extend-select = ["I"]
 known-first-party = ["fl_g13"]
 force-sort-within-sections = true
 
+[tool.flwr.app]
+publisher = "polito_mldl_g13"
+
+[tool.flwr.app.components]
+serverapp = "fl_g13.fl_pytorch.server_app:app"
+clientapp = "fl_g13.fl_pytorch.client_app:app"
+
 [tool.flwr.app.config]
 num-server-rounds = 4
-fraction-fit = 0.25
-fraction-evaluate = 0.5
-local-epochs = 1
+fraction-fit = 0.1
+fraction-evaluate = 0.1
+local-epochs = 4
 #server-device = "cpu"
 use-wandb = false
 
+[tool.flwr.federations]
+default = "local-sim"
+
 [tool.flwr.federations.local-sim]
-options.num-supernodes = 10
-options.backend.client-resources.num-cpus = 2 # each ClientApp assumes to use 2CPUs
+options.num-supernodes = 100
+options.backend.client-resources.num-cpus = 1 # each ClientApp assumes to use 2CPUs
 options.backend.client-resources.num-gpus = 0.0 # ratio of VRAM a ClientApp has access to
+
 [tool.flwr.federations.local-sim-gpu]
-options.num-supernodes = 10
-options.backend.client-resources.num-cpus = 2
-options.backend.client-resources.num-gpus = 0.25
+options.num-supernodes = 100
+options.backend.client-resources.num-cpus = 1
+options.backend.client-resources.num-gpus = 1.0
 

@@ -1,27 +1,47 @@
+from typing import Type
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor, optim, device, cuda, nn
+from fl_g13.modeling.load import load_or_create, get_model
 
 
 class Net(nn.Module):
-    """Model (simple CNN adapted for Fashion-MNIST)"""
-
+    """Model (simple CNN adapted for cifar100)"""
     def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 16, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(16, 32, 5)
-        self.fc1 = nn.Linear(32 * 4 * 4, 128)
-        self.fc2 = nn.Linear(128, 10)
+        super(Net, self).__init__()
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)  # Aggiunto pooling
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)  # Aggiunto pooling
+        # Calcola la dimensione corretta per l'input di fc1
+        self.fc1 = nn.Linear(128 * 56 * 56, 512)  # Modificato in base alla nuova dimensione
+        self.fc2 = nn.Linear(512, 100)
 
-    def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 32 * 4 * 4)
+    def forward(self, x: Tensor) -> Tensor:
+        x = F.relu(self.conv1(x))
+        x = self.pool1(x)  # Riduce la dimensione spaziale
+        x = F.relu(self.conv2(x))
+        x = self.pool2(x)  # Riduce ulteriormente la dimensione spaziale
+        x = x.view(x.size(0), -1)  # Appiattisce mantenendo la dimensione del batch
         x = F.relu(self.fc1(x))
-        return self.fc2(x)
-DEFAULT_MODEL = Net
-def get_default_model():
-    return DEFAULT_MODEL
+        x = self.fc2(x)
+        return x
 
-def set_default_model(model):
-    DEFAULT_MODEL = model
+
+def get_default_model():
+    return Net()
+
+def get_experiment_setting(
+        checkpoint_dir: str, 
+        model_class: Type[nn.Module] | nn.Module, 
+        learning_rate: float = 0.25, 
+        momentum: float = 0.9
+    ):
+    """Get the experiment setting."""
+    model = get_model(model_class)
+    optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+    criterion = nn.CrossEntropyLoss()
+    dev = device("cuda:0" if cuda.is_available() else "cpu")
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=8, T_mult=2, eta_min=0.001)
+    #model, _ = load_or_create(checkpoint_dir, model_class, dev, optimizer, scheduler)
+    return model, optimizer, criterion, dev, scheduler
