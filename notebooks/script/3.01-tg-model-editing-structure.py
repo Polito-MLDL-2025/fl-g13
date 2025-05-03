@@ -139,7 +139,7 @@ def convert_masks_to_list(classes, masks_per_class):
 
     for cls in classes:
         # print(f"Computing Mask for class {cls}")
-        mask = mask_dict_to_list(masks_per_class[cls])
+        mask = mask_dict_to_list(model, masks_per_class[cls])
         masks_lists[cls] = mask
 
     return masks_lists

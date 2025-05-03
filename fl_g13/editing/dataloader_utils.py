@@ -61,10 +61,20 @@ def build_per_class_dataloaders(
 ):
     """Returns a dict: {class_idx: DataLoader}"""
     class_dataloaders = {}
+    # Create a dictionary to store indices for each class
+    class_indices = {cls: [] for cls in target_classes}
+    
+    # Iterate over the dataset once and collect indices for each target class
+    for i, (_, label) in enumerate(tqdm(dataset, desc='Collecting class indices', unit='el')):
+        if label in target_classes:
+            class_indices[label].append(i)
+    print()
+    
+    # Create DataLoaders for each target class
     for cls in target_classes:
         print(f'Building dataloader for class {cls}')
-        indices = [i for i, (_, label) in enumerate(tqdm(dataset, desc = f'Class {cls}', unit = 'el')) if label == cls]
-        subset = Subset(dataset, indices)
+        subset = Subset(dataset, class_indices[cls])
         loader = DataLoader(subset, batch_size=batch_size, shuffle=True)
         class_dataloaders[cls] = loader
+    
     return class_dataloaders
