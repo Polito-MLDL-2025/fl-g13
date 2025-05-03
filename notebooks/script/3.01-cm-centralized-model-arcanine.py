@@ -46,7 +46,9 @@ eval_transform = Compose([
 cifar100_train = datasets.CIFAR100(root=RAW_DATA_DIR, train=True, download=True, transform=train_transform)
 cifar100_test = datasets.CIFAR100(root=RAW_DATA_DIR, train=False, download=True, transform=eval_transform)
 
-train_dataset, val_dataset = train_test_split(cifar100_train, 0.8, random_state=None)
+# Always specify a random state, otherwise the split will be different each time 
+# If you have intention to load a model mid-training, you may have part of the validation set as already seen in the previous training
+train_dataset, val_dataset = train_test_split(cifar100_train, 0.8, random_state=42)
 test_dataset = cifar100_test
 
 print(f"Train dataset size: {len(train_dataset)}")
@@ -60,34 +62,54 @@ print(f"Using device: {device}")
 
 # Settings
 CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
-name = "wigglypuff"
+name="arcanine"
 start_epoch=1
-num_epochs=140
-save_every=10
-backup_every=20
+num_epochs=50
+save_every=1
+backup_every=10
 
-# Hyper-parameters
-BATCH_SIZE = 128
-LR = 1e-3
+# Model Hyper-parameters
+head_layers=3
+head_hidden_size=512
+dropout_rate=0.0
+unfreeze_blocks=1
+
+# Training Hyper-parameters
+batch_size=128
+lr=1e-3
+momentum=0.9
+weight_decay=1e-5
+T_max=8
+eta_min=1e-5
 
 # Dataloaders
-train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
-test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 # Model
-model = BaseDino(head_layers=5, head_hidden_size=512, dropout_rate=0.0, unfreeze_blocks=1)
+model = BaseDino(
+    head_layers=head_layers, 
+    head_hidden_size=head_hidden_size, 
+    dropout_rate=dropout_rate, 
+    unfreeze_blocks=unfreeze_blocks
+    )
 model.to(device)
 
 # Optimizer, scheduler, and loss function
 mask = [torch.ones_like(p, device=p.device) for p in model.parameters()] # Must be done AFTER the model is moved to CUDA
-optimizer = SparseSGDM(model.parameters(), mask=mask, lr=LR)
-scheduler = CosineAnnealingWarmRestarts(
-    optimizer, 
-    T_0=20,          # First restart after 12 epochs
-    T_mult=2,        # Double the interval between restarts each time
-    eta_min=1e-6     # Minimum learning rate after annealing
-)
+optimizer = SparseSGDM(
+    model.parameters(),
+    mask=mask,
+    lr=lr,
+    momentum=momentum,
+    weight_decay=weight_decay
+    )
+scheduler = CosineAnnealingLR(
+    optimizer=optimizer, 
+    T_max=T_max, 
+    eta_min=eta_min
+    )
 criterion = CrossEntropyLoss()
 
 all_training_losses=[]       # Pre-allocated list for training losses
@@ -95,24 +117,28 @@ all_validation_losses=[]       # Pre-allocated list for validation losses
 all_training_accuracies=[]    # Pre-allocated list for training accuracies
 all_validation_accuracies=[]    # Pre-allocated list for validation accuracies
 
-# # Model loading (uncomment to properly overwrite)
-# loading_epoch = 60
-# model, start_epoch = load(
-#     f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
-#     model_class=BaseDino,
-#     device=device,
-#     optimizer=optimizer,
-#     scheduler=scheduler,
-#     verbose=True
-# )
-# model.to(device)
-# loaded_metrics = load_loss_and_accuracies(path=f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.loss_acc.json")
+# ---- RESUME ----
 
-# # Preallocated lists: if the training interrupts, it will still save their values (uncomment to properly load and overwrite)
-# all_training_losses=loaded_metrics["train_loss"]       # Pre-allocated list for training losses
-# all_validation_losses=loaded_metrics["val_loss"]       # Pre-allocated list for validation losses
-# all_training_accuracies=loaded_metrics["train_acc"]    # Pre-allocated list for training accuracies
-# all_validation_accuracies=loaded_metrics["val_acc"]    # Pre-allocated list for validation accuracies
+# Model loading (uncomment to properly overwrite)
+loading_epoch = 25
+model, start_epoch = load(
+    f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
+    model_class=BaseDino,
+    device=device,
+    optimizer=optimizer,
+    scheduler=scheduler,
+    verbose=True
+)
+model.to(device)
+loaded_metrics = load_loss_and_accuracies(path=f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.loss_acc.json")
+
+# Preallocated lists: if the training interrupts, it will still save their values (uncomment to properly load and overwrite)
+all_training_losses=loaded_metrics["train_loss"]       # Pre-allocated list for training losses
+all_validation_losses=loaded_metrics["val_loss"]       # Pre-allocated list for validation losses
+all_training_accuracies=loaded_metrics["train_acc"]    # Pre-allocated list for training accuracies
+all_validation_accuracies=loaded_metrics["val_acc"]    # Pre-allocated list for validation accuracies
+
+# -----------------
 
 print(f"\nModel: {model}")
 
@@ -131,7 +157,7 @@ try:
         criterion=criterion,
         optimizer=optimizer,
         scheduler=scheduler,
-        verbose=False,
+        verbose=1,
         all_training_losses=all_training_losses,
         all_validation_losses=all_validation_losses,
         all_training_accuracies=all_training_accuracies,
@@ -146,9 +172,10 @@ except Exception as e:
 
 
 import matplotlib.pyplot as plt
+get_ipython().run_line_magic('matplotlib', 'inline')
 
 # Plot losses
-plt.figure(figsize=(12, 6))
+plt.figure(figsize=(18, 6))
 plt.subplot(1, 2, 1)
 plt.plot(all_training_losses, label='Training Loss')
 plt.plot(all_validation_losses, label='Validation Loss')
@@ -156,6 +183,8 @@ plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.title('Loss vs Epochs')
 plt.legend()
+plt.grid(True)  # Add grid
+plt.xticks(range(0, len(all_training_losses)+1, 2), rotation=45)  # Skip every other tick
 
 # Plot accuracies
 plt.subplot(1, 2, 2)
@@ -165,6 +194,8 @@ plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
 plt.title('Accuracy vs Epochs')
 plt.legend()
+plt.grid(True)  # Add grid
+plt.xticks(range(0, len(all_training_accuracies)+1, 2), rotation=45)  # Skip every other tick
 
 plt.tight_layout()
 plt.show()
@@ -178,4 +209,7 @@ print(
     f"\t📉 Test Loss: {test_loss:.4f}\n"
     f"\t🎯 Test Accuracy: {100 * test_accuracy:.2f}%"
 )
+
+
+
 

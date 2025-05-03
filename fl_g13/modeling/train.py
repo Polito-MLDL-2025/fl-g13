@@ -84,9 +84,10 @@ def train_one_epoch(
         correct += batch_correct
         total += batch_total
 
-        # Verbose == 2 print progress every 10 batches
-        if verbose == 2 and (batch_idx + 1) % 10 == 0:
+        # Verbose == 2 print progress every 10 batches, else every batch
+        if verbose > 1 and (batch_idx + 1) % (10 if verbose == 2 else 1) == 0:
             print(f"  ↳ Batch {batch_idx + 1}/{total_batches} | Loss: {loss.item():.4f}")
+            
     # Compute the average training loss for the epoch
     training_loss = total_loss / total_batches
     # Compute the training accuracy for the epoch
@@ -201,7 +202,7 @@ def train(
         if val_dataloader and eval_every and epoch % eval_every == 0:
             # Evaluate the model on the validation dataset
             validation_loss, validation_accuracy, _ = eval(
-                dataloader=val_dataloader, model=model, criterion=criterion
+                dataloader=val_dataloader, model=model, criterion=criterion, verbose=verbose
             )
             # Append the per-iteration validation losses and accuracy to the total lists
             all_validation_losses.append(validation_loss)
