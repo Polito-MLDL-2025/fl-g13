@@ -1,11 +1,14 @@
 import torch
 
-def create_gradiend_mask(class_score, sparsity = 0.2):
-    """
-    class_score: dict of {param_name: tensor}
-    sparsity: fraction of parameters to keep editable (lowest scores values)
+def _local_mask(class_score, sparsity = 0.2):
+    """Create a mask for each parameter
 
-    Returns: dict {param_name: binary_mask_tensor}
+    Args:
+        class_score (_type_): scores related for a specific class
+        sparsity (float, optional): expected sparsity of each parameter's mask. Defaults to 0.2.
+
+    Returns:
+        dict: dict of {param_name: binary_mask_tensor}
     """
     gradient_mask = {}
 
@@ -24,6 +27,39 @@ def create_gradiend_mask(class_score, sparsity = 0.2):
 
     return gradient_mask
 
+def _global_mask(class_score, sparsity = 0.2):
+    gradient_mask = {}
+
+    global_scores = torch.cat([torch.flatten(v) for v in class_score.values()])
+    # Calculate the number of parameters to keep based on the desired sparsity
+    k = int(global_scores.numel() * sparsity)
+    # Proceed only if there is at least one parameter to keep
+    if k >= 1:
+        # Find the k-th smallest value in the global scores (this is the threshold)
+        threshold, _ = torch.kthvalue(global_scores, k)
+        
+        for name, scores in class_score.items():
+            mask = (scores <= threshold).to(dtype = torch.float)
+            gradient_mask[name] = mask
+
+    return gradient_mask
+
+def create_gradiend_mask(class_score, sparsity = 0.2, mask_type = 'local'):
+    """
+    class_score: dict of {param_name: tensor}
+    sparsity: fraction of parameters to keep editable (lowest scores values)
+
+    Returns: dict {param_name: binary_mask_tensor}
+    """
+    if mask_type == 'local':
+        gradient_mask = _local_mask(class_score, sparsity)
+    elif mask_type == 'global':
+        gradient_mask = _global_mask(class_score, sparsity)
+    else:
+        raise ValueError(f'Invalid mask type: {mask_type}, expected "local" or "global".')
+
+    return gradient_mask
+
 def mask_dict_to_list(model, gradient_mask_dict):
     """
     Converts a {param_name: mask_tensor} dict into a list of mask_tensors
@@ -32,8 +68,10 @@ def mask_dict_to_list(model, gradient_mask_dict):
     mask_list = []
     for name, param in model.named_parameters():
         if name not in gradient_mask_dict:
-            raise KeyError(f"Missing mask for parameter: {name}")
-        mask = gradient_mask_dict[name]
+            mask = torch.zeros_like(param, dtype = torch.float)
+        else:
+            mask = gradient_mask_dict[name]
+            
         if param.shape != mask.shape:
             raise ValueError(f"Mask shape mismatch for {name}: {param.shape} vs {mask.shape}")
         mask_list.append(mask.to(param.device))

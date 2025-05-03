@@ -46,8 +46,6 @@ def fisher_scores(
         for name, param in model.named_parameters():
             if param.grad is not None:
                 fisher_scores[name] += (param.grad.detach() ** 2)
-            else: # Frozen layer, use default tensor
-                fisher_scores[name] = torch.zeros_like(param.data)
                 
         # Verbose == 2 print progress every 10 batches
         if verbose == 2 and (batch_idx + 1) % 10 == 0:

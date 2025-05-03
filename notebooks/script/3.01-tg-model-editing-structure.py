@@ -121,16 +121,16 @@ scores_per_class = compute_score_per_classes(model, worst_classes, classes_datal
 # ## Create Gradient Masks
 
 def compute_masks_per_classes(classes, scores_per_class):
-    masks_per_class = {}
+    global_masks, local_masks = {}, {}
 
     for cls in classes:
         # print(f"Computing Mask for class {cls}")
-        mask = create_gradiend_mask(scores_per_class[cls])
-        masks_per_class[cls] = mask
+        global_masks[cls] = create_gradiend_mask(scores_per_class[cls], mask_type = 'global')
+        local_masks[cls] = create_gradiend_mask(scores_per_class[cls], mask_type = 'local')
 
-    return masks_per_class
+    return global_masks, local_masks
 
-masks_per_class = compute_masks_per_classes(worst_classes, scores_per_class)
+global_masks, local_masks = compute_masks_per_classes(worst_classes, scores_per_class)
 
 
 # Convert the masks to a list, as required by SparseSGDM
@@ -144,7 +144,8 @@ def convert_masks_to_list(classes, masks_per_class):
 
     return masks_lists
 
-masks_list = convert_masks_to_list(worst_classes, masks_per_class)
+global_masks_list = convert_masks_to_list(worst_classes, global_masks)
+local_masks_list = convert_masks_to_list(worst_classes, local_masks)
 
 
 # ## Fine tune the model on the choosen classes
@@ -188,47 +189,53 @@ def fine_tuned_model(class_to_fine_tune, train_dataloader, mask, optimizer, sche
 
     return class_acc
 
-# Fine-tune the model on the worst classes
-for cls in worst_classes:
-    print(f"Fine-tuning model on class {cls}")
+def fine_tune(classes, classes_dataloaders, masks, optimizer, scheduler, criterion, mask_type):
+    # Fine-tune the model on the worst classes
+    for cls in classes:
+        print(f"Fine-tuning model on class {cls}")
 
-    # Get the dataloaders for the current class
-    train_dataloader = classes_dataloaders[cls]
+        # Get the dataloaders for the current class
+        train_dataloader = classes_dataloaders[cls]
 
-    # Get the mask for the current class
-    mask = masks_list[cls]
+        # Get the mask for the current class
+        mask = masks[cls]
 
-    # Fine-tune the model
-    new_class_acc = fine_tuned_model(
-        class_to_fine_tune = cls,
-        train_dataloader = train_dataloader,
-        mask = mask,
-        optimizer = optimizer,
-        scheduler = scheduler,
-        criterion = criterion
-    )
+        # Fine-tune the model
+        new_class_acc = fine_tuned_model(
+            class_to_fine_tune = cls,
+            train_dataloader = train_dataloader,
+            mask = mask,
+            optimizer = optimizer,
+            scheduler = scheduler,
+            criterion = criterion
+        )
 
-    # Compare results with the original model
-    new_test_accuracy = np.mean(new_class_acc)
+        # Compare results with the original model
+        new_test_accuracy = np.mean(new_class_acc)
 
-    print(f'\nTest accuracy: {100*new_test_accuracy:.2f}% (original: {100*test_accuracy:.2f}%)')
-    # Print print accuracy for the specific class
-    print(f'Accuracy for class {cls}: {100*new_class_acc[cls]:.2f}% (original: {100*class_acc[cls]:.2f}%)')
-    # Print other classes accuracy if the new model is worse than the original
-    count = sum([1 for i in range(len(new_class_acc)) if new_class_acc[i] < class_acc[i] and i != cls])
-    print(f'New model is worse in {count} classes, wrt the original model')
+        print(f'\nTest accuracy: {100*new_test_accuracy:.2f}% (original: {100*test_accuracy:.2f}%)')
+        # Print print accuracy for the specific class
+        print(f'Accuracy for class {cls}: {100*new_class_acc[cls]:.2f}% (original: {100*class_acc[cls]:.2f}%)')
+        # Print other classes accuracy if the new model is worse than the original
+        count = sum([1 for i in range(len(new_class_acc)) if new_class_acc[i] < class_acc[i] and i != cls])
+        print(f'New model is worse in {count} classes, wrt the original model')
 
-    # Save to file the per-class accuracy difference
-    # Create a dictionary with new_class_acc, class_acc, and class_idx
-    accuracy_data = {
-        "class_idx": list(range(100)),
-        "new_class_acc": new_class_acc,
-        "class_acc": class_acc
-    }
-    output_file = f"{CHECKPOINT_DIR}/Editing/{model_name}/accuracy_comparison_{cls}.json"
+        # Save to file the per-class accuracy difference
+        # Create a dictionary with new_class_acc, class_acc, and class_idx
+        accuracy_data = {
+            "class_idx": list(range(100)),
+            "new_class_acc": list(new_class_acc),
+            "class_acc": list(class_acc)
+        }
+        output_file = f"{CHECKPOINT_DIR}/Editing/{model_name}/accuracy_comparison_{cls}_{mask_type}.json"
 
-    # Save the dictionary to a JSON file
-    with open(output_file, "w") as json_file:
-        json.dump(accuracy_data, json_file, indent=4)
-    print(f"Accuracy data saved to {output_file}\n\n")
+        # Save the dictionary to a JSON file
+        with open(output_file, "w") as json_file:
+            json.dump(accuracy_data, json_file, indent=4)
+        print(f"Accuracy data saved to {output_file}\n\n")
+
+print('Fine-tune with global masks')
+fine_tune(worst_classes, classes_dataloaders, global_masks_list, optimizer, scheduler, criterion, 'global')
+print('\n\nFine-tune with local masks')
+fine_tune(worst_classes, classes_dataloaders, local_masks_list, optimizer, scheduler, criterion, 'local')
 
