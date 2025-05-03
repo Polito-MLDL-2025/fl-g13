@@ -1,27 +1,32 @@
 """pytorch-example: A Flower / PyTorch app."""
 
+from typing import List, Tuple
+
 import torch
-from flwr.common import Context, ndarrays_to_parameters
+from flwr.common import Context, ndarrays_to_parameters, Metrics
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
+from torchvision import datasets
 
 from fl_g13.config import RAW_DATA_DIR
-from fl_g13.fl_pytorch.strategy import CustomFedAvg
+from fl_g13.fl_pytorch.datasets import get_eval_transforms
+from fl_g13.fl_pytorch.strategy import SaveModelFedAvg
 from fl_g13.fl_pytorch.task import (
     get_weights,
     set_weights,
 )
+# from fl_g13.fl_pytorch.task import test
 from fl_g13.modeling.eval import eval
 from fl_g13.modeling.load import load_or_create
 
 
-def gen_evaluate_fn(
+def get_evaluate_fn(
         testloader: DataLoader,
         model=None,
         criterion=None,
 ):
-    """Generate the function for centralized evaluation."""
+    """Generate the function for centralized evaluation of the global model on full test set. 
+    Executed by the server at the end of each round."""
 
     def evaluate(server_round, parameters_ndarrays, config):
         """Evaluate global model on centralized test set."""
@@ -32,18 +37,17 @@ def gen_evaluate_fn(
     return evaluate
 
 
-def on_fit_config(server_round: int):
-    """Construct `config` that clients receive when running `fit()`"""
-    lr = 0.1
-    # Enable a simple form of learning rate decay
-    if server_round > 10:
-        lr /= 2
-    return {"lr": lr}
+def on_fit_config(server_round: int) -> Metrics:
+    """Allow communication from server to client.
+    Construct `config` that clients receive when running `fit()`"""
+
+    return {"round": server_round}
 
 
 # Define metric aggregation function
-def weighted_average(metrics):
-    # Multiply accuracy of each client by number of examples used
+def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
+    """Aggregate application specific metrics computed by clients at each round with .evaluate()"""
+    # Multiply accuracy calculated by each client during .evaluate() by number of examples used
     accuracies = [num_examples * m["accuracy"] for num_examples, m in metrics]
     examples = [num_examples for num_examples, _ in metrics]
 
@@ -51,13 +55,20 @@ def weighted_average(metrics):
     return {"federated_evaluate_accuracy": sum(accuracies) / sum(examples)}
 
 
-def get_data_set_default(context: Context):
-    transform = transforms.Compose([
-        transforms.ToTensor()
-    ])
-    cifar100_test = datasets.CIFAR100(root=RAW_DATA_DIR, train=False, download=True, transform=transform)
-    return cifar100_test
+def handle_fit_metrics(metrics: List[Tuple[int, Metrics]]) -> Metrics:
+    """Allow to communicate metrics from client to server.
+    Aggregate application specific metrics computed by clients at each round with .fit()"""
 
+    train_losses = [num_examples * m["train_loss"] for num_examples, m in metrics]
+    train_drifts = [num_examples * m["drift"] for num_examples, m in metrics]
+    examples = [num_examples for num_examples, _ in metrics]
+
+    # Aggregate and return custom metric
+    return {"avg_train_loss": sum(train_losses) / sum(examples), "avg_drift": sum(train_drifts) / sum(examples)}
+
+def get_data_set_default(context: Context):
+    testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
+    return DataLoader(testset, batch_size=32)
 
 def get_server_app(checkpoint_dir,
                    model_class,
@@ -65,17 +76,18 @@ def get_server_app(checkpoint_dir,
                    criterion=None,
                    scheduler=None,
                    save_every=1,
-                   get_datatest_fn=get_data_set_default,
-                   num_rounds=10,
-                   fraction_fit=1.0,  # Sample 100% of available clients for training
-                   fraction_evaluate=0.5,  # Sample 50% of available clients for evaluation
-                   min_fit_clients=5,  # Never sample less than 10 clients for training
-                   min_evaluate_clients=5,  # Never sample less than 5 clients for evaluation
-                   min_available_clients=5,  # Wait until all 10 clients are available
+                   num_rounds=200,
+                   fraction_fit=0.1,  # Sample 10% of available clients for training
+                   fraction_evaluate=0.1,  # Sample 10% of available clients for evaluation
+                   min_fit_clients=10,  # Never sample less than 10 clients for training
+                   min_evaluate_clients=10,  # Never sample less than 10 clients for evaluation
+                   min_available_clients=100,  # Wait until all 100 clients are available
                    device=None,
                    use_wandb=False,
-                   evaluate_fn=gen_evaluate_fn,
-                   save_best_model=False
+                   save_best_model=False,
+                   wandb_config=None,
+                   get_datatest_fn=get_data_set_default,
+                   get_evaluate_fn=get_evaluate_fn,
                    ):
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, start_epoch = load_or_create(
@@ -90,17 +102,18 @@ def get_server_app(checkpoint_dir,
     def server_fn(context: Context):
         print(f'Continue train model from epoch {start_epoch}')
         # Read from config
-        # num_rounds = context.run_config.get("num-server-rounds") or 2
-        server_device = device
+        # run_config holds hyperparameters that we might want to override at runtime
+        number_rounds = context.run_config.get("num-server-rounds") or num_rounds  # defined in .toml
 
         # Initialize model parameters
         ndarrays = get_weights(model)
         parameters = ndarrays_to_parameters(ndarrays)
 
-        # Prepare dataset for central evaluation
+        # load global full testset for central evaluation
         testloader = get_datatest_fn(context)
+
         # Define strategy
-        strategy = CustomFedAvg(
+        strategy = SaveModelFedAvg(
             checkpoint=checkpoint_dir,
             model=model,
             run_config=context.run_config,
@@ -109,16 +122,18 @@ def get_server_app(checkpoint_dir,
             fraction_evaluate=fraction_evaluate,
             initial_parameters=parameters,
             on_fit_config_fn=on_fit_config,
-            evaluate_fn=evaluate_fn(testloader, model=model, criterion=criterion),
+            evaluate_fn=get_evaluate_fn(testloader, model, criterion),
             evaluate_metrics_aggregation_fn=weighted_average,
-            min_fit_clients=min_fit_clients,  # Never sample less than 10 clients for training
-            min_evaluate_clients=min_evaluate_clients,  # Never sample less than 5 clients for evaluation
+            min_fit_clients=min_fit_clients,
+            min_evaluate_clients=min_evaluate_clients,
             min_available_clients=min_available_clients,
             save_every=save_every,
             start_epoch=start_epoch,
-            save_best_model=save_best_model
+            fit_metrics_aggregation_fn=handle_fit_metrics,
+            save_best_model=save_best_model,
+            wandb_config=wandb_config,
         )
-        config = ServerConfig(num_rounds=num_rounds, round_timeout=None)
+        config = ServerConfig(num_rounds=number_rounds, round_timeout=None)
 
         return ServerAppComponents(strategy=strategy, config=config)
 
