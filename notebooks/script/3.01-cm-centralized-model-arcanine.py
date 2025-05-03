@@ -64,9 +64,9 @@ print(f"Using device: {device}")
 CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
 name="arcanine"
 start_epoch=1
-num_epochs=80
-save_every=5
-backup_every=20
+num_epochs=50
+save_every=1
+backup_every=10
 
 # Model Hyper-parameters
 head_layers=3
@@ -119,46 +119,28 @@ all_validation_accuracies=[]    # Pre-allocated list for validation accuracies
 
 # ---- RESUME ----
 
-# # Model loading (uncomment to properly overwrite)
-# loading_epoch = 80
-# model, start_epoch = load(
-#     f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
-#     model_class=BaseDino,
-#     device=device,
-#     optimizer=optimizer,
-#     scheduler=scheduler,
-#     verbose=True
-# )
-# model.to(device)
-# loaded_metrics = load_loss_and_accuracies(path=f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.loss_acc.json")
+# Model loading (uncomment to properly overwrite)
+loading_epoch = 25
+model, start_epoch = load(
+    f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
+    model_class=BaseDino,
+    device=device,
+    optimizer=optimizer,
+    scheduler=scheduler,
+    verbose=True
+)
+model.to(device)
+loaded_metrics = load_loss_and_accuracies(path=f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.loss_acc.json")
 
-# # Preallocated lists: if the training interrupts, it will still save their values (uncomment to properly load and overwrite)
-# all_training_losses=loaded_metrics["train_loss"]       # Pre-allocated list for training losses
-# all_validation_losses=loaded_metrics["val_loss"]       # Pre-allocated list for validation losses
-# all_training_accuracies=loaded_metrics["train_acc"]    # Pre-allocated list for training accuracies
-# all_validation_accuracies=loaded_metrics["val_acc"]    # Pre-allocated list for validation accuracies
+# Preallocated lists: if the training interrupts, it will still save their values (uncomment to properly load and overwrite)
+all_training_losses=loaded_metrics["train_loss"]       # Pre-allocated list for training losses
+all_validation_losses=loaded_metrics["val_loss"]       # Pre-allocated list for validation losses
+all_training_accuracies=loaded_metrics["train_acc"]    # Pre-allocated list for training accuracies
+all_validation_accuracies=loaded_metrics["val_acc"]    # Pre-allocated list for validation accuracies
 
 # -----------------
 
 print(f"\nModel: {model}")
-
-
-# Get one batch of data from the test dataloader
-data_iter = iter(test_dataloader)
-images, labels = next(data_iter)
-
-# Move the data to the same device as the model
-images = images.to(device)
-
-# Perform prediction
-model.eval()  # Set the model to evaluation mode
-with torch.no_grad():
-    outputs = model(images)
-    _, predicted = torch.max(outputs, 1)
-
-# Print the first prediction and its corresponding label
-print(f"Predicted class: {predicted[0].item()}, True class: {labels[0].item()}")
-print(f"Outputs shape: {outputs.shape}")
 
 
 try:
