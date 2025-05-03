@@ -202,7 +202,7 @@ def train(
         if val_dataloader and eval_every and epoch % eval_every == 0:
             # Evaluate the model on the validation dataset
             validation_loss, validation_accuracy, _ = eval(
-                dataloader=val_dataloader, model=model, criterion=criterion
+                dataloader=val_dataloader, model=model, criterion=criterion, verbose=verbose
             )
             # Append the per-iteration validation losses and accuracy to the total lists
             all_validation_losses.append(validation_loss)
