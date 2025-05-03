@@ -152,7 +152,7 @@ local_masks_list = convert_masks_to_list(worst_classes, local_masks)
 
 import json
 
-def fine_tuned_model(class_to_fine_tune, train_dataloader, mask, optimizer, scheduler, criterion, epochs = 10, verbose = 1):
+def fine_tuned_model(name, train_dataloader, mask, optimizer, scheduler, criterion, epochs = 10, verbose = 1):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load the model
@@ -170,7 +170,7 @@ def fine_tuned_model(class_to_fine_tune, train_dataloader, mask, optimizer, sche
 
     _, _, _, _ = train(
         checkpoint_dir = CHECKPOINT_DIR,
-        name = f'{model_name}_{class_to_fine_tune}',
+        name = name,
         start_epoch = 1,
         num_epochs = epochs,
         save_every = epochs,
@@ -202,7 +202,7 @@ def fine_tune(classes, classes_dataloaders, masks, optimizer, scheduler, criteri
 
         # Fine-tune the model
         new_class_acc = fine_tuned_model(
-            class_to_fine_tune = cls,
+            name = f'{model_name}_{cls}_{mask_type}',
             train_dataloader = train_dataloader,
             mask = mask,
             optimizer = optimizer,
