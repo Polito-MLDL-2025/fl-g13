@@ -25,7 +25,7 @@ def fisher_scores(
     # Set the for loop iterator according to the verbose flag
     if verbose == 1:
         # Default, use tqdm with progress bar
-        batch_iterator = tqdm(dataloader, desc = 'Per Class Accuracy', unit = 'batch')
+        batch_iterator = tqdm(dataloader, desc = 'Fisher Score', unit = 'batch')
     else:
         # No progress bar
         batch_iterator = dataloader
