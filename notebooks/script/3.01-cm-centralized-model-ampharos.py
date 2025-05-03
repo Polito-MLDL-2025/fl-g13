@@ -46,7 +46,9 @@ eval_transform = Compose([
 cifar100_train = datasets.CIFAR100(root=RAW_DATA_DIR, train=True, download=True, transform=train_transform)
 cifar100_test = datasets.CIFAR100(root=RAW_DATA_DIR, train=False, download=True, transform=eval_transform)
 
-train_dataset, val_dataset = train_test_split(cifar100_train, 0.8, random_state=None)
+# Always specify a random state, otherwise the split will be different each time 
+# If you have intention to load a model mid-training, you may have part of the validation set as already seen in the previous training
+train_dataset, val_dataset = train_test_split(cifar100_train, 0.8, random_state=42)
 test_dataset = cifar100_test
 
 print(f"Train dataset size: {len(train_dataset)}")
@@ -60,34 +62,52 @@ print(f"Using device: {device}")
 
 # Settings
 CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
-name = "uxie"
+name = "ampharos"
 start_epoch=1
-num_epochs=60
+num_epochs=80
 save_every=5
-backup_every=10
+backup_every=20
 
-# Hyper-parameters
-BATCH_SIZE = 128
-LR = 1e-3
+# Model Hyper-parameters
+head_layers=5
+head_hidden_size=512
+dropout_rate=0.0
+unfreeze_blocks=1
+
+# Training Hyper-parameters
+batch_size=128
+lr=1e-3
+momentum=0.9
+weight_decay=1e-5
+T_max=30
+eta_min=1e-5
 
 # Dataloaders
-train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
-test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 # Model
-model = BaseDino(head_layers=5, head_hidden_size=512, dropout_rate=0.0, unfreeze_blocks=1)
+model = BaseDino(
+    head_layers=head_layers, 
+    head_hidden_size=head_hidden_size, 
+    dropout_rate=dropout_rate, 
+    unfreeze_blocks=unfreeze_blocks
+    )
 model.to(device)
 
 # Optimizer, scheduler, and loss function
-mask = [torch.ones_like(p, device=p.device) for p in model.parameters()] # Must be done AFTER the model is moved to CUDA
-optimizer = SparseSGDM(model.parameters(), mask=mask, lr=LR)
-scheduler = CosineAnnealingWarmRestarts(
-    optimizer, 
-    T_0=15,          # First restart after 12 epochs
-    T_mult=2,        # Double the interval between restarts each time
-    eta_min=1e-7     # Minimum learning rate after annealing
-)
+optimizer = SGD(
+    model.parameters(), 
+    lr=lr,
+    momentum=momentum,
+    weight_decay=weight_decay
+    )
+scheduler = CosineAnnealingLR(
+    optimizer=optimizer, 
+    T_max=T_max, 
+    eta_min=eta_min
+    )
 criterion = CrossEntropyLoss()
 
 all_training_losses=[]       # Pre-allocated list for training losses
@@ -95,8 +115,10 @@ all_validation_losses=[]       # Pre-allocated list for validation losses
 all_training_accuracies=[]    # Pre-allocated list for training accuracies
 all_validation_accuracies=[]    # Pre-allocated list for validation accuracies
 
+# ---- RESUME ----
+
 # Model loading (uncomment to properly overwrite)
-loading_epoch = 60
+loading_epoch = 20
 model, start_epoch = load(
     f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
     model_class=BaseDino,
@@ -114,7 +136,27 @@ all_validation_losses=loaded_metrics["val_loss"]       # Pre-allocated list for 
 all_training_accuracies=loaded_metrics["train_acc"]    # Pre-allocated list for training accuracies
 all_validation_accuracies=loaded_metrics["val_acc"]    # Pre-allocated list for validation accuracies
 
+# -----------------
+
 print(f"\nModel: {model}")
+
+
+# Get one batch of data from the test dataloader
+data_iter = iter(test_dataloader)
+images, labels = next(data_iter)
+
+# Move the data to the same device as the model
+images = images.to(device)
+
+# Perform prediction
+model.eval()  # Set the model to evaluation mode
+with torch.no_grad():
+    outputs = model(images)
+    _, predicted = torch.max(outputs, 1)
+
+# Print the first prediction and its corresponding label
+print(f"Predicted class: {predicted[0].item()}, True class: {labels[0].item()}")
+print(f"Outputs shape: {outputs.shape}")
 
 
 try:
@@ -131,7 +173,7 @@ try:
         criterion=criterion,
         optimizer=optimizer,
         scheduler=scheduler,
-        verbose=False,
+        verbose=1,
         all_training_losses=all_training_losses,
         all_validation_losses=all_validation_losses,
         all_training_accuracies=all_training_accuracies,
@@ -146,9 +188,10 @@ except Exception as e:
 
 
 import matplotlib.pyplot as plt
+get_ipython().run_line_magic('matplotlib', 'inline')
 
 # Plot losses
-plt.figure(figsize=(12, 6))
+plt.figure(figsize=(18, 6))
 plt.subplot(1, 2, 1)
 plt.plot(all_training_losses, label='Training Loss')
 plt.plot(all_validation_losses, label='Validation Loss')
@@ -156,6 +199,8 @@ plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.title('Loss vs Epochs')
 plt.legend()
+plt.grid(True)  # Add grid
+plt.xticks(range(len(all_training_losses)), rotation=0)  # Rotate ticks by 20 degrees
 
 # Plot accuracies
 plt.subplot(1, 2, 2)
@@ -165,6 +210,8 @@ plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
 plt.title('Accuracy vs Epochs')
 plt.legend()
+plt.grid(True)  # Add grid
+plt.xticks(range(len(all_training_accuracies)), rotation=0)  # Rotate ticks by 20 degrees
 
 plt.tight_layout()
 plt.show()
@@ -178,91 +225,6 @@ print(
     f"\t📉 Test Loss: {test_loss:.4f}\n"
     f"\t🎯 Test Accuracy: {100 * test_accuracy:.2f}%"
 )
-
-
-# ## Model Editing
-
-from torch.utils.data import Subset
-
-def extract_images_by_label(dataset, target_labels):
-    target_labels = set(target_labels)
-    matching_indices = [i for i in range(len(dataset)) if dataset[i][1] in target_labels]
-    return Subset(dataset, matching_indices)
-
-
-def train_task_model(labels, task_name):
-    def extract_subclass(dataset, ):
-        return extract_images_by_label(dataset, labels)
-
-    # Subsets
-    task_train_dataset = extract_subclass(cifar100_train)
-    task_test_dataset = extract_subclass(cifar100_test)
-
-    print("Lenght train dataset: ", len(task_train_dataset))
-    print("Lenght test  dataset: ", len(task_test_dataset))
-
-    # Dataloaders
-    task_train_dataloader = DataLoader(task_train_dataset, batch_size=64, shuffle=True)
-    task_test_dataloader = DataLoader(task_test_dataset, batch_size=64, shuffle=False)
-
-    # Load the original model
-    loading_epoch = 60
-    original_model, _ = load(
-        f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
-        model_class=BaseDino,
-        device=device,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        verbose=True
-    )
-    original_model.to(device)
-
-    # Define the task model as the original one
-    task_model, _ = load(
-        f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
-        model_class=BaseDino,
-        device=device,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        verbose=True
-    )
-    task_model.to(device)    
-    task_optimizer = SGD(task_model.parameters(), lr=1e-5)
-
-    # Train the task model
-    _, _, _, _ = train(
-        checkpoint_dir=CHECKPOINT_DIR,
-        name=f"{name}_{task_name}",
-        start_epoch=1,
-        num_epochs=15,
-        save_every=5,
-        backup_every=None,
-        train_dataloader=task_train_dataloader,
-        val_dataloader=task_test_dataloader,
-        model=task_model,
-        criterion=criterion,
-        optimizer=task_optimizer,
-        scheduler=None,
-        verbose=False,
-    )
-
-    return original_model, task_model
-
-
-original_model, task_model = train_task_model([0], "apple")
-
-
-# Compute the task vector
-task_vector = {}
-for (name1, param1), (name2, param2) in zip(original_model.named_parameters(), task_model.named_parameters()):
-    if name1 != name2:
-        raise ValueError(f"Parameter names do not match: {name1} vs {name2}")
-    task_vector[name1] = param2.data - param1.data
-
-# Example: print the last few entries of the task vector
-for param_name, diff in task_vector.items():
-    if torch.any(diff != 0):
-        print(f"{param_name}: {diff.shape}")
 
 
 
