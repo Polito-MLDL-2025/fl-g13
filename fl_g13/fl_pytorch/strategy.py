@@ -1,6 +1,7 @@
 """pytorch-example: A Flower / PyTorch app."""
 
 import os, json
+import time
 from logging import INFO
 from typing import Union, Optional
 from pathlib import Path
@@ -15,7 +16,7 @@ from flwr.server.strategy import FedAvg
 
 from fl_g13.fl_pytorch.model import get_default_model
 from fl_g13.fl_pytorch.task import create_run_dir, set_weights
-from fl_g13.modeling import save
+from fl_g13.modeling import save, save_loss_and_accuracy
 
 PROJECT_NAME = "CIFAR100_FL_experiment"
 
@@ -74,7 +75,7 @@ class SaveModelFedAvg(FedAvg):
         # init W&B
         wandb.init(
             project=PROJECT_NAME, 
-            name=f"{self.model.__class__.__name__}-{self.wandb_config['partition']}",
+            name=f"{self.model.__class__.__name__}-{self.wandb_config['partition_type']}",
             config=self.wandb_config,
             id=run_id,
             resume="allow",

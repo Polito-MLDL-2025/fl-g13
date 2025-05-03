@@ -1,23 +1,23 @@
 """pytorch-example: A Flower / PyTorch app."""
 
+from typing import List, Tuple
+
 import torch
 from flwr.common import Context, ndarrays_to_parameters, Metrics
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from torch.utils.data import DataLoader
+from torchvision import datasets
 
 from fl_g13.config import RAW_DATA_DIR
+from fl_g13.fl_pytorch.datasets import get_eval_transforms
 from fl_g13.fl_pytorch.strategy import SaveModelFedAvg
 from fl_g13.fl_pytorch.task import (
     get_weights,
     set_weights,
 )
-from typing import List, Tuple
-from fl_g13.fl_pytorch.datasets import get_eval_transforms
-#from fl_g13.fl_pytorch.task import test
-from datasets import load_dataset
+# from fl_g13.fl_pytorch.task import test
 from fl_g13.modeling.eval import eval
 from fl_g13.modeling.load import load_or_create
-from torchvision import datasets
 
 
 def get_evaluate_fn(
@@ -54,10 +54,11 @@ def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
     # Aggregate and return custom metric (weighted average)
     return {"federated_evaluate_accuracy": sum(accuracies) / sum(examples)}
 
+
 def handle_fit_metrics(metrics: List[Tuple[int, Metrics]]) -> Metrics:
     """Allow to communicate metrics from client to server.
     Aggregate application specific metrics computed by clients at each round with .fit()"""
-    
+
     train_losses = [num_examples * m["train_loss"] for num_examples, m in metrics]
     train_drifts = [num_examples * m["drift"] for num_examples, m in metrics]
     examples = [num_examples for num_examples, _ in metrics]
@@ -65,6 +66,9 @@ def handle_fit_metrics(metrics: List[Tuple[int, Metrics]]) -> Metrics:
     # Aggregate and return custom metric
     return {"avg_train_loss": sum(train_losses) / sum(examples), "avg_drift": sum(train_drifts) / sum(examples)}
 
+def get_data_set_default(context: Context):
+    testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
+    return DataLoader(testset, batch_size=32)
 
 def get_server_app(checkpoint_dir,
                    model_class,
@@ -82,6 +86,8 @@ def get_server_app(checkpoint_dir,
                    use_wandb=False,
                    save_best_model=False,
                    wandb_config=None,
+                   get_datatest_fn=get_data_set_default,
+                   get_evaluate_fn=get_evaluate_fn,
                    ):
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, start_epoch = load_or_create(
@@ -97,18 +103,15 @@ def get_server_app(checkpoint_dir,
         print(f'Continue train model from epoch {start_epoch}')
         # Read from config
         # run_config holds hyperparameters that we might want to override at runtime
-        number_rounds = context.run_config.get("num-server-rounds") or num_rounds #defined in .toml
+        number_rounds = context.run_config.get("num-server-rounds") or num_rounds  # defined in .toml
 
         # Initialize model parameters
         ndarrays = get_weights(model)
         parameters = ndarrays_to_parameters(ndarrays)
 
-        #testset = load_dataset("cifar100", split="test")
-        testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
-
         # load global full testset for central evaluation
-        testloader = DataLoader(testset, batch_size=32)
-        
+        testloader = get_datatest_fn(context)
+
         # Define strategy
         strategy = SaveModelFedAvg(
             checkpoint=checkpoint_dir,
@@ -119,13 +122,13 @@ def get_server_app(checkpoint_dir,
             fraction_evaluate=fraction_evaluate,
             initial_parameters=parameters,
             on_fit_config_fn=on_fit_config,
-            evaluate_fn=get_evaluate_fn(testloader, model, criterion), 
+            evaluate_fn=get_evaluate_fn(testloader, model, criterion),
             evaluate_metrics_aggregation_fn=weighted_average,
-            min_fit_clients=min_fit_clients, 
-            min_evaluate_clients=min_evaluate_clients, 
+            min_fit_clients=min_fit_clients,
+            min_evaluate_clients=min_evaluate_clients,
             min_available_clients=min_available_clients,
             save_every=save_every,
-            start_epoch =start_epoch,
+            start_epoch=start_epoch,
             fit_metrics_aggregation_fn=handle_fit_metrics,
             save_best_model=save_best_model,
             wandb_config=wandb_config,

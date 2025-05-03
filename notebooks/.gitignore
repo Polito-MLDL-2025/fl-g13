@@ -1,2 +1,5 @@
 utils.py
 vision_transformer.py
+outputs
+wandb
+wandb_run_id.txt

@@ -122,7 +122,7 @@ In the real case, each client will have its dataset
 '''
 
 
-def load_data_client(context: Context):
+def load_data_client(context: Context,**kwargs):
     partition_id = context.node_config["partition-id"]
     print(f"Client {partition_id} is ready to train")
     return clients_dataloader_train[partition_id], clients_dataloader_val[partition_id]
@@ -132,11 +132,13 @@ def load_data_client(context: Context):
 
 from fl_g13.fl_pytorch.client_app import get_client_app
 
-config = {'local-epochs': 3}
+local_epochs = 2
 
-client = get_client_app(load_data_client,
+client = get_client_app(load_data_fn=load_data_client,
                         model=model, optimizer=optimizer, criterion=criterion,
-                        device=DEVICE, config=config)
+                        device=DEVICE,
+                        local_epochs=local_epochs
+                        )
 
 
 # # Define the Flower ServerApp

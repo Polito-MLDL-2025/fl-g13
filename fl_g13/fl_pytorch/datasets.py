@@ -52,21 +52,22 @@ def load_datasets(
         partition_id: int, 
         num_partitions: int,
         dataset: str="cifar100",
-        partitionType: str="iid", 
+        partition_type: str= "iid",
         batch_size: int=BATCH_SIZE,
-        num_shards_per_partition: int=NUM_SHARDS_PER_PARTITION
+        num_shards_per_partition: int=NUM_SHARDS_PER_PARTITION,
+        train_test_split_ratio=0.2
     ) -> Tuple[DataLoader, DataLoader]:
 
     global fds
     if fds is None:
-        if partitionType == "iid":
+        if partition_type == "iid":
             fds = FederatedDataset(
                 dataset=dataset,
                 partitioners={
                     "train": IidPartitioner(num_partitions=num_partitions),
                 },
             )
-        elif partitionType == "shard":
+        elif partition_type == "shard":
             fds = FederatedDataset(
                 dataset=dataset,
                 partitioners={
@@ -81,7 +82,7 @@ def load_datasets(
     partition = fds.load_partition(partition_id)
 
     # Divide data on each node: 80% train, 20% test
-    partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
+    partition_train_test = partition.train_test_split(test_size=train_test_split_ratio, seed=42)
 
     # Create train/val for each partition and wrap it into DataLoader
     partition_train_test = partition_train_test.with_transform(get_transforms())

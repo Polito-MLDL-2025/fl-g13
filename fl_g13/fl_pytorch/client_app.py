@@ -1,14 +1,17 @@
 """pytorch-example: A Flower / PyTorch app."""
 
+from typing import List
+
+# from fl_g13.fl_pytorch.task import train, test
+import numpy as np
 import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import ArrayRecord, Context, RecordDict
+from torch import nn
+from torch.utils.data import DataLoader
 
-from fl_g13.fl_pytorch.task import get_weights, set_weights
 from fl_g13.fl_pytorch.datasets import load_datasets
-#from fl_g13.fl_pytorch.task import train, test
-import numpy as np
-from typing import List
+from fl_g13.fl_pytorch.task import get_weights, set_weights
 from fl_g13.modeling.eval import eval
 from fl_g13.modeling.train import train
 
@@ -22,9 +25,9 @@ class FlowerClient(NumPyClient):
     """
 
     def __init__(
-            self, model, client_state: RecordDict, trainloader, valloader,
-            local_epochs,
-            optimizer: torch.optim.Optimizer=None, criterion=None, scheduler=None,
+            self, model: nn.Module, client_state: RecordDict, trainloader: DataLoader, valloader: DataLoader,
+            local_epochs: int,
+            optimizer: torch.optim.Optimizer = None, criterion=None, scheduler=None,
             device=None
     ):
         self.model = model
@@ -41,7 +44,6 @@ class FlowerClient(NumPyClient):
         self.scheduler = scheduler
         self.criterion = criterion
         self.optimizer = optimizer
-        self.scheduler = scheduler
         self.local_layer_name = "classification-head"
         self.last_global_weights = None
 
@@ -76,7 +78,7 @@ class FlowerClient(NumPyClient):
                                              scheduler=self.scheduler,
                                              eval_every=None,
                                              )
-        
+
         updated_weights = get_weights(self.model)
         updated_vector = model_weights_to_vector(updated_weights)
 
@@ -89,7 +91,8 @@ class FlowerClient(NumPyClient):
         return (
             updated_weights,
             len(self.trainloader.dataset),
-            {"train_loss": sum(all_training_losses), "drift": drift.tolist()}, # if you have more complex metrics you have to serialize them with json since Metrics value allow only Scalar
+            {"train_loss": sum(all_training_losses), "drift": drift.tolist()},
+            # if you have more complex metrics you have to serialize them with json since Metrics value allow only Scalar
         )
 
     def _save_layer_weights_to_state(self):
@@ -127,47 +130,66 @@ class FlowerClient(NumPyClient):
 def model_weights_to_vector(weights: List[np.ndarray]) -> np.ndarray:
     return np.concatenate([w.flatten() for w in weights])
 
-def get_client_app( 
-        model=None, 
-        optimizer=None, 
+
+def load_data_client_default(context: Context,
+                             partition_type="iid",
+                             batch_size=50,
+                             num_shards_per_partition=2,
+                             train_test_split_ratio=0.2):
+    partition_id = context.node_config["partition-id"]  # assigned at runtime
+    num_partitions = context.node_config["num-partitions"]
+    trainloader, valloader = load_datasets(
+        partition_id,
+        num_partitions,
+        partition_type=partition_type,
+        batch_size=batch_size,
+        num_shards_per_partition=num_shards_per_partition,
+        train_test_split_ratio=train_test_split_ratio
+    )
+    return trainloader, valloader
+
+
+def get_client_app(
+        load_data_fn=load_data_client_default,
+        model=None,
+        optimizer=None,
         criterion=None,
-        device=None, 
-        partition="iid",
+        device=None,
+        partition_type="iid",
         local_epochs=4,
         batch_size=50,
         num_shards_per_partition=2,
         scheduler=None,
-    ) -> ClientApp:
+        train_test_split_ratio=0.2
+) -> ClientApp:
     """Create a Flower client app."""
 
     def client_fn(context: Context):
         """Create a Flower client."""
-        partition_id = context.node_config["partition-id"] # assigned at runtime
-        num_partitions = context.node_config["num-partitions"]
-        trainloader, valloader = load_datasets(
-            partition_id, 
-            num_partitions, 
-            partitionType=partition,
+
+        trainloader, valloader = load_data_fn(
+            context=context,
+            partition_type=partition_type,
             batch_size=batch_size,
             num_shards_per_partition=num_shards_per_partition,
+            train_test_split_ratio=train_test_split_ratio
         )
-
         # Return Client instance
         # We pass the state to persist information across
         # participation rounds. Note that each client always
         # receives the same Context instance (it's a 1:1 mapping)
         client_state = context.state
         return FlowerClient(
-            model, 
-            client_state, 
-            trainloader, 
-            valloader, 
-            local_epochs, 
-            optimizer=optimizer, 
+            model=model,
+            client_state=client_state,
+            trainloader=trainloader,
+            valloader=valloader,
+            local_epochs=local_epochs,
+            optimizer=optimizer,
             criterion=criterion,
             device=device,
             scheduler=scheduler,
         ).to_client()
-    
+
     app = ClientApp(client_fn=client_fn)
     return app
