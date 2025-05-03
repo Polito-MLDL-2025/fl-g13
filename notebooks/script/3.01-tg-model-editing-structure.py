@@ -37,13 +37,13 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 CHECKPOINT_DIR = str(PROJ_ROOT / 'checkpoints')
-model_name = 'yamask'
+model_name = 'arcanine'
 model_checkpoint_path = f'{CHECKPOINT_DIR}/Editing/{model_name}.pth'
 model_metrics_path = f'{CHECKPOINT_DIR}/Editing/{model_name}.loss_acc.json'
 
 # Empty model
 # Will be replaced with the already trained model from the checkpoint
-model = BaseDino(head_layers=5, head_hidden_size=512, dropout_rate=0.0, unfreeze_blocks=1)
+model = BaseDino(head_layers=3, head_hidden_size=512, dropout_rate=0.0, unfreeze_blocks=1)
 model.to(device)
 
 # Hyper-parameters
@@ -58,8 +58,18 @@ test_dataloader = DataLoader(test_dataset, batch_size = BATCH_SIZE, shuffle = Fa
 # Create a dummy mask for SparseSGDM
 mask = [torch.ones_like(p, device = p.device) for p in model.parameters()] # Must be done AFTER the model is moved to the device
 # Optimizer, scheduler, and loss function
-optimizer = SparseSGDM(model.parameters(), mask = mask, lr = LR)
-scheduler = CosineAnnealingLR(optimizer = optimizer, T_max = 20, eta_min = 1e-5)
+optimizer = SparseSGDM(
+    model.parameters(), 
+    mask = mask, 
+    lr = LR,
+    momentum = 0.9,
+    weight_decay = 1e-5
+)
+scheduler = CosineAnnealingLR(
+    optimizer = optimizer, 
+    T_max = 8, 
+    eta_min = 1e-5
+)
 criterion = CrossEntropyLoss()
 
 # Load the model
@@ -166,7 +176,13 @@ def fine_tuned_model(name, train_dataloader, mask, optimizer, scheduler, criteri
     new_model.to(device) # manually move the model to the device
 
     # Create a new SparseSGDM optimizer
-    new_optimizer = SparseSGDM(new_model.parameters(), mask = mask, lr = LR)
+    new_optimizer = SparseSGDM(
+        new_model.parameters(), 
+        mask = mask, 
+        lr = LR,
+        momentum = 0.9,
+        weight_decay = 1e-5
+    )
 
     _, _, _, _ = train(
         checkpoint_dir = CHECKPOINT_DIR,
@@ -207,7 +223,8 @@ def fine_tune(classes, classes_dataloaders, masks, optimizer, scheduler, criteri
             mask = mask,
             optimizer = optimizer,
             scheduler = scheduler,
-            criterion = criterion
+            criterion = criterion,
+            epochs = 15
         )
 
         # Compare results with the original model
