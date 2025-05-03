@@ -111,10 +111,6 @@ def compute_score_per_classes(model, classes, classes_dataloaders):
     for cls in classes:
         print(f"Computing scores for class {cls}")
         scores = fisher_scores(classes_dataloaders[cls], model)
-        # Ensure the scores dictionary has entries for all model parameters
-        for name, param in model.named_parameters():
-            if name not in scores:
-                scores[name] = torch.zeros_like(param)
         score_per_class[cls] = scores
 
     return score_per_class
@@ -152,6 +148,8 @@ masks_list = convert_masks_to_list(worst_classes, masks_per_class)
 
 
 # ## Fine tune the model on the choosen classes
+
+import json
 
 def fine_tuned_model(class_to_fine_tune, train_dataloader, mask, optimizer, scheduler, criterion, epochs = 10, verbose = 1):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -218,5 +216,19 @@ for cls in worst_classes:
     print(f'Accuracy for class {cls}: {100*new_class_acc[cls]:.2f}% (original: {100*class_acc[cls]:.2f}%)')
     # Print other classes accuracy if the new model is worse than the original
     count = sum([1 for i in range(len(new_class_acc)) if new_class_acc[i] < class_acc[i] and i != cls])
-    print(f'New model is worse in {count} classes, wrt the original model\n\n')
+    print(f'New model is worse in {count} classes, wrt the original model')
+
+    # Save to file the per-class accuracy difference
+    # Create a dictionary with new_class_acc, class_acc, and class_idx
+    accuracy_data = {
+        "class_idx": list(range(100)),
+        "new_class_acc": new_class_acc,
+        "class_acc": class_acc
+    }
+    output_file = f"{CHECKPOINT_DIR}/Editing/{model_name}/accuracy_comparison_{cls}.json"
+
+    # Save the dictionary to a JSON file
+    with open(output_file, "w") as json_file:
+        json.dump(accuracy_data, json_file, indent=4)
+    print(f"Accuracy data saved to {output_file}\n\n")
 
