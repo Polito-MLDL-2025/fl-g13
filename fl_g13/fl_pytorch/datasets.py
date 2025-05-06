@@ -5,7 +5,7 @@ from flwr_datasets.partitioner import IidPartitioner, ShardPartitioner
 from flwr_datasets.visualization import plot_label_distributions
 import matplotlib.pyplot as plt
 from torch import stack, tensor, long
-from typing import Tuple
+from typing import Tuple, Optional, Callable
 
 BATCH_SIZE, NUM_SHARDS_PER_PARTITION = 32, 2
 
@@ -41,7 +41,7 @@ def get_transforms():
         pytorch_transforms = get_train_transforms()
         batch["img"] = [pytorch_transforms(img) for img in batch["img"]]
         batch["fine_label"] = [int(lbl) for lbl in batch["fine_label"]]
-        
+
         return batch
 
     return apply_transforms
@@ -49,13 +49,14 @@ def get_transforms():
 fds = None # Cache the FederatedDataset
 
 def load_datasets(
-        partition_id: int, 
+        partition_id: int,
         num_partitions: int,
         dataset: str="cifar100",
         partition_type: str= "iid",
         batch_size: int=BATCH_SIZE,
         num_shards_per_partition: int=NUM_SHARDS_PER_PARTITION,
-        train_test_split_ratio=0.2
+        train_test_split_ratio=0.2,
+        transform: Optional[Callable]=get_transforms,
     ) -> Tuple[DataLoader, DataLoader]:
 
     global fds
@@ -72,8 +73,8 @@ def load_datasets(
                 dataset=dataset,
                 partitioners={
                     "train": ShardPartitioner(
-                        num_partitions=num_partitions, 
-                        partition_by="fine_label", 
+                        num_partitions=num_partitions,
+                        partition_by="fine_label",
                         num_shards_per_partition=num_shards_per_partition
                     )
                 },
@@ -85,7 +86,7 @@ def load_datasets(
     partition_train_test = partition.train_test_split(test_size=train_test_split_ratio, seed=42)
 
     # Create train/val for each partition and wrap it into DataLoader
-    partition_train_test = partition_train_test.with_transform(get_transforms())
+    partition_train_test = partition_train_test.with_transform(transform())
     trainloader = DataLoader(
         partition_train_test["train"], batch_size=batch_size, shuffle=True, collate_fn=my_collate
     )
@@ -148,7 +149,7 @@ def show_partition_distribution(partitioner):
     plt.show()
     plt.close(fig)
 
-    
+
 def plot_results(results):
     # Estrai i dati per il plot
     rounds = [entry['round'] for entry in results['federated_evaluate']]
@@ -159,7 +160,7 @@ def plot_results(results):
     centralized_accuracy = [entry['centralized_accuracy'] for entry in results['centralized_evaluate']]
     avg_drift = [entry['avg_drift'] for entry in results['client_fit']]
 
-    _, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 6)) 
+    _, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 6))
 
     # Plot federated_evaluate_loss
     axes[0].plot(rounds, federated_loss, label='Federated Evaluate Loss', marker='o', color='red')

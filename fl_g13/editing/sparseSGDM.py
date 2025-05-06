@@ -1,13 +1,16 @@
 from typing import List
+
 import torch
 from torch import Tensor
 from torch.optim.optimizer import Optimizer
+
 
 # Reference:    https://pytorch.org/docs/stable/generated/torch.optim.SGD.html
 #               https://github.com/pytorch/pytorch/blob/v2.7.0/torch/optim/sgd.py#L26
 
 class SparseSGDM(Optimizer):
-    def __init__(self, params, mask:List[Tensor], lr:float, momentum:float=0.0, dampening:float=0.0, weight_decay:float=0.00, nesterov:bool=False, maximize=False) -> None:
+    def __init__(self, params, mask: List[Tensor], lr: float, momentum: float = 0.0, dampening: float = 0.0,
+                 weight_decay: float = 0.00, nesterov: bool = False, maximize=False) -> None:
 
         # Checks
         if not isinstance(mask, list):
@@ -25,13 +28,14 @@ class SparseSGDM(Optimizer):
             raise ValueError("Nesterov momentum requires a momentum and zero dampening")
 
         # Prepare defaults values
-        defaults = dict(mask=mask, lr=lr, momentum=momentum, dampening=dampening, weight_decay=weight_decay, nesterov=nesterov, maximize=maximize)
-        super().__init__(params, defaults) # params are moved to self.param_groups
+        defaults = dict(mask=mask, lr=lr, momentum=momentum, dampening=dampening, weight_decay=weight_decay,
+                        nesterov=nesterov, maximize=maximize)
+        super().__init__(params, defaults)  # params are moved to self.param_groups
 
         # Group-wise parameters not supported at the moment, passing them for torch compatibility
         for param_group in self.param_groups:
             param_group['mask'] = mask
-            param_group['lr'] = lr  
+            param_group['lr'] = lr
             param_group['momentum'] = momentum
             param_group['dampening'] = dampening
             param_group['weight_decay'] = weight_decay
@@ -44,6 +48,22 @@ class SparseSGDM(Optimizer):
                 if p.shape != m.shape:
                     raise ValueError("Mask shape must match the shape of the corresponding parameter.")
 
+    def set_mask(self, mask):
+        # Checks
+        if not isinstance(mask, list):
+            raise ValueError("Mask must be a list of tensors.")
+        for m in mask:
+            if not isinstance(m, Tensor):
+                raise ValueError("Each mask element must be a torch.Tensor.")
+        for param_group in self.param_groups:
+            param_group['mask'] = mask
+
+        # Sanity-check
+        for param_group in self.param_groups:
+            for p, m in zip(param_group['params'], param_group['mask']):
+                if p.shape != m.shape:
+                    raise ValueError("Mask shape must match the shape of the corresponding parameter.")
+        self.defaults['mask'] = mask
 
     # TODO?: sparsity management for mask
     @torch.no_grad()
@@ -68,13 +88,13 @@ class SparseSGDM(Optimizer):
 
                 # Detached for safety, not cloned as done in:
                 # https://github.com/pytorch/pytorch/blob/134179474539648ba7dee1317959529fbd0e7f89/torch/optim/sgd.py#L93)
-                grad = p.grad.detach()#.clone()
+                grad = p.grad.detach()  # .clone()
                 if weight_decay != 0:
-                    grad.add_(p.data, alpha=weight_decay) # Modify tensor in-place using add_
+                    grad.add_(p.data, alpha=weight_decay)  # Modify tensor in-place using add_
 
                 if momentum != 0:
                     state = self.state[p]
-                    buf = state.get('momentum_buffer', None)    
+                    buf = state.get('momentum_buffer', None)
 
                     if buf is None:
                         # Cloning the grad, but in a faster way that as done in:
@@ -82,7 +102,7 @@ class SparseSGDM(Optimizer):
                         buf = p.grad.detach().clone()
                         state['momentum_buffer'] = buf
                     else:
-                        buf.mul_(momentum).add_(grad, alpha=(1-dampening))
+                        buf.mul_(momentum).add_(grad, alpha=(1 - dampening))
 
                     if nesterov:
                         # Could use add_ to optimize operations, but nesterov is rarely used, preferred following as done in:
@@ -100,4 +120,3 @@ class SparseSGDM(Optimizer):
                 p.data.add_(grad * m, alpha=-lr)
 
         return loss
-

@@ -14,6 +14,7 @@ from flwr.common.typing import UserConfig, FitRes, Scalar, Parameters
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy import FedAvg
 
+from fl_g13.editing.masking import uncompress_mask_sparse
 from fl_g13.fl_pytorch.model import get_default_model
 from fl_g13.fl_pytorch.task import create_run_dir, set_weights
 from fl_g13.modeling import save, save_loss_and_accuracy
@@ -134,6 +135,15 @@ class SaveModelFedAvg(FedAvg):
         """Aggregate model weights using weighted average and store checkpoint"""
 
         # Call aggregate_fit from base class (FedAvg) to aggregate parameters and metrics
+
+        ## code to retrive client's masks:
+
+        # for result in results:
+        #     client_proxy, fit_res = result
+        #     if "mask" in fit_res.metrics:
+        #         mask = uncompress_mask_sparse(fit_res.metrics["mask"])
+
+
         aggregated_parameters, aggregated_metrics = super().aggregate_fit(
             server_round, results, failures
         )

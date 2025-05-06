@@ -137,7 +137,7 @@ def compute_masks_per_classes(classes, scores_per_class):
         # print(f"Computing Mask for class {cls}")
         global_masks[cls] = create_gradiend_mask(scores_per_class[cls], mask_type = 'global')
         local_masks[cls] = create_gradiend_mask(scores_per_class[cls], mask_type = 'local')
-
+        
     return global_masks, local_masks
 
 global_masks, local_masks = compute_masks_per_classes(worst_classes, scores_per_class)
@@ -151,7 +151,7 @@ def convert_masks_to_list(classes, masks_per_class):
         # print(f"Computing Mask for class {cls}")
         mask = mask_dict_to_list(model, masks_per_class[cls])
         masks_lists[cls] = mask
-
+        
     return masks_lists
 
 global_masks_list = convert_masks_to_list(worst_classes, global_masks)
@@ -236,7 +236,7 @@ def fine_tune(classes, classes_dataloaders, masks, optimizer, scheduler, criteri
         # Print other classes accuracy if the new model is worse than the original
         count = sum([1 for i in range(len(new_class_acc)) if new_class_acc[i] < class_acc[i] and i != cls])
         print(f'New model is worse in {count} classes, wrt the original model')
-
+        
         # Save to file the per-class accuracy difference
         # Create a dictionary with new_class_acc, class_acc, and class_idx
         accuracy_data = {
@@ -250,7 +250,7 @@ def fine_tune(classes, classes_dataloaders, masks, optimizer, scheduler, criteri
         with open(output_file, "w") as json_file:
             json.dump(accuracy_data, json_file, indent=4)
         print(f"Accuracy data saved to {output_file}\n\n")
-
+        
 print('Fine-tune with global masks')
 fine_tune(worst_classes, classes_dataloaders, global_masks_list, optimizer, scheduler, criterion, 'global')
 print('\n\nFine-tune with local masks')

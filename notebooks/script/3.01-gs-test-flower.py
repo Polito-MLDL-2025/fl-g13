@@ -44,8 +44,8 @@ if DEBUG:
     local_epochs = 2
     batch_size = 128
     num_shards_per_partition = 6
-    use_wandb = True
-    model_class = Net
+    use_wandb = False
+    model_class = BaseDino
 
 
 checkpoint_dir = "./../models/"
@@ -63,10 +63,11 @@ if show_distribution:
     show_partition_distribution(p)
 
 
-starting_lr = 0.25
+starting_lr = 0.001
+partition_type = "iid" # or "shard"
 momentum = 0.9
 wandb_config = {
-    "partition_type": "iid",
+    "partition_type": partition_type,
     "starting_lr": starting_lr,
     "momentum": momentum,
 }
@@ -74,11 +75,11 @@ wandb_config = {
 
 model, optimizer, criterion, device, scheduler = get_experiment_setting(checkpoint_dir, model_class, starting_lr, momentum)
 client_app = get_client_app(
-    model, 
-    optimizer, 
-    criterion, 
-    device, 
-    partition_type="iid", 
+    model=model, 
+    optimizer=optimizer, 
+    criterion=criterion, 
+    device=device, 
+    partition_type=partition_type, 
     local_epochs=local_epochs,
     batch_size=batch_size,
     num_shards_per_partition=num_shards_per_partition,
