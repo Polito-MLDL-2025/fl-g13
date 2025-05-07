@@ -17,6 +17,13 @@
 - Mask is calculated at Client or Server level? Aggregation of client masks at server level?
 - What about re-calibrating mask every n epochs?
 
+- Q, K, bias of K will probably be less sensitive parameters;
+- Probably sparsity to 90% onwards (10% of ones, 90% of zeros)
+- Train the mask with batch_size = 1 (online training), and multiple rounds (i.e., epochs)
+- See torchs's vmap routine, backpack (not implemented for all modules of Dino), torch.autograd.grad()
+- Use backward(retain_grad=True)
+- Optimizer SparseSGDM for not multiplying each param with 1s and 0s, but seting requires.grad() = False to appropriate elements
+
 15/04 Questions for Riccardo
 - At "make centralized model" we need to make just a model as in labs, or rather pre-traing with some batches the server's model, which will then be shared with the rest of the network?
 - Do we need to transform and augment our data? Then we tune using different optimizers. Can we use Adam?
