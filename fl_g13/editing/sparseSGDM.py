@@ -66,6 +66,7 @@ class SparseSGDM(Optimizer):
         self.defaults['mask'] = mask
 
     # TODO?: sparsity management for mask
+    # TODO? dynamic require_grad control: set to True or False and completely skip them in the Differentiation Graph
     @torch.no_grad()
     def step(self, closure=None):
         loss = None
@@ -115,6 +116,12 @@ class SparseSGDM(Optimizer):
 
                 if maximize:
                     grad.neg_()
+
+                # Uncomment this in the future if we are sure we do not need gradients after multiplication is done,
+                # while also substituting grad*m with grad in lines below
+                # 
+                # Apply mask to gradient directly (safest + most common approach)
+                # grad.mul_(m) # If m is zero, the grad is completely lost!
 
                 # Apply mask and step
                 p.data.add_(grad * m, alpha=-lr)
