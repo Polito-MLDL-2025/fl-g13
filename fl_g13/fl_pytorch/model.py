@@ -27,6 +27,21 @@ class Net(nn.Module):
         x = self.fc2(x)
         return x
 
+class TinyCNN(nn.Module):
+    def __init__(self, num_classes=100):
+        super(TinyCNN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 16, 3, padding=1)
+        self.conv2 = nn.Conv2d(16, 32, 3, padding=1)
+        self.fc1 = nn.Linear(32 * 8 * 8, num_classes)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))  # -> [B, 16, 32, 32]
+        x = F.max_pool2d(x, 2)  # -> [B, 16, 16, 16]
+        x = F.relu(self.conv2(x))  # -> [B, 32, 16, 16]
+        x = F.max_pool2d(x, 2)  # -> [B, 32, 8, 8]
+        x = x.view(x.size(0), -1)  # -> [B, 32*8*8]
+        x = self.fc1(x)  # -> [B, 100]
+        return x
 
 def get_default_model():
     return Net()

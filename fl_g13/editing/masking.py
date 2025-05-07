@@ -1,3 +1,6 @@
+import pickle
+
+import numpy as np
 import torch
 
 def _local_mask(class_score, sparsity = 0.2):
@@ -76,3 +79,29 @@ def mask_dict_to_list(model, gradient_mask_dict):
             raise ValueError(f"Mask shape mismatch for {name}: {param.shape} vs {mask.shape}")
         mask_list.append(mask.to(param.device))
     return mask_list
+
+def compress_mask_sparse(mask_list):
+    """
+    """
+    compressed = []
+    for mask in mask_list:
+        flat_mask = mask.view(-1)
+        indices = torch.nonzero(flat_mask, as_tuple=False).squeeze(1).tolist()
+        shape = list(mask.shape)
+        compressed.append((shape, indices))
+    data_bytes = pickle.dumps(compressed)
+    return data_bytes
+
+def uncompress_mask_sparse(mask_bytes, device=None):
+    """
+    """
+    compressed_list = pickle.loads(mask_bytes)
+    uncompressed = []
+    for shape, indices in compressed_list:
+        flat = torch.zeros(int(np.prod(shape)), dtype=torch.float32)
+        flat[indices] = 1.0
+        mask = flat.view(shape)
+        if device:
+            mask = mask.to(device)
+        uncompressed.append(mask)
+    return uncompressed

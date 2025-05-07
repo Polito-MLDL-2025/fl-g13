@@ -7,10 +7,12 @@ import numpy as np
 import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import ArrayRecord, Context, RecordDict
-from torch import nn
+from torch import nn, Tensor
 from torch.utils.data import DataLoader
 
-from fl_g13.fl_pytorch.datasets import load_datasets
+from fl_g13.editing import fisher_scores, create_gradiend_mask, mask_dict_to_list
+from fl_g13.editing.masking import compress_mask_sparse
+from fl_g13.fl_pytorch.datasets import load_datasets, get_transforms
 from fl_g13.fl_pytorch.task import get_weights, set_weights
 from fl_g13.modeling.eval import eval
 from fl_g13.modeling.train import train
@@ -22,13 +24,17 @@ class FlowerClient(NumPyClient):
     It implements a basic version of `personalization` by which
     the classification layer of the CNN is stored locally and used
     and updated during `fit()` and used during `evaluate()`.
+
     """
 
     def __init__(
             self, model: nn.Module, client_state: RecordDict, trainloader: DataLoader, valloader: DataLoader,
             local_epochs: int,
             optimizer: torch.optim.Optimizer = None, criterion=None, scheduler=None,
-            device=None
+            device=None,
+            model_editing=False,
+            mask_type='global',
+            sparsity=0.2
     ):
         self.model = model
         self.client_state = client_state
@@ -46,6 +52,24 @@ class FlowerClient(NumPyClient):
         self.optimizer = optimizer
         self.local_layer_name = "classification-head"
         self.last_global_weights = None
+        self.mask = False
+        if model_editing:
+            self._compute_mask(sparsity=sparsity, mask_type=mask_type)
+
+    def set_mask(self, mask: List[Tensor]):
+        if not hasattr(self.optimizer, "set_mask"):
+            raise Exception("The optimizer should have a set_mask method")
+        self.optimizer.set_mask(mask)
+        self.mask = compress_mask_sparse(mask)
+
+    def _compute_mask(self, sparsity=0.2, mask_type='global'):
+        scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
+        mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
+        mask_list = mask_dict_to_list(self.model, mask)
+        if not hasattr(self.optimizer, "set_mask"):
+            raise Exception("The optimizer should have a set_mask method")
+        self.optimizer.set_mask(mask_list)
+        self.mask = compress_mask_sparse(mask_list)
 
     def fit(self, parameters, config):
         """Train model locally.
@@ -87,11 +111,11 @@ class FlowerClient(NumPyClient):
         # Save classification head to context's state to use in a future fit() call
         self._save_layer_weights_to_state()
 
-        # Return locally-trained model and metrics
+
         return (
             updated_weights,
             len(self.trainloader.dataset),
-            {"train_loss": sum(all_training_losses), "drift": drift.tolist()},
+            {"train_loss": sum(all_training_losses), "drift": drift.tolist(),'mask':self.mask}
             # if you have more complex metrics you have to serialize them with json since Metrics value allow only Scalar
         )
 
@@ -135,7 +159,9 @@ def load_data_client_default(context: Context,
                              partition_type="iid",
                              batch_size=50,
                              num_shards_per_partition=2,
-                             train_test_split_ratio=0.2):
+                             train_test_split_ratio=0.2,
+                             transfrom=get_transforms
+                             ):
     partition_id = context.node_config["partition-id"]  # assigned at runtime
     num_partitions = context.node_config["num-partitions"]
     trainloader, valloader = load_datasets(
@@ -144,7 +170,8 @@ def load_data_client_default(context: Context,
         partition_type=partition_type,
         batch_size=batch_size,
         num_shards_per_partition=num_shards_per_partition,
-        train_test_split_ratio=train_test_split_ratio
+        train_test_split_ratio=train_test_split_ratio,
+        transform=transfrom
     )
     return trainloader, valloader
 
@@ -160,7 +187,10 @@ def get_client_app(
         batch_size=50,
         num_shards_per_partition=2,
         scheduler=None,
-        train_test_split_ratio=0.2
+        train_test_split_ratio=0.2,
+        model_editing=False,
+        mask_type='global',
+        sparsity=0.2
 ) -> ClientApp:
     """Create a Flower client app."""
 
@@ -189,6 +219,9 @@ def get_client_app(
             criterion=criterion,
             device=device,
             scheduler=scheduler,
+            model_editing=model_editing,
+            mask_type=mask_type,
+            sparsity=sparsity
         ).to_client()
 
     app = ClientApp(client_fn=client_fn)

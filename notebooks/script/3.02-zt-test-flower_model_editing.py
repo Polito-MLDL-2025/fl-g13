@@ -37,12 +37,13 @@ cifar100_test = datasets.CIFAR100(root=RAW_DATA_DIR, train=False, download=True,
 
 
 ### train val split
+cifar100_test, _ = dataset_handler.train_test_split(cifar100_test, train_ratio=0.2)
+
+### train val split
 train_dataset, val_dataset = dataset_handler.train_test_split(cifar100_train, train_ratio=0.8)
-
-
 # I.I.D Sharding Split
 ## k client
-k = 10
+k = 100
 clients_dataset_train = dataset_handler.iid_sharding(train_dataset, k)
 clients_dataset_val = dataset_handler.iid_sharding(val_dataset, k)
 
@@ -68,9 +69,21 @@ class TinyCNN(nn.Module):
 
 # ## Init model , optimizer and loss function
 
-net = TinyCNN().to(DEVICE)
+from fl_g13.editing import SparseSGDM
+
+BATCH_SIZE = 128
+LR = 1e-3
+model = TinyCNN().to(DEVICE)
 # optimizer = optim.SGD(net.parameters(), lr=0.01, momentum=0.9)
-optimizer = torch.optim.AdamW(net.parameters(), lr=1e-4, weight_decay=0.04)
+# optimizer = torch.optim.AdamW(net.parameters(), lr=1e-4, weight_decay=0.04)
+mask = [torch.ones_like(p, device=p.device) for p in model.parameters()]
+optimizer = SparseSGDM(
+    model.parameters(),
+    mask=mask,
+    lr=LR,
+    momentum=0.9,
+    weight_decay=1e-5
+)
 criterion = torch.nn.CrossEntropyLoss()
 
 
@@ -85,28 +98,27 @@ get_ipython().system('pip install -e ..')
 
 # ## create FlowerClient instances  
 
-'''
-Function load data client is to simulate the distribution data into each client
-In the real case, each client will have its dataset
-'''
+# ### Create instant of ClientApp
+
+from fl_g13.fl_pytorch.client_app import get_client_app
 
 
-def load_data_client(context: Context,**kwargs):
+def load_data_client(context: Context, **kwargs):
     partition_id = context.node_config["partition-id"]
     print(f"Client {partition_id} is ready to train")
     trainloader = DataLoader(clients_dataset_train[partition_id])
     valloader = DataLoader(clients_dataset_val[partition_id])
     return trainloader, valloader
 
-
-# ### Create instant of ClientApp
-
-from fl_g13.fl_pytorch.client_app import get_client_app
-
+mask_type='local'
 local_epoches = 2
-client = get_client_app(load_data_fn=load_data_client, model=net, 
+client = get_client_app(load_data_fn=load_data_client, model=model,
                         optimizer=optimizer, criterion=criterion, device=DEVICE,
-                        local_epochs=local_epoches)
+                        local_epochs=local_epoches,
+                        model_editing=True,
+                        mask_type=mask_type,
+                        sparsity=0.2
+                        )
 
 
 # # Define the Flower ServerApp
@@ -128,7 +140,7 @@ def get_datatest_fn(context: Context):
 
 ## checkpoints directory
 current_path = Path.cwd()
-model_test_path = current_path / "../models/model_test"
+model_test_path = current_path / "../models/fl/model_editing_test"
 model_test_path.resolve()
 
 num_rounds = 2
@@ -176,30 +188,6 @@ NUM_CLIENTS = 10
 
 
 # Run simulation
-run_simulation(
-    server_app=server,
-    client_app=client,
-    num_supernodes=NUM_CLIENTS,
-    backend_config=backend_config,
-)
-
-
-server = get_server_app(checkpoint_dir=model_test_path.resolve(),
-                        model_class=TinyCNN,
-                        optimizer=optimizer, criterion=criterion, get_datatest_fn=get_datatest_fn,
-                        num_rounds=num_rounds,
-                        fraction_fit=fraction_fit,
-                        fraction_evaluate=fraction_evaluate,
-                        min_fit_clients=min_fit_clients,
-                        min_evaluate_clients=min_evaluate_clients,
-                        min_available_clients=min_available_clients,
-                        device=device,
-                        use_wandb=use_wandb,
-                        save_every=save_every
-                        )
-
-
-# Run simulation second time
 run_simulation(
     server_app=server,
     client_app=client,
