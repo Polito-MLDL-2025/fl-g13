@@ -119,24 +119,24 @@ all_validation_accuracies=[]    # Pre-allocated list for validation accuracies
 
 # ---- RESUME ----
 
-# # Model loading (uncomment to properly overwrite)
-# loading_epoch = 25
-# model, start_epoch = load(
-#     f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
-#     model_class=BaseDino,
-#     device=device,
-#     optimizer=optimizer,
-#     scheduler=scheduler,
-#     verbose=True
-# )
-# model.to(device)
-# loaded_metrics = load_loss_and_accuracies(path=f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.loss_acc.json")
+# Model loading (uncomment to properly overwrite)
+loading_epoch = 10
+model, start_epoch = load(
+    f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.pth",
+    model_class=BaseDino,
+    device=device,
+    optimizer=optimizer,
+    scheduler=scheduler,
+    verbose=True
+)
+model.to(device)
+loaded_metrics = load_loss_and_accuracies(path=f"{CHECKPOINT_DIR}/BaseDino/{name}_BaseDino_epoch_{loading_epoch}.loss_acc.json")
 
-# # Preallocated lists: if the training interrupts, it will still save their values (uncomment to properly load and overwrite)
-# all_training_losses=loaded_metrics["train_loss"]       # Pre-allocated list for training losses
-# all_validation_losses=loaded_metrics["val_loss"]       # Pre-allocated list for validation losses
-# all_training_accuracies=loaded_metrics["train_acc"]    # Pre-allocated list for training accuracies
-# all_validation_accuracies=loaded_metrics["val_acc"]    # Pre-allocated list for validation accuracies
+# Preallocated lists: if the training interrupts, it will still save their values (uncomment to properly load and overwrite)
+all_training_losses=loaded_metrics["train_loss"]       # Pre-allocated list for training losses
+all_validation_losses=loaded_metrics["val_loss"]       # Pre-allocated list for validation losses
+all_training_accuracies=loaded_metrics["train_acc"]    # Pre-allocated list for training accuracies
+all_validation_accuracies=loaded_metrics["val_acc"]    # Pre-allocated list for validation accuracies
 
 # -----------------
 
