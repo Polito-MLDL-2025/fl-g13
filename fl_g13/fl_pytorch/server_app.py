@@ -70,6 +70,9 @@ def get_data_set_default(context: Context):
     testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
     return DataLoader(testset, batch_size=32)
 
+def simple_scale(client, n_examples, rnd):
+    return 1.0 / n_examples**0.5       # or fixed =1, or metrics based
+
 def get_server_app(checkpoint_dir,
                    model_class,
                    optimizer=None,
@@ -88,6 +91,7 @@ def get_server_app(checkpoint_dir,
                    wandb_config=None,
                    get_datatest_fn=get_data_set_default,
                    get_evaluate_fn=get_evaluate_fn,
+                   model_editing=False,
                    ):
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, start_epoch = load_or_create(
@@ -132,6 +136,8 @@ def get_server_app(checkpoint_dir,
             fit_metrics_aggregation_fn=handle_fit_metrics,
             save_best_model=save_best_model,
             wandb_config=wandb_config,
+            scale_fn=simple_scale,
+            model_editing=model_editing,
         )
         config = ServerConfig(num_rounds=number_rounds, round_timeout=None)
 

@@ -53,6 +53,7 @@ class FlowerClient(NumPyClient):
         self.local_layer_name = "classification-head"
         self.last_global_weights = None
         self.mask = False
+        self.model_editing = model_editing
         if model_editing:
             self._compute_mask(sparsity=sparsity, mask_type=mask_type)
 
@@ -63,13 +64,11 @@ class FlowerClient(NumPyClient):
         self.mask = compress_mask_sparse(mask)
 
     def _compute_mask(self, sparsity=0.2, mask_type='global'):
+        # TODO : calibrate mask iteratively
         scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
         mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
         mask_list = mask_dict_to_list(self.model, mask)
-        if not hasattr(self.optimizer, "set_mask"):
-            raise Exception("The optimizer should have a set_mask method")
-        self.optimizer.set_mask(mask_list)
-        self.mask = compress_mask_sparse(mask_list)
+        self.set_mask(self, mask_list)
 
     def fit(self, parameters, config):
         """Train model locally.
@@ -79,15 +78,13 @@ class FlowerClient(NumPyClient):
         training and used the next time this client participates.
         """
 
+        # pre-trained weigths
         self.last_global_weights = model_weights_to_vector(parameters)
 
         # Apply weights from global models (the whole local model weights are replaced)
         set_weights(self.model, parameters)
 
-        # Override weights in classification layer with those this client
-        # had at the end of the last fit() round it participated in
-        # self._load_layer_weights_from_state()
-
+        # sparse-fine tuning on client specific task
         all_training_losses, _, _, _ = train(checkpoint_dir=None,
                                              name=None,
                                              start_epoch=1,
@@ -103,19 +100,33 @@ class FlowerClient(NumPyClient):
                                              eval_every=None,
                                              )
 
+        # fine tuned weights
         updated_weights = get_weights(self.model)
+
         updated_vector = model_weights_to_vector(updated_weights)
+        # τ = (θ* − θ₀) ⊙ mask
+        task_vector = [self.mask[i] * (updated_vector[i] - self.last_global_weights[i]) for i in range(len(updated_vector))]
+                     
 
         # Client drift (Euclidean)
         drift = np.linalg.norm(updated_vector - self.last_global_weights)
         # Save classification head to context's state to use in a future fit() call
         self._save_layer_weights_to_state()
 
+        if self.model_editing:
+            fit_params = task_vector
+        else:
+            fit_params = updated_weights
+
 
         return (
-            updated_weights,
+            fit_params,
             len(self.trainloader.dataset),
-            {"train_loss": sum(all_training_losses), "drift": drift.tolist(),'mask':self.mask}
+            {
+                "train_loss": sum(all_training_losses), 
+                "drift": drift.tolist(),
+                'mask':self.mask,
+            }
             # if you have more complex metrics you have to serialize them with json since Metrics value allow only Scalar
         )
 

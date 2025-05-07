@@ -18,6 +18,7 @@ from fl_g13.editing.masking import uncompress_mask_sparse
 from fl_g13.fl_pytorch.model import get_default_model
 from fl_g13.fl_pytorch.task import create_run_dir, set_weights
 from fl_g13.modeling import save, save_loss_and_accuracy
+import torch
 
 PROJECT_NAME = "CIFAR100_FL_experiment"
 
@@ -36,12 +37,16 @@ class SaveModelFedAvg(FedAvg):
                  start_epoch=1,
                  save_best_model = True,
                  wandb_config=None,
+                 model_editing=False,
+                 scale_fn=None,
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
 
         # Create a directory where to save results from this run
         self.use_wandb = use_wandb
+        self.model_editing = model_editing
+        self.scale_fn = scale_fn
 
         # Keep track of best acc
         self.best_acc_so_far = 0.0
@@ -143,10 +148,26 @@ class SaveModelFedAvg(FedAvg):
         #     if "mask" in fit_res.metrics:
         #         mask = uncompress_mask_sparse(fit_res.metrics["mask"])
 
+        if self.model_editing:
+            global_params = parameters_to_ndarrays(self.initial_parameters)
+            task_vecs, weights = [], []
 
-        aggregated_parameters, aggregated_metrics = super().aggregate_fit(
-            server_round, results, failures
-        )
+            for client, fit_res in results:
+                task_vecs.append(fit_res.parameters)
+                weights.append(self.scale_fn(client, fit_res.num_examples, server_round))  # λ_c
+
+            summed = torch.zeros_like(global_params)
+            for lam, tau in zip(weights, task_vecs):
+                summed = [g + lam * t for g, t in zip(summed, tau)]
+
+            aggregated_parameters = [g + s for g, s in zip(global_params, summed)]
+            _, aggregated_metrics = super().aggregate_fit(
+                server_round, results, failures
+            )
+        else:
+            aggregated_parameters, aggregated_metrics = super().aggregate_fit(
+                server_round, results, failures
+            )
 
         if aggregated_parameters is not None:
             epoch = self.start_epoch + server_round - 1
