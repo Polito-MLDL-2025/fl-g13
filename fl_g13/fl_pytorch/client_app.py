@@ -70,7 +70,7 @@ class FlowerClient(NumPyClient):
             scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
             mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
             mask_list = mask_dict_to_list(self.model, mask)
-            self.set_mask(self, mask_list)
+            self.set_mask(mask_list)
 
     def fit(self, parameters, config):
         """Train model locally.
