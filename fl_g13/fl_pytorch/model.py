@@ -1,8 +1,10 @@
 from typing import Type
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import Tensor, optim, device, cuda, nn
+from torch import Tensor, optim, device, cuda, nn, ones_like
 from fl_g13.modeling.load import load_or_create, get_model
+from fl_g13.editing import SparseSGDM
+from fl_g13.architectures import BaseDino
 
 
 class Net(nn.Module):
@@ -50,13 +52,20 @@ def get_experiment_setting(
         checkpoint_dir: str, 
         model_class: Type[nn.Module] | nn.Module, 
         learning_rate: float = 0.25, 
-        momentum: float = 0.9
+        momentum: float = 0.9,
+        weight_decay: float = 1e-5,
+        model_editing: bool = False,
     ):
     """Get the experiment setting."""
-    model = get_model(model_class)
-    optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
-    criterion = nn.CrossEntropyLoss()
+    model = BaseDino(head_layers=3, head_hidden_size=512, dropout_rate=0.0, unfreeze_blocks=1)
     dev = device("cuda:0" if cuda.is_available() else "cpu")
+    model.to(device)
+    if model_editing:
+        mask = [ones_like(p, device = p.device) for p in model.parameters()] # Must be done AFTER the model is moved to the device
+        optimizer = SparseSGDM(model.parameters(), mask=mask, lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+    else:
+        optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+    criterion = nn.CrossEntropyLoss()
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=8, T_mult=2, eta_min=0.001)
     #model, _ = load_or_create(checkpoint_dir, model_class, dev, optimizer, scheduler)
     return model, optimizer, criterion, dev, scheduler

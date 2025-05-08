@@ -64,11 +64,13 @@ class FlowerClient(NumPyClient):
         self.mask = compress_mask_sparse(mask)
 
     def _compute_mask(self, sparsity=0.2, mask_type='global'):
-        # TODO : calibrate mask iteratively
-        scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
-        mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
-        mask_list = mask_dict_to_list(self.model, mask)
-        self.set_mask(self, mask_list)
+        num_of_rounds = 4
+        for round in range(num_of_rounds):
+            sparsity = sparsity**((round + 1) / num_of_rounds)
+            scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
+            mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
+            mask_list = mask_dict_to_list(self.model, mask)
+            self.set_mask(self, mask_list)
 
     def fit(self, parameters, config):
         """Train model locally.
