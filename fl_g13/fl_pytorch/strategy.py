@@ -18,7 +18,7 @@ from fl_g13.editing.masking import uncompress_mask_sparse
 from fl_g13.fl_pytorch.model import get_default_model
 from fl_g13.fl_pytorch.task import create_run_dir, set_weights
 from fl_g13.modeling import save, save_loss_and_accuracy
-from fl_g13.fl_pytorch.task import parameters_to_ndarrays, get_weights
+from fl_g13.fl_pytorch.task import get_weights
 import torch
 
 PROJECT_NAME = "CIFAR100_FL_experiment"
