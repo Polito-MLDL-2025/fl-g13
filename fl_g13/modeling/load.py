@@ -230,6 +230,11 @@ def load(
     # Load model weights from the checkpoint
     model.load_state_dict(checkpoint[ModelKeys.MODEL_STATE_DICT.value])
 
+    if device: # Only move if a device was specified
+        model.to(device)
+        if verbose:
+            print(f"➡️ Moved model to device: {device}")
+
     # Load optimizer state if an optimizer is provided and the checkpoint contains its state
     if optimizer and ModelKeys.OPTIMIZER_STATE_DICT.value in checkpoint:
         optimizer.load_state_dict(checkpoint[ModelKeys.OPTIMIZER_STATE_DICT.value])
@@ -280,7 +285,7 @@ def load_or_create(
         a `from_config` method.
     """
     try:
-        return load(path, model_class, device, optimizer, scheduler, verbose)
+        return  load(path, model_class, device, optimizer, scheduler, verbose)
     except FileNotFoundError:
         if verbose:
             print(f"⚠️ No checkpoint found at {path}. Creating a new model.")
@@ -292,7 +297,7 @@ def load_or_create(
         else:
             raise ValueError(f"You provided a model config but no method to load such was found in model_class {model_class}")
         
-        device = device or torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if device:
             model.to(device)
 
