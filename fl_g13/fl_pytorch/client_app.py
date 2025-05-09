@@ -53,7 +53,7 @@ class FlowerClient(NumPyClient):
         self.local_layer_name = "classification-head"
         self.last_global_weights = None
         self.mask = False
-        self.mask_list = []
+        self.flat_mask = None
         self.model_editing = model_editing
         if model_editing:
             self._compute_mask(sparsity=sparsity, mask_type=mask_type)
@@ -70,11 +70,12 @@ class FlowerClient(NumPyClient):
             sparsity = sparsity**((round + 1) / num_of_rounds)
             scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
             mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
-            self.mask_list = mask_dict_to_list(self.model, mask)
-            self.set_mask(self.mask_list)
+            mask_list = mask_dict_to_list(self.model, mask)
+            self.flat_mask = torch.cat([mask.view(-1) for mask in mask_list])
+            self.set_mask(mask_list)
         
         # print the percentage of elements in the mask with value 1
-        mask_percentage = sum([torch.sum(m) for m in self.mask_list]) / sum([m.numel() for m in self.mask_list])
+        mask_percentage = sum([torch.sum(m) for m in self.flat_mask]) / sum([m.numel() for m in self.flat_mask])
         print(f"Mask percentage: {mask_percentage:.2%}")
 
     def fit(self, parameters, config):
@@ -112,12 +113,12 @@ class FlowerClient(NumPyClient):
 
         updated_vector = model_weights_to_vector(updated_weights)
 
-        print(f"self.mask_list: {type(self.mask_list)}, len: {len(self.mask_list) if self.mask_list else 'N/A'}")
+        print(f"self.flat_mask: {type(self.flat_mask)}, len: {len(self.flat_mask) if self.flat_mask else 'N/A'}")
         print(f"updated_vector: {type(updated_vector)}, len: {len(updated_vector)}")
         print(f"self.last_global_weights: {type(self.last_global_weights)}, len: {len(self.last_global_weights)}")
 
         # τ = (θ* − θ₀) ⊙ mask
-        task_vector = [self.mask_list[i] * (updated_vector[i] - self.last_global_weights[i]) for i in range(len(updated_vector))]
+        task_vector = [self.flat_mask[i] * (updated_vector[i] - self.last_global_weights[i]) for i in range(len(updated_vector))]
                      
 
         # Client drift (Euclidean)
