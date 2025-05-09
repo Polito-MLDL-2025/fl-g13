@@ -104,6 +104,9 @@ def get_server_app(checkpoint_dir,
             scheduler=scheduler,
             verbose=True,
         )
+    else:
+        start_epoch = 1
+        model.to(device)
 
     def server_fn(context: Context):
         print(f'Continue train model from epoch {start_epoch}')
