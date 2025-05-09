@@ -53,7 +53,7 @@ class FlowerClient(NumPyClient):
         self.local_layer_name = "classification-head"
         self.last_global_weights = None
         self.mask = False
-        self.mask_list = None
+        self.mask_list = []
         self.model_editing = model_editing
         if model_editing:
             self._compute_mask(sparsity=sparsity, mask_type=mask_type)
@@ -111,6 +111,11 @@ class FlowerClient(NumPyClient):
         updated_weights = get_weights(self.model)
 
         updated_vector = model_weights_to_vector(updated_weights)
+
+        print(f"self.mask_list: {type(self.mask_list)}, len: {len(self.mask_list) if self.mask_list else 'N/A'}")
+        print(f"updated_vector: {type(updated_vector)}, len: {len(updated_vector)}")
+        print(f"self.last_global_weights: {type(self.last_global_weights)}, len: {len(self.last_global_weights)}")
+
         # τ = (θ* − θ₀) ⊙ mask
         task_vector = [self.mask_list[i] * (updated_vector[i] - self.last_global_weights[i]) for i in range(len(updated_vector))]
                      
