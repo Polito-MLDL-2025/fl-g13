@@ -132,10 +132,29 @@ download_if_not_exists("utils.py",
                        "https://raw.githubusercontent.com/facebookresearch/dino/refs/heads/main/utils.py")
 
 
+import torch
+import flwr
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+# DEVICE = "cpu"
+print(f"Training on {DEVICE}")
+print(f"Flower {flwr.__version__} / PyTorch {torch.__version__}")
+
+
+backend_config = {"client_resources": {"num_cpus": 1, "num_gpus": 0.0}}
+
+# When running on GPU, assign an entire GPU for each client
+if DEVICE == "cuda":
+    backend_config["client_resources"] = {"num_cpus": 1, "num_gpus": 1}
+    # Refer to our Flower framework documentation for more details about Flower simulations
+    # and how to set up the `backend_config`
+
+
 run_simulation(
     client_app=client_app,
     server_app=server_app,
-    num_supernodes=number_of_clients
+    num_supernodes=number_of_clients,
+    backend_config=backend_config,
 )
 
 
