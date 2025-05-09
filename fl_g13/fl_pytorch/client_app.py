@@ -75,7 +75,7 @@ class FlowerClient(NumPyClient):
             self.set_mask(mask_list)
         
         # print the percentage of elements in the mask with value 1
-        mask_percentage = sum([torch.sum(m) for m in self.flat_mask]) / sum([m.numel() for m in self.flat_mask])
+        mask_percentage = self.flat_mask.sum().item() / self.flat_mask.numel()
         print(f"Mask percentage: {mask_percentage:.2%}")
 
     def fit(self, parameters, config):
