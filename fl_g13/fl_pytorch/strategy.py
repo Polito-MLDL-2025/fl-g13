@@ -39,6 +39,7 @@ class SaveModelFedAvg(FedAvg):
                  wandb_config=None,
                  model_editing=False,
                  scale_fn=None,
+                 initial_parameters=None,
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
@@ -47,6 +48,9 @@ class SaveModelFedAvg(FedAvg):
         self.use_wandb = use_wandb
         self.model_editing = model_editing
         self.scale_fn = scale_fn
+        if initial_parameters is None:
+            raise ValueError("initial_parameters must be provided to the strategy.")
+        self.initial_parameters = initial_parameters
 
         # Keep track of best acc
         self.best_acc_so_far = 0.0
@@ -149,6 +153,8 @@ class SaveModelFedAvg(FedAvg):
         #         mask = uncompress_mask_sparse(fit_res.metrics["mask"])
 
         if self.model_editing:
+            if self.initial_parameters is None:
+                raise ValueError("self.initial_parameters is None. Ensure it is set during initialization.")
             global_params = parameters_to_ndarrays(self.initial_parameters)
             task_vecs, weights = [], []
 
