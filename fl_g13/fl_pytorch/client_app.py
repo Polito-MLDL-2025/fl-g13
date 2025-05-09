@@ -1,68 +1,53 @@
-"""pytorch-example: A Flower / PyTorch app."""
-
-from typing import List
-
-# from fl_g13.fl_pytorch.task import train, test
 import numpy as np
 import torch
 from flwr.client import ClientApp, NumPyClient
-from flwr.common import ArrayRecord, Context, RecordDict
-from torch import nn, Tensor
-from torch.utils.data import DataLoader
+from flwr.common import ArrayRecord, Context
 
-from fl_g13.editing import fisher_scores, create_gradiend_mask, mask_dict_to_list
-from fl_g13.editing.masking import compress_mask_sparse
-from fl_g13.fl_pytorch.datasets import load_datasets, get_transforms
-from fl_g13.fl_pytorch.task import get_weights, set_weights
-from fl_g13.modeling.eval import eval
 from fl_g13.modeling.train import train
+from fl_g13.modeling.eval import eval
+from fl_g13.editing import create_gradiend_mask, fisher_scores, mask_dict_to_list, compress_mask_sparse
 
+from fl_g13.fl_pytorch.task import get_weights, set_weights
+from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
+
+# *** ---------------- CLIENT CLASS ---------------- *** # 
 
 class FlowerClient(NumPyClient):
-    """A simple client that showcases how to use the state.
-
-    It implements a basic version of `personalization` by which
-    the classification layer of the CNN is stored locally and used
-    and updated during `fit()` and used during `evaluate()`.
-
-    """
 
     def __init__(
-            self, model: nn.Module, client_state: RecordDict, trainloader: DataLoader, valloader: DataLoader,
-            local_epochs: int,
-            optimizer: torch.optim.Optimizer = None, criterion=None, scheduler=None,
+            self, 
+            client_state,
+            local_epochs,
+            trainloader, 
+            valloader,
+            model,
+            criterion,
+            optimizer, 
+            scheduler=None,
             device=None,
             model_editing=False,
+            sparsity=0.2,
             mask_type='global',
-            sparsity=0.2
     ):
-        self.model = model
         self.client_state = client_state
+        self.local_epochs = local_epochs
         self.trainloader = trainloader
         self.valloader = valloader
-        self.local_epochs = local_epochs
-        self.device = device or torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.model.to(self.device)
-        if not criterion:
-            criterion = torch.nn.CrossEntropyLoss()
-        if not optimizer:
-            optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-        self.scheduler = scheduler
+        self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
-        self.local_layer_name = "classification-head"
-        self.last_global_weights = None
-        self.mask = False
+        self.scheduler = scheduler
+        self.device = device or torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        self.mask = None
         if model_editing:
             self._compute_mask(sparsity=sparsity, mask_type=mask_type)
 
-    def set_mask(self, mask: List[Tensor]):
-        if not hasattr(self.optimizer, "set_mask"):
-            raise Exception("The optimizer should have a set_mask method")
-        self.optimizer.set_mask(mask)
-        self.mask = compress_mask_sparse(mask)
+        self.model.to(self.device)
 
-    def _compute_mask(self, sparsity=0.2, mask_type='global'):
+    # --- MASKING --- #
+
+    def _compute_mask(self, sparsity, mask_type):
         scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
         mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
         mask_list = mask_dict_to_list(self.model, mask)
@@ -71,131 +56,131 @@ class FlowerClient(NumPyClient):
         self.optimizer.set_mask(mask_list)
         self.mask = compress_mask_sparse(mask_list)
 
+    def set_mask(self, mask):
+        if not hasattr(self.optimizer, "set_mask"):
+            raise Exception("The optimizer should have a set_mask method")
+        self.optimizer.set_mask(mask)
+        self.mask = compress_mask_sparse(mask)
+    
+    # --- SAVE AND LOAD WEIGHTS TO STATE --- #
+
+    def _save_weights_to_state(self):
+        # Convert model state dictionary to ArrayDict
+        arr_record = ArrayRecord(self.model.state_dict())
+
+        # Add the state to the context (replace if already exists)
+        self.client_state["full_model_state"] = arr_record
+
+
+    def _load_weights_from_state(self):
+        # Extract state from context
+        state_dict = self.client_state["full_model_state"].to_torch_state_dict()
+        
+        # Apply the state found in context to the model
+        self.model.load_state_dict(state_dict, strict=True)
+
+    # --- FIT AND EVALUATE --- #
+
     def fit(self, parameters, config):
-        """Train model locally.
-
-        The client stores in its context the parameters of the last layer in the model
-        (i.e. the classification head). The classifier is saved at the end of the
-        training and used the next time this client participates.
-        """
-
-        self.last_global_weights = model_weights_to_vector(parameters)
+        # Save weights from global models
+        flatten_global_weights = np.concatenate([p.flatten() for p in parameters])
 
         # Apply weights from global models (the whole local model weights are replaced)
         set_weights(self.model, parameters)
 
-        # Override weights in classification layer with those this client
-        # had at the end of the last fit() round it participated in
-        # self._load_layer_weights_from_state()
-
-        all_training_losses, _, _, _ = train(checkpoint_dir=None,
-                                             name=None,
-                                             start_epoch=1,
-                                             num_epochs=self.local_epochs,
-                                             save_every=None,
-                                             backup_every=None,
-                                             train_dataloader=self.trainloader,
-                                             val_dataloader=None,
-                                             model=self.model,
-                                             criterion=self.criterion,
-                                             optimizer=self.optimizer,
-                                             scheduler=self.scheduler,
-                                             eval_every=None,
-                                             )
+        # Train using the new weights
+        all_training_losses, _, _, _ = train(
+            checkpoint_dir=None,
+            name=None,
+            start_epoch=1,
+            num_epochs=self.local_epochs,
+            save_every=None,
+            backup_every=None,
+            train_dataloader=self.trainloader,
+            val_dataloader=None,
+            model=self.model,
+            criterion=self.criterion,
+            optimizer=self.optimizer,
+            scheduler=self.scheduler,
+            eval_every=None,
+        )
 
         updated_weights = get_weights(self.model)
-        updated_vector = model_weights_to_vector(updated_weights)
+        flatten_updated_weights = np.concatenate([w.flatten() for w in updated_weights])
+
+        # Save mdoel to context's state to use in a future fit() call
+        self._save_weights_to_state()
 
         # Client drift (Euclidean)
-        drift = np.linalg.norm(updated_vector - self.last_global_weights)
-        # Save classification head to context's state to use in a future fit() call
-        self._save_layer_weights_to_state()
+        drift = np.linalg.norm(flatten_updated_weights - flatten_global_weights)
 
-
+         # --- Modified: Conditionally include the mask in results ---
+        results = {
+            "train_loss": sum(all_training_losses),
+            "drift": drift.tolist(),
+        }
+        if self.mask is not None: # Only include 'mask' if it was computed
+            results["mask"] = self.mask
+            
         return (
             updated_weights,
             len(self.trainloader.dataset),
-            {"train_loss": sum(all_training_losses), "drift": drift.tolist(),'mask':self.mask}
+            results, 
             # if you have more complex metrics you have to serialize them with json since Metrics value allow only Scalar
         )
 
-    def _save_layer_weights_to_state(self):
-        """Save last layer weights to state."""
-        arr_record = ArrayRecord(self.model.state_dict())
-
-        # Add to RecordDict (replace if already exists)
-        self.client_state[self.local_layer_name] = arr_record
-
-    def _load_layer_weights_from_state(self):
-        """Load last layer weights to state."""
-        if self.local_layer_name not in self.client_state.array_records:
-            return
-
-        state_dict = self.client_state[self.local_layer_name].to_torch_state_dict()
-
-        # apply previously saved classification head by this client
-        self.model.load_state_dict(state_dict, strict=True)
-
     def evaluate(self, parameters, config):
-        """Evaluate the global model on the local validation set.
-
-        Note the classification head is replaced with the weights this client had the
-        last time it trained the model.
-        """
         set_weights(self.model, parameters)
-        # Override weights in classification layer with those this client
-        # had at the end of the last fit() round it participated in
-        self._load_layer_weights_from_state()
         test_loss, test_accuracy, _ = eval(self.valloader, self.model, self.criterion)
 
         return test_loss, len(self.valloader.dataset), {"accuracy": test_accuracy}
 
+# *** ---------------- CLIENT APP ---------------- *** # 
 
-def model_weights_to_vector(weights: List[np.ndarray]) -> np.ndarray:
-    return np.concatenate([w.flatten() for w in weights])
-
-
-def load_data_client_default(context: Context,
-                             partition_type="iid",
-                             batch_size=50,
-                             num_shards_per_partition=2,
-                             train_test_split_ratio=0.2,
-                             transfrom=get_transforms
-                             ):
+def load_client_dataloaders(
+        context: Context,
+        partition_type,
+        num_shards_per_partition,
+        batch_size,
+        train_test_split_ratio,
+        transform=get_transforms
+    ):
+    
+    # Retrive meta-data from context
     partition_id = context.node_config["partition-id"]  # assigned at runtime
     num_partitions = context.node_config["num-partitions"]
-    trainloader, valloader = load_datasets(
-        partition_id,
-        num_partitions,
+    
+    # Load flower datasets for clients
+    trainloader, valloader = load_flwr_datasets(
+        partition_id=partition_id,
         partition_type=partition_type,
-        batch_size=batch_size,
+        num_partitions=num_partitions,
         num_shards_per_partition=num_shards_per_partition,
+        batch_size=batch_size,
         train_test_split_ratio=train_test_split_ratio,
-        transform=transfrom
+        transform=transform
     )
     return trainloader, valloader
 
-
 def get_client_app(
-        load_data_fn=load_data_client_default,
-        model=None,
-        optimizer=None,
-        criterion=None,
-        device=None,
+        load_data_fn=load_client_dataloaders,
         partition_type="iid",
-        local_epochs=4,
         batch_size=50,
         num_shards_per_partition=2,
-        scheduler=None,
         train_test_split_ratio=0.2,
+        local_epochs=4,
+        model=None,
+        criterion=None,
+        optimizer=None,
+        scheduler=None,
+        device=None,
         model_editing=False,
         mask_type='global',
         sparsity=0.2
 ) -> ClientApp:
-    """Create a Flower client app."""
-
     def client_fn(context: Context):
-        """Create a Flower client."""
+        
+        print(f"Client on {device}")
 
         trainloader, valloader = load_data_fn(
             context=context,
@@ -204,21 +189,17 @@ def get_client_app(
             num_shards_per_partition=num_shards_per_partition,
             train_test_split_ratio=train_test_split_ratio
         )
-        # Return Client instance
-        # We pass the state to persist information across
-        # participation rounds. Note that each client always
-        # receives the same Context instance (it's a 1:1 mapping)
         client_state = context.state
         return FlowerClient(
-            model=model,
             client_state=client_state,
+            local_epochs=local_epochs,
             trainloader=trainloader,
             valloader=valloader,
-            local_epochs=local_epochs,
-            optimizer=optimizer,
+            model=model,
             criterion=criterion,
-            device=device,
+            optimizer=optimizer,
             scheduler=scheduler,
+            device=device,
             model_editing=model_editing,
             mask_type=mask_type,
             sparsity=sparsity
