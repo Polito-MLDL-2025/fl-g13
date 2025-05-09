@@ -13,7 +13,6 @@ from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
 # *** ---------------- CLIENT CLASS ---------------- *** # 
 
 class FlowerClient(NumPyClient):
-
     def __init__(
             self, 
             client_state,
