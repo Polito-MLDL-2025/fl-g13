@@ -120,10 +120,6 @@ class FlowerClient(NumPyClient):
         self._save_layer_weights_to_state()
 
         if self.model_editing:
-            print(f"self.flat_mask: {type(self.flat_mask)}, len: {len(self.flat_mask)}")
-            print(f"updated_vector: {type(updated_vector)}, len: {len(updated_vector)}")
-            print(f"self.last_global_weights: {type(self.last_global_weights)}, len: {len(self.last_global_weights)}")
-
             # τ = (θ* − θ₀) ⊙ mask
             #task_vector = [self.flat_mask[i] * (updated_vector[i] - self.last_global_weights[i]) for i in range(len(updated_vector))]
             updated_vector = torch.tensor(updated_vector, device=self.device)
