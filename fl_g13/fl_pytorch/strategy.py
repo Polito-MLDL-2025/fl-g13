@@ -9,7 +9,7 @@ from pathlib import Path
 import flwr
 import numpy as np
 import wandb
-from flwr.common import logger, parameters_to_ndarrays
+from flwr.common import logger, parameters_to_ndarrays, ndarrays_to_parameters
 from flwr.common.typing import UserConfig, FitRes, Scalar, Parameters
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy import FedAvg
@@ -18,6 +18,7 @@ from fl_g13.editing.masking import uncompress_mask_sparse
 from fl_g13.fl_pytorch.model import get_default_model
 from fl_g13.fl_pytorch.task import create_run_dir, set_weights
 from fl_g13.modeling import save, save_loss_and_accuracy
+from fl_g13.fl_pytorch.task import parameters_to_ndarrays, get_weights
 import torch
 
 PROJECT_NAME = "CIFAR100_FL_experiment"
@@ -39,7 +40,6 @@ class SaveModelFedAvg(FedAvg):
                  wandb_config=None,
                  model_editing=False,
                  scale_fn=None,
-                 initial_parameters=None,
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
@@ -48,9 +48,6 @@ class SaveModelFedAvg(FedAvg):
         self.use_wandb = use_wandb
         self.model_editing = model_editing
         self.scale_fn = scale_fn
-        if initial_parameters is None:
-            raise ValueError("initial_parameters must be provided to the strategy.")
-        self.initial_parameters = initial_parameters
 
         # Keep track of best acc
         self.best_acc_so_far = 0.0
@@ -153,9 +150,7 @@ class SaveModelFedAvg(FedAvg):
         #         mask = uncompress_mask_sparse(fit_res.metrics["mask"])
 
         if self.model_editing:
-            if self.initial_parameters is None:
-                raise ValueError("self.initial_parameters is None. Ensure it is set during initialization.")
-            global_params = parameters_to_ndarrays(self.initial_parameters)
+            global_params = get_weights(self.model)
             task_vecs, weights = [], []
 
             for client, fit_res in results:
