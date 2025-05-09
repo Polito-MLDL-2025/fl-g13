@@ -53,6 +53,7 @@ class FlowerClient(NumPyClient):
         self.local_layer_name = "classification-head"
         self.last_global_weights = None
         self.mask = False
+        self.mask_list = None
         self.model_editing = model_editing
         if model_editing:
             self._compute_mask(sparsity=sparsity, mask_type=mask_type)
@@ -69,8 +70,12 @@ class FlowerClient(NumPyClient):
             sparsity = sparsity**((round + 1) / num_of_rounds)
             scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
             mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
-            mask_list = mask_dict_to_list(self.model, mask)
-            self.set_mask(mask_list)
+            self.mask_list = mask_dict_to_list(self.model, mask)
+            self.set_mask(self.mask_list)
+        
+        # print the percentage of elements in the mask with value 1
+        mask_percentage = sum([torch.sum(m) for m in self.mask_list]) / sum([m.numel() for m in self.mask_list])
+        print(f"Mask percentage: {mask_percentage:.2%}")
 
     def fit(self, parameters, config):
         """Train model locally.
@@ -107,7 +112,7 @@ class FlowerClient(NumPyClient):
 
         updated_vector = model_weights_to_vector(updated_weights)
         # τ = (θ* − θ₀) ⊙ mask
-        task_vector = [self.mask[i] * (updated_vector[i] - self.last_global_weights[i]) for i in range(len(updated_vector))]
+        task_vector = [self.mask_list[i] * (updated_vector[i] - self.last_global_weights[i]) for i in range(len(updated_vector))]
                      
 
         # Client drift (Euclidean)
