@@ -180,7 +180,9 @@ def get_client_app(
 ) -> ClientApp:
     def client_fn(context: Context):
         
-        print(f"Client on {device}")
+        print(f"[Client] Client on device: {next(model.parameters()).device}")
+        if torch.cuda.is_available():
+             print(f"[Client] CUDA available in client: {torch.cuda.is_available()}")
 
         trainloader, valloader = load_data_fn(
             context=context,

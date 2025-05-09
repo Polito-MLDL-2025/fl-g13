@@ -1,5 +1,6 @@
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
+import torch
 from torch.utils.data import DataLoader
 from torchvision import datasets
 
@@ -15,6 +16,11 @@ from fl_g13.modeling.load import load_or_create
 def get_evaluate_fn(testloader, model=None, criterion=None):
     def evaluate(server_round, parameters_ndarrays, config):
         set_weights(model, parameters_ndarrays)
+
+        print(f"[Server Eval Round {server_round}] Model device: {next(model.parameters()).device}")
+        if torch.cuda.is_available():
+             print(f"[Server Eval Round {server_round}] CUDA available in server eval: {torch.cuda.is_available()}")
+
         test_loss, test_accuracy, _ = eval(testloader, model, criterion)
         return test_loss, {"centralized_accuracy": test_accuracy}
     return evaluate
@@ -41,7 +47,7 @@ def get_server_app(
     scheduler=None,
     device=None,
     save_every=1,
-    save_best_model=False,
+    #save_best_model=False,
     get_evaluate_fn=get_evaluate_fn,
     num_rounds=200,
     fraction_fit=0.1,
@@ -51,7 +57,6 @@ def get_server_app(
     min_available_clients=100,
     
 ):
-    print(f"Server on {device}")
     
     model, start_epoch = load_or_create(
         path=checkpoint_dir,
@@ -64,6 +69,10 @@ def get_server_app(
     )
 
     def server_fn(context):
+        
+        print(f"[Server] Server on device: {next(model.parameters()).device}")
+        if torch.cuda.is_available():
+             print(f"[Server] CUDA available in client: {torch.cuda.is_available()}")
 
         # Retrive test dataset and prepare dataloader
         testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
@@ -79,7 +88,7 @@ def get_server_app(
             checkpoint_dir=checkpoint_dir,
             start_epoch=start_epoch,
             save_every=save_every,
-            save_best_model=save_best_model,
+            #save_best_model=save_best_model,
             fraction_fit=fraction_fit,
             fraction_evaluate=fraction_evaluate,
             min_fit_clients=min_fit_clients,
