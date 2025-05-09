@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+get_ipython().run_line_magic('load_ext', 'autoreload')
+get_ipython().run_line_magic('autoreload', '2')
+
+
 import torch
 from fl_g13.editing.sparseSGDM import SparseSGDM
 from torch.nn import CrossEntropyLoss
@@ -79,7 +83,12 @@ use_wandb = False
 
 # Device settings
 device = "cuda" if torch.cuda.is_available() else "cpu"
-backend_config = {"client_resources": {"num_cpus": 1, "num_gpus": 0.0}}
+backend_config = {
+    "client_resources": {
+        "num_cpus": 1, 
+        "num_gpus": 0
+    }
+}
 
 # When running on GPU, assign an entire GPU for each client
 if device == "cuda":
