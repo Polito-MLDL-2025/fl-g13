@@ -1,10 +1,15 @@
+import os
+from pathlib import Path
 import numpy as np
 import torch.nn as nn
 from flwr.common import logger, parameters_to_ndarrays #! logger doesnt work
 from flwr.server.strategy import FedAvg
+import wandb
 
-from fl_g13.fl_pytorch.task import set_weights
+from fl_g13.fl_pytorch.task import create_run_dir, set_weights
 from fl_g13.modeling import save
+
+WANDB_PROJECT_NAME = "CIFAR100_FL_experiment"
 
 # *** -------- AGGREGATION SERVER STRATEGY -------- *** #
 
@@ -15,7 +20,8 @@ class MaskedFedAvg(FedAvg):
         checkpoint_dir,
         start_epoch= 1,
         save_every= 1,
-        save_best_model: bool = True,
+        use_wandb = False,
+        wandb_config=None,
         *args,
         **kwargs
     ):
@@ -24,8 +30,10 @@ class MaskedFedAvg(FedAvg):
         self.checkpoint_dir = checkpoint_dir
         self.start_epoch = start_epoch
         self.save_every = save_every
-        self.save_best_model = save_best_model
-        self.results = {}
+        self.use_wandb = use_wandb
+        self.wandb_config = wandb_config
+        if use_wandb:
+            self._init_wandb_project()
 
     def aggregate_fit(self, server_round, results, failures):
 
@@ -78,3 +86,37 @@ class MaskedFedAvg(FedAvg):
         #logger.info(f"[Round {server_round}] Centralized Evaluation - Loss: {loss:.4f}, Metrics: {metrics}")
         print(f"[Round {server_round}] Centralized Evaluation - Loss: {loss:.4f}, Metrics: {metrics}")
         return loss, metrics
+
+    def _init_wandb_project(self):
+        
+        # save or read run_id to be able to resume the run
+        run_id_path = Path.cwd() / "wandb_run_id.txt"
+        if os.path.exists(run_id_path):
+            with open(run_id_path, "r") as f:
+                run_id = f.read().strip()
+        else:
+            run_id = wandb.util.generate_id()
+            with open(run_id_path, "w") as f:
+                f.write(run_id)
+        
+        # init W&B
+        wandb.init(
+            project=WANDB_PROJECT_NAME, 
+            name=f"{self.model.__class__.__name__}-{self.wandb_config['partition_type']}",
+            config=self.wandb_config,
+            id=run_id,
+            resume="allow",
+        )
+
+    def store_results_and_log(self, server_round: int, tag: str, results_dict):
+        """A helper method that stores results and logs them to W&B if enabled."""
+
+        if self.use_wandb:
+            # Log centralized loss and metrics to W&B
+            wandb.log(results_dict, step=self.start_epoch + server_round - 1)
+        else:
+            # Store results and save to disk
+            self._store_results(
+                tag=tag,
+                results_dict={"round": self.start_epoch + server_round - 1, **results_dict},
+            )
