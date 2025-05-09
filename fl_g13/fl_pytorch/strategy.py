@@ -242,3 +242,58 @@ class SaveModelFedAvg(FedAvg):
             results_dict={"federated_evaluate_loss": loss, **metrics},
         )
         return loss, metrics
+
+class ClientSideTaskArithmetic(SaveModelFedAvg):
+    """A class that behaves like FedAvg but has extra functionality.
+
+    This strategy: (1) saves results to the filesystem, (2) saves a
+    checkpoint of the global  model when a new best is found, (3) logs
+    results to W&B if enabled.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    def aggregate_fit(
+            self,
+            server_round: int,
+            results: list[tuple[flwr.server.client_proxy.ClientProxy, flwr.common.FitRes]],
+            failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
+    ) -> tuple[Optional[Parameters], dict[str, Scalar]]:
+        """Aggregate model weights using weighted average and store checkpoint"""
+
+        global_params = parameters_to_ndarrays(self.initial_parameters)
+        task_vecs, weights = [], []
+
+        for client, fit_res in results:
+            task_vecs.append(fit_res.parameters)
+            weights.append(self.scale_fn(client, fit_res.num_examples, server_round))  # λ_c
+
+        summed = torch.zeros_like(global_params)
+        for lam, tau in zip(weights, task_vecs):
+            summed = [g + lam * t for g, t in zip(summed, tau)]
+
+        aggregated_parameters = [g + s for g, s in zip(global_params, summed)]
+        _, aggregated_metrics = super().aggregate_fit(
+            server_round, results, failures
+        )
+
+        if aggregated_parameters is not None:
+            epoch = self.start_epoch + server_round - 1
+            # Convert `Parameters` to `list[np.ndarray]`
+            aggregated_ndarrays: list[np.ndarray] = parameters_to_ndarrays(
+                aggregated_parameters
+            )
+            if self.checkpoint and self.save_every and epoch % self.save_every == 0:
+                print(f"Saving centralized model epoch {epoch} aggregated_parameters...")
+
+                set_weights(self.model, aggregated_ndarrays)
+                save(
+                    checkpoint_dir=self.checkpoint,
+                    model=self.model,
+                    prefix="FL",
+                    epoch=epoch,
+                    with_model_dir=False
+                )
+
+        return aggregated_parameters, aggregated_metrics

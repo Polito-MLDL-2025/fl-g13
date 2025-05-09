@@ -92,16 +92,18 @@ def get_server_app(checkpoint_dir,
                    get_datatest_fn=get_data_set_default,
                    get_evaluate_fn=get_evaluate_fn,
                    model_editing=False,
+                   model=None
                    ):
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model, start_epoch = load_or_create(
-        path=checkpoint_dir,
-        model_class=model_class,
-        device=device,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        verbose=True,
-    )
+    if model is None:
+        model, start_epoch = load_or_create(
+            path=checkpoint_dir,
+            model_class=model_class,
+            device=device,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            verbose=True,
+        )
 
     def server_fn(context: Context):
         print(f'Continue train model from epoch {start_epoch}')
