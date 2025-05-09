@@ -55,7 +55,8 @@ def get_server_app(
     min_fit_clients=10,
     min_evaluate_clients=10,
     min_available_clients=100,
-    
+    use_wandb=False,
+    wandb_config=None,
 ):
     
     model, start_epoch = load_or_create(
@@ -98,6 +99,8 @@ def get_server_app(
             initial_parameters=params,
             fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
             evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
+            use_wandb=use_wandb,
+            wandb_config=wandb_config,
         )
 
         # Prepare server config
