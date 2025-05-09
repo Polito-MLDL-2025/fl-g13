@@ -129,7 +129,7 @@ class FlowerClient(NumPyClient):
             updated_vector = torch.tensor(updated_vector, device=self.device)
             self.last_global_weights = torch.tensor(self.last_global_weights, device=self.device)
             task_vector = self.flat_mask * (updated_vector - self.last_global_weights)
-            fit_params = task_vector
+            fit_params = [task_vector.cpu().numpy()]
         else:
             fit_params = updated_weights
 
