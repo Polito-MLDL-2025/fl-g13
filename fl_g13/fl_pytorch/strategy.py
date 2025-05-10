@@ -156,12 +156,15 @@ class SaveModelFedAvg(FedAvg):
             task_vecs, weights = [], []
 
             for client, fit_res in results:
-                task_vecs.append(fit_res.parameters)
+                task_vecs.append(parameters_to_ndarrays(fit_res.parameters))
                 weights.append(self.scale_fn(client, fit_res.num_examples, server_round))  # λ_c
 
             summed = torch.zeros_like(global_params)
-            for lam, tau in zip(weights, task_vecs):
-                summed = [g + lam * t for g, t in zip(summed, tau)]
+
+            summed = torch.stack([
+                lam * torch.tensor(np.concatenate([t.flatten() for t in tau]))
+                for lam, tau in zip(weights, task_vecs)
+            ]).sum(dim=0)
 
             aggregated_parameters = [g + s for g, s in zip(global_params, summed)]
             _, aggregated_metrics = super().aggregate_fit(
