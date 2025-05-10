@@ -89,7 +89,7 @@ def load_flwr_datasets(
     partition = fds.load_partition(partition_id)
 
     # Divide data on each node: 80% train, 20% test
-    partition_train_test = partition.train_test_split(test_size=train_test_split_ratio)
+    partition_train_test = partition.train_test_split(test_size=train_test_split_ratio, seed=42) # Using arbitrary seed for reproducibility
     
     # Apply transforms on the parititions
     partition_train_test = partition_train_test.with_transform(transform(type='train'))
