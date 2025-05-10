@@ -151,7 +151,7 @@ class SaveModelFedAvg(FedAvg):
 
         if self.model_editing:
             global_params = get_weights(self.model)
-            global_params = torch.cat([gp.view(-1) for gp in global_params])
+            global_params = torch.cat([gp.flatten() for gp in global_params])
             task_vecs, weights = [], []
 
             for client, fit_res in results:
