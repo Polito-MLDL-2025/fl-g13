@@ -43,49 +43,6 @@ class MaskedFedAvg(FedAvg):
             self._init_wandb_project()
 
     def aggregate_fit(self, server_round, results, failures):
-        
-        # # *** SERVER MASK *** #
-        
-        # # === Step 1: Setup ===
-        # original_params = {k: v.detach().clone().cpu().numpy() for k, v in self.model.state_dict().items()}
-
-        # # === Step 2: Compute deltas ===
-        # print("Extracting deltas...")
-        # deltas = []
-        # for _, fit_res in results:
-        #     client_params = parameters_to_ndarrays(fit_res.parameters)
-        #     client_tensors = {k: torch.tensor(p) for k, p in zip(original_params.keys(), client_params)}
-        #     delta = {k: client_tensors[k]*1e3 - original_params[k]*1e3 for k in original_params} #! pay attention to the lr, it is nested inside the delta!!!
-        #     deltas.append(delta)
-
-        # # === Step 3: Compute Fisher diagonal approximation ===
-        # print("Computing fisher diagonal...")
-        # fisher_diag = {
-        #     k: torch.stack([d[k]**2 for d in deltas], dim=0).sum(dim=0)
-        #     for k in original_params
-        # }
-
-        # # === Step 4: Create gradient mask ===
-        # print("Create masks...")
-        # mask = create_gradiend_mask(
-        #     class_score=fisher_diag,
-        #     sparsity=0.2,
-        #     mask_type='global'
-        # )  # mask is assumed to be a dict of torch.Tensors
-
-        # # === Step 5: Apply mask to each client's parameters ===
-        # print("Apply masks...")
-        # masked_results = []
-        # for client_idx, (_, fit_res) in enumerate(results):
-        #     client_params = parameters_to_ndarrays(fit_res.parameters)
-        #     client_tensors = {k: torch.tensor(p) for k, p in zip(original_params.keys(), client_params)}
-        #     masked_tensors = [client_tensors[k] * mask[k] for k in original_params]
-        #     masked_ndarrays = [t.cpu().numpy() for t in masked_tensors]
-        #     masked_fit_res = copy.deepcopy(fit_res)  # Deepcopy if needed
-        #     masked_fit_res.parameters = ndarrays_to_parameters(masked_ndarrays)
-        #     masked_results.append((client_idx, masked_fit_res))
-
-        # --- Continue with normal execution --- #
 
         print("Run FedAvg...")
         # Retrieve results from standard FedAvg using masked results
