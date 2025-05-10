@@ -117,9 +117,6 @@ def get_server_app(checkpoint_dir,
         # Initialize model parameters
         ndarrays = get_weights(model)
         parameters = ndarrays_to_parameters(ndarrays)
-
-        if parameters is None:
-            raise ValueError("Initial parameters could not be created. Check the model or conversion process.")
         
 
         # load global full testset for central evaluation
