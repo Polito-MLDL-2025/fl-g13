@@ -166,7 +166,9 @@ class SaveModelFedAvg(FedAvg):
                 for lam, tau in zip(weights, task_vecs)
             ]).sum(dim=0)
 
-            aggregated_parameters = [g + s for g, s in zip(global_params, summed)]
+            aggregated_parameters = global_params + summed
+            aggregated_parameters = ndarrays_to_parameters([aggregated_parameters.cpu().numpy()])
+
             _, aggregated_metrics = super().aggregate_fit(
                 server_round, results, failures
             )
