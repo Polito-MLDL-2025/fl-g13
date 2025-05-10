@@ -13,7 +13,7 @@ from fl_g13.modeling.load import load_or_create
 
 # *** -------- UTILITY FUNCTIONS FOR SERVER -------- *** #
 
-def get_evaluate_fn(testloader, model=None, criterion=None):
+def get_evaluate_fn(testloader, model, criterion):
     def evaluate(server_round, parameters_ndarrays, config):
         set_weights(model, parameters_ndarrays)
 
@@ -41,20 +41,22 @@ def evaluate_metrics_aggregation_fn(metrics):
 def get_server_app(
     checkpoint_dir,
     model_class,
-    model_config=None,
+    model_config=None, ##! New 
     optimizer=None,
     criterion=None,
     scheduler=None,
     device=None,
     save_every=1,
-    #save_best_model=False,
+    #save_best_model=False, ##! Removed
+    #get_datatest_fn=get_data_set_default, ##! Removed
     get_evaluate_fn=get_evaluate_fn,
     num_rounds=200,
-    fraction_fit=0.1,
-    fraction_evaluate=0.1,
-    min_fit_clients=10,
-    min_evaluate_clients=10,
-    min_available_clients=100,
+    fraction_fit=0.1,           # Sample 10% of available clients for training
+    fraction_evaluate=0.1,      # Sample 10% of available clients for evaluation
+    min_fit_clients=10,         # Never sample less than 10 clients for training
+    min_evaluate_clients=10,    # Never sample less than 10 clients for evaluation
+    min_available_clients=100,  # Wait until all 100 clients are available
+    model_editing=False,
     use_wandb=False,
     wandb_config=None,
 ):
@@ -85,11 +87,12 @@ def get_server_app(
         
         # Call custom strategy for aggregating data
         strategy = MaskedFedAvg(
+            #run_config=context.run_config, ##! Removed
             model=model,
             checkpoint_dir=checkpoint_dir,
             start_epoch=start_epoch,
             save_every=save_every,
-            #save_best_model=save_best_model,
+            #save_best_model=save_best_model, ##! Removed
             fraction_fit=fraction_fit,
             fraction_evaluate=fraction_evaluate,
             min_fit_clients=min_fit_clients,
@@ -97,8 +100,11 @@ def get_server_app(
             min_available_clients=min_available_clients,
             evaluate_fn=evaluate_fn,
             initial_parameters=params,
+            #on_fit_config_fn=on_fit_config, ##! Removed (on fit config was not used as config was never accessed when needed)
             fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
             evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
+            #scale_fn=simple_scale, ## !Removed
+            model_editing=model_editing,
             use_wandb=use_wandb,
             wandb_config=wandb_config,
         )

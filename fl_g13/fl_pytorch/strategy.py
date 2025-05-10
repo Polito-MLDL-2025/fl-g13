@@ -1,12 +1,15 @@
+import copy
 import os
 from pathlib import Path
 import numpy as np
+import torch
 import torch.nn as nn
-from flwr.common import logger, parameters_to_ndarrays #! logger doesnt work
+from flwr.common import logger, parameters_to_ndarrays, ndarrays_to_parameters #! logger doesnt work
 from flwr.server.strategy import FedAvg
 import wandb
 
-from fl_g13.fl_pytorch.task import create_run_dir, set_weights
+from fl_g13.editing.masking import create_gradiend_mask
+from fl_g13.fl_pytorch.task import set_weights
 from fl_g13.modeling import save
 
 WANDB_PROJECT_NAME = "CIFAR100_FL_experiment"
@@ -16,18 +19,22 @@ WANDB_PROJECT_NAME = "CIFAR100_FL_experiment"
 class MaskedFedAvg(FedAvg):
     def __init__(
         self,
-        model: nn.Module,
         checkpoint_dir,
-        start_epoch= 1,
-        save_every= 1,
+        model,
+        start_epoch=1,
+        save_every=1,
+        #scale_fn=None, #!! Removed (unused)
+        #save_best_model = True, #!! Removed
+        #scale_fn=simple_scale, ## !Removed
+        model_editing=False,
         use_wandb = False,
         wandb_config=None,
         *args,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
-        self.model = model
         self.checkpoint_dir = checkpoint_dir
+        self.model = model
         self.start_epoch = start_epoch
         self.save_every = save_every
         self.use_wandb = use_wandb
@@ -36,10 +43,52 @@ class MaskedFedAvg(FedAvg):
             self._init_wandb_project()
 
     def aggregate_fit(self, server_round, results, failures):
+        
+        # # *** SERVER MASK *** #
+        
+        # # === Step 1: Setup ===
+        # original_params = {k: v.detach().clone().cpu().numpy() for k, v in self.model.state_dict().items()}
 
-        #TODO Server Masking (aggregation of masks, or pure centralized aggregation)
+        # # === Step 2: Compute deltas ===
+        # print("Extracting deltas...")
+        # deltas = []
+        # for _, fit_res in results:
+        #     client_params = parameters_to_ndarrays(fit_res.parameters)
+        #     client_tensors = {k: torch.tensor(p) for k, p in zip(original_params.keys(), client_params)}
+        #     delta = {k: client_tensors[k]*1e3 - original_params[k]*1e3 for k in original_params} #! pay attention to the lr, it is nested inside the delta!!!
+        #     deltas.append(delta)
 
-        # Retrive results from standard FedAvg
+        # # === Step 3: Compute Fisher diagonal approximation ===
+        # print("Computing fisher diagonal...")
+        # fisher_diag = {
+        #     k: torch.stack([d[k]**2 for d in deltas], dim=0).sum(dim=0)
+        #     for k in original_params
+        # }
+
+        # # === Step 4: Create gradient mask ===
+        # print("Create masks...")
+        # mask = create_gradiend_mask(
+        #     class_score=fisher_diag,
+        #     sparsity=0.2,
+        #     mask_type='global'
+        # )  # mask is assumed to be a dict of torch.Tensors
+
+        # # === Step 5: Apply mask to each client's parameters ===
+        # print("Apply masks...")
+        # masked_results = []
+        # for client_idx, (_, fit_res) in enumerate(results):
+        #     client_params = parameters_to_ndarrays(fit_res.parameters)
+        #     client_tensors = {k: torch.tensor(p) for k, p in zip(original_params.keys(), client_params)}
+        #     masked_tensors = [client_tensors[k] * mask[k] for k in original_params]
+        #     masked_ndarrays = [t.cpu().numpy() for t in masked_tensors]
+        #     masked_fit_res = copy.deepcopy(fit_res)  # Deepcopy if needed
+        #     masked_fit_res.parameters = ndarrays_to_parameters(masked_ndarrays)
+        #     masked_results.append((client_idx, masked_fit_res))
+
+        # --- Continue with normal execution --- #
+
+        print("Run FedAvg...")
+        # Retrieve results from standard FedAvg using masked results
         aggregated_params, aggregated_metrics = super().aggregate_fit(server_round, results, failures)
 
         # If no aggregate params are available then no client trained succesffuly, warn and skip
@@ -108,6 +157,7 @@ class MaskedFedAvg(FedAvg):
             resume="allow",
         )
 
+    ##! Unused (when does wandb save data?)
     def store_results_and_log(self, server_round: int, tag: str, results_dict):
         """A helper method that stores results and logs them to W&B if enabled."""
 

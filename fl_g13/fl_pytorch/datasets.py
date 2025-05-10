@@ -92,7 +92,7 @@ def load_flwr_datasets(
     partition_train_test = partition.train_test_split(test_size=train_test_split_ratio)
     
     # Apply transforms on the parititions
-    partition_train_test = partition_train_test.with_transform(transform(type='train')) # TODO Should not apply train transform on test!!! Or maybe this is validation? 
+    partition_train_test = partition_train_test.with_transform(transform(type='train'))
 
     # Create train/val for each partition and wrap it into DataLoader
     trainloader = DataLoader(
