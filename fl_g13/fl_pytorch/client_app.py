@@ -53,7 +53,7 @@ class FlowerClient(NumPyClient):
         self.local_layer_name = "classification-head"
         self.last_global_weights = None
         self.mask = False
-        self.flat_mask = None
+        self.mask_list = None
         self.model_editing = model_editing
         if model_editing:
             self._compute_mask(sparsity=sparsity, mask_type=mask_type)
@@ -71,12 +71,9 @@ class FlowerClient(NumPyClient):
             scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
             mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
             mask_list = mask_dict_to_list(self.model, mask)
-            self.flat_mask = torch.cat([mask.view(-1) for mask in mask_list])
+            self.mask_list = mask_list
             self.set_mask(mask_list)
         
-        # print the percentage of elements in the mask with value 1
-        mask_percentage = self.flat_mask.sum().item() / self.flat_mask.numel()
-        print(f"Mask percentage: {mask_percentage:.2%}")
 
     def fit(self, parameters, config):
         """Train model locally.
@@ -128,8 +125,8 @@ class FlowerClient(NumPyClient):
             fine_tuned_weights_tensors = [torch.tensor(w, device=self.device) for w in updated_weights]
             pre_trained_tensors = [torch.tensor(w, device=self.device) for w in parameters]
             task_vector = [
-                self.flat_mask * (fine_tuned_layer - pre_trained_layer)
-                for fine_tuned_layer, pre_trained_layer in zip(fine_tuned_weights_tensors, pre_trained_tensors)
+                mask_layer * (fine_tuned_layer - pre_trained_layer)
+                for fine_tuned_layer, pre_trained_layer, mask_layer in zip(fine_tuned_weights_tensors, pre_trained_tensors, self.mask_list)
             ]
             fit_params = [layer.cpu().numpy() for layer in task_vector]
         else:
