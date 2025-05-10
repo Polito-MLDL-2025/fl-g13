@@ -12,8 +12,6 @@ from torch.utils.data import DataLoader
 
 import numpy as np
 
-from copy import deepcopy
-
 import json
 
 from fl_g13.config import RAW_DATA_DIR, PROJ_ROOT
@@ -197,9 +195,7 @@ global_acc = fine_tune(
     optimizer = optimizer,
     scheduler = scheduler,
     criterion = criterion,
-    train_dataloader = train_dataloader,
-    epochs = 3,
-    save_every = 3
+    train_dataloader = train_dataloader
 )
 
 new_test_accuracy = np.mean(global_acc)
@@ -229,9 +225,7 @@ local_acc = fine_tune(
     optimizer = optimizer,
     scheduler = scheduler,
     criterion = criterion,
-    train_dataloader = train_dataloader,
-    epochs = 3,
-    save_every = 3
+    train_dataloader = train_dataloader
 )
 
 new_test_accuracy = np.mean(local_acc)
