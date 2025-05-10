@@ -11,6 +11,7 @@ from flwr.common.typing import UserConfig
 
 
 def get_weights(net):
+    """Get model weights as a list of ndarrays, one for each layer."""
     return [val.cpu().numpy() for _, val in net.state_dict().items()]
 
 

@@ -150,24 +150,40 @@ class SaveModelFedAvg(FedAvg):
         #         mask = uncompress_mask_sparse(fit_res.metrics["mask"])
 
         if self.model_editing:
+            dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             global_params = get_weights(self.model)
-            global_vector = np.concatenate([gp.flatten() for gp in global_params])
-            global_params = torch.tensor(global_vector)
-            task_vecs, weights = [], []
+            #global_vector = np.concatenate([gp.flatten() for gp in global_params])
+            global_params = [torch.tensor(w, device=dev) for w in global_params]
+            task_vecs, lambdas = [], [] 
 
             for client, fit_res in results:
+                # one list of ndarrays per client (one ndarray per layer)
                 task_vecs.append(parameters_to_ndarrays(fit_res.parameters))
-                weights.append(self.scale_fn(client, fit_res.num_examples, server_round))  # λ_c
+                lambdas.append(self.scale_fn(client, fit_res.num_examples, server_round))  # λ_c
 
-            summed = torch.zeros_like(global_params)
+            # sum of the task vectors of all clients per each layer
+            merged_task_vectors = [torch.zeros_like(layer_params) for layer_params in global_params]
 
-            summed = torch.stack([
-                lam * torch.tensor(np.concatenate([t.flatten() for t in tau]))
-                for lam, tau in zip(weights, task_vecs)
-            ]).sum(dim=0)
+            for lam, tau in zip(lambdas, task_vecs):
+                for i, layer_params in enumerate(tau):
+                    merged_task_vectors[i] += lam * torch.tensor(layer_params, device=dev)
 
-            aggregated_parameters = global_params + summed
-            aggregated_parameters = ndarrays_to_parameters([aggregated_parameters.cpu().numpy()])
+            
+            # merged_task_vectors = torch.stack([
+            #     lam * torch.tensor(np.concatenate([t.flatten() for t in tau]))
+            #     for lam, tau in zip(lambdas, task_vecs)
+            # ]).sum(dim=0)
+
+            aggregated_parameters = [
+                global_layer + merged_vectors_layer 
+                for global_layer, merged_vectors_layer in zip(global_params, merged_task_vectors) 
+            ]
+
+            #aggregated_parameters = ndarrays_to_parameters([aggregated_parameters.cpu().numpy()])
+            aggregated_parameters = ndarrays_to_parameters([
+                aggregated_parameters_layer.cpu().numpy()
+                for aggregated_parameters_layer in aggregated_parameters
+            ])
 
             _, aggregated_metrics = super().aggregate_fit(
                 server_round, results, failures
