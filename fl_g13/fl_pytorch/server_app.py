@@ -10,7 +10,7 @@ from torchvision import datasets
 
 from fl_g13.config import RAW_DATA_DIR
 from fl_g13.fl_pytorch.datasets import get_eval_transforms
-from fl_g13.fl_pytorch.strategy import SaveModelFedAvg
+from fl_g13.fl_pytorch.strategy import SaveModelFedAvg, ClientSideTaskArithmetic
 from fl_g13.fl_pytorch.task import (
     get_weights,
     set_weights,
@@ -122,29 +122,50 @@ def get_server_app(checkpoint_dir,
         # load global full testset for central evaluation
         testloader = get_datatest_fn(context)
 
-        # Define strategy
-        strategy = SaveModelFedAvg(
-            checkpoint=checkpoint_dir,
-            model=model,
-            run_config=context.run_config,
-            use_wandb=use_wandb,
-            fraction_fit=fraction_fit,
-            fraction_evaluate=fraction_evaluate,
-            initial_parameters=parameters,
-            on_fit_config_fn=on_fit_config,
-            evaluate_fn=get_evaluate_fn(testloader, model, criterion),
-            evaluate_metrics_aggregation_fn=weighted_average,
-            min_fit_clients=min_fit_clients,
-            min_evaluate_clients=min_evaluate_clients,
-            min_available_clients=min_available_clients,
-            save_every=save_every,
-            start_epoch=start_epoch,
-            fit_metrics_aggregation_fn=handle_fit_metrics,
-            save_best_model=save_best_model,
-            wandb_config=wandb_config,
-            scale_fn=simple_scale,
-            model_editing=model_editing,
-        )
+        if model_editing:
+            strategy = ClientSideTaskArithmetic(
+                checkpoint=checkpoint_dir,
+                model=model,
+                run_config=context.run_config,
+                use_wandb=use_wandb,
+                fraction_fit=fraction_fit,
+                fraction_evaluate=fraction_evaluate,
+                initial_parameters=parameters,
+                on_fit_config_fn=on_fit_config,
+                evaluate_fn=get_evaluate_fn(testloader, model, criterion),
+                evaluate_metrics_aggregation_fn=weighted_average,
+                min_fit_clients=min_fit_clients,
+                min_evaluate_clients=min_evaluate_clients,
+                min_available_clients=min_available_clients,
+                save_every=save_every,
+                start_epoch=start_epoch,
+                fit_metrics_aggregation_fn=handle_fit_metrics,
+                save_best_model=save_best_model,
+                wandb_config=wandb_config,
+                scale_fn=simple_scale,
+            )
+        else:
+            strategy = SaveModelFedAvg(
+                checkpoint=checkpoint_dir,
+                model=model,
+                run_config=context.run_config,
+                use_wandb=use_wandb,
+                fraction_fit=fraction_fit,
+                fraction_evaluate=fraction_evaluate,
+                initial_parameters=parameters,
+                on_fit_config_fn=on_fit_config,
+                evaluate_fn=get_evaluate_fn(testloader, model, criterion),
+                evaluate_metrics_aggregation_fn=weighted_average,
+                min_fit_clients=min_fit_clients,
+                min_evaluate_clients=min_evaluate_clients,
+                min_available_clients=min_available_clients,
+                save_every=save_every,
+                start_epoch=start_epoch,
+                fit_metrics_aggregation_fn=handle_fit_metrics,
+                save_best_model=save_best_model,
+                wandb_config=wandb_config,
+                scale_fn=simple_scale,
+            )
         config = ServerConfig(num_rounds=number_rounds, round_timeout=None)
 
         return ServerAppComponents(strategy=strategy, config=config)

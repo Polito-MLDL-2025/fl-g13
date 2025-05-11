@@ -38,7 +38,6 @@ class SaveModelFedAvg(FedAvg):
                  start_epoch=1,
                  save_best_model = True,
                  wandb_config=None,
-                 model_editing=False,
                  scale_fn=None,
                  *args,
                  **kwargs):
@@ -46,7 +45,6 @@ class SaveModelFedAvg(FedAvg):
 
         # Create a directory where to save results from this run
         self.use_wandb = use_wandb
-        self.model_editing = model_editing
         self.scale_fn = scale_fn
 
         # Keep track of best acc
@@ -141,57 +139,10 @@ class SaveModelFedAvg(FedAvg):
         """Aggregate model weights using weighted average and store checkpoint"""
 
         # Call aggregate_fit from base class (FedAvg) to aggregate parameters and metrics
-
-        ## code to retrive client's masks:
-
-        # for result in results:
-        #     client_proxy, fit_res = result
-        #     if "mask" in fit_res.metrics:
-        #         mask = uncompress_mask_sparse(fit_res.metrics["mask"])
-
-        if self.model_editing:
-            dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            global_params = get_weights(self.model)
-            #global_vector = np.concatenate([gp.flatten() for gp in global_params])
-            global_params = [torch.tensor(w, device=dev) for w in global_params]
-            task_vecs, lambdas = [], [] 
-
-            for client, fit_res in results:
-                # one list of ndarrays per client (one ndarray per layer)
-                task_vecs.append(parameters_to_ndarrays(fit_res.parameters))
-                lambdas.append(self.scale_fn(client, fit_res.num_examples, server_round))  # λ_c
-
-            # sum of the task vectors of all clients per each layer
-            merged_task_vectors = [torch.zeros_like(layer_params) for layer_params in global_params]
-
-            for lam, tau in zip(lambdas, task_vecs):
-                for i, layer_params in enumerate(tau):
-                    merged_task_vectors[i] += lam * torch.tensor(layer_params, device=dev)
-
-            
-            # merged_task_vectors = torch.stack([
-            #     lam * torch.tensor(np.concatenate([t.flatten() for t in tau]))
-            #     for lam, tau in zip(lambdas, task_vecs)
-            # ]).sum(dim=0)
-
-            aggregated_parameters = [
-                global_layer + merged_vectors_layer 
-                for global_layer, merged_vectors_layer in zip(global_params, merged_task_vectors) 
-            ]
-
-            #aggregated_parameters = ndarrays_to_parameters([aggregated_parameters.cpu().numpy()])
-            aggregated_parameters = ndarrays_to_parameters([
-                aggregated_parameters_layer.cpu().numpy()
-                for aggregated_parameters_layer in aggregated_parameters
-            ])
-
-            _, aggregated_metrics = super().aggregate_fit(
-                server_round, results, failures
-            )
-        else:
-            aggregated_parameters, aggregated_metrics = super().aggregate_fit(
-                server_round, results, failures
-            )
+        
+        aggregated_parameters, aggregated_metrics = super().aggregate_fit(
+            server_round, results, failures
+        )
 
         if aggregated_parameters is not None:
             epoch = self.start_epoch + server_round - 1
@@ -268,11 +219,9 @@ class SaveModelFedAvg(FedAvg):
         return loss, metrics
 
 class ClientSideTaskArithmetic(SaveModelFedAvg):
-    """A class that behaves like FedAvg but has extra functionality.
-
-    This strategy: (1) saves results to the filesystem, (2) saves a
-    checkpoint of the global  model when a new best is found, (3) logs
-    results to W&B if enabled.
+    """
+    This strategy: merge the task vectors computed by each client 
+    and then apply it to the global model to teach it the specific tasks learnt by each client.
     """
 
     def __init__(self, *args, **kwargs):
@@ -286,18 +235,36 @@ class ClientSideTaskArithmetic(SaveModelFedAvg):
     ) -> tuple[Optional[Parameters], dict[str, Scalar]]:
         """Aggregate model weights using weighted average and store checkpoint"""
 
-        global_params = parameters_to_ndarrays(self.initial_parameters)
-        task_vecs, weights = [], []
+        dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        global_params = get_weights(self.model)
+        #global_vector = np.concatenate([gp.flatten() for gp in global_params])
+        global_params = [torch.tensor(w, device=dev) for w in global_params]
+        task_vecs, lambdas = [], [] 
 
         for client, fit_res in results:
-            task_vecs.append(fit_res.parameters)
-            weights.append(self.scale_fn(client, fit_res.num_examples, server_round))  # λ_c
+            # one list of ndarrays per client (one ndarray per layer)
+            task_vecs.append(parameters_to_ndarrays(fit_res.parameters))
+            lambdas.append(self.scale_fn(client, fit_res.num_examples, server_round))  # λ_c
 
-        summed = torch.zeros_like(global_params)
-        for lam, tau in zip(weights, task_vecs):
-            summed = [g + lam * t for g, t in zip(summed, tau)]
+        # sum of the task vectors of all clients per each layer
+        merged_task_vectors = [torch.zeros_like(layer_params) for layer_params in global_params]
 
-        aggregated_parameters = [g + s for g, s in zip(global_params, summed)]
+        for lam, tau in zip(lambdas, task_vecs):
+            for i, layer_params in enumerate(tau):
+                merged_task_vectors[i] += lam * torch.tensor(layer_params, device=dev)
+
+
+        aggregated_parameters = [
+            global_layer + merged_vectors_layer 
+            for global_layer, merged_vectors_layer in zip(global_params, merged_task_vectors) 
+        ]
+
+        #aggregated_parameters = ndarrays_to_parameters([aggregated_parameters.cpu().numpy()])
+        aggregated_parameters = ndarrays_to_parameters([
+            aggregated_parameters_layer.cpu().numpy()
+            for aggregated_parameters_layer in aggregated_parameters
+        ])
+
         _, aggregated_metrics = super().aggregate_fit(
             server_round, results, failures
         )

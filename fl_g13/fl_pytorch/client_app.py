@@ -65,14 +65,27 @@ class FlowerClient(NumPyClient):
         self.mask = compress_mask_sparse(mask)
 
     def _compute_mask(self, sparsity=0.2, mask_type='global'):
-        num_of_rounds = 4
-        for round in range(num_of_rounds):
-            sparsity = sparsity**((round + 1) / num_of_rounds)
-            scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
-            mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
-            mask_list = mask_dict_to_list(self.model, mask)
-            self.mask_list = mask_list
-            self.set_mask(mask_list)
+        scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
+        mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
+        mask_list = mask_dict_to_list(self.model, mask)
+        self.mask_list = mask_list
+        self.set_mask(mask_list)
+
+    def _compute_task_vector(self, updated_weights, pre_trained_weights):
+        """compute τ = (θ* − θ₀) ⊙ mask"""
+        fine_tuned_weights_tensors = [torch.tensor(w, device=self.device) for w in updated_weights]
+        pre_trained_weights_tensors = [torch.tensor(w, device=self.device) for w in pre_trained_weights]
+        task_vector = [
+            mask_layer * (fine_tuned_layer - pre_trained_layer)
+            for fine_tuned_layer, pre_trained_layer, mask_layer in zip(
+                fine_tuned_weights_tensors, 
+                pre_trained_weights_tensors, 
+                self.mask_list
+            )
+        ]
+        # Convert to type required by Flower
+        fit_params = [layer.cpu().numpy() for layer in task_vector]
+        return fit_params
         
 
     def fit(self, parameters, config):
@@ -117,18 +130,7 @@ class FlowerClient(NumPyClient):
         self._save_layer_weights_to_state()
 
         if self.model_editing:
-            # τ = (θ* − θ₀) ⊙ mask
-            # updated_vector = torch.tensor(updated_vector, device=self.device)
-            # self.last_global_weights = torch.tensor(self.last_global_weights, device=self.device)
-            # task_vector = self.flat_mask * (updated_vector - self.last_global_weights)
-            # fit_params = [task_vector.cpu().numpy()]
-            fine_tuned_weights_tensors = [torch.tensor(w, device=self.device) for w in updated_weights]
-            pre_trained_tensors = [torch.tensor(w, device=self.device) for w in parameters]
-            task_vector = [
-                mask_layer * (fine_tuned_layer - pre_trained_layer)
-                for fine_tuned_layer, pre_trained_layer, mask_layer in zip(fine_tuned_weights_tensors, pre_trained_tensors, self.mask_list)
-            ]
-            fit_params = [layer.cpu().numpy() for layer in task_vector]
+            self._compute_task_vector(updated_weights, parameters)
         else:
             fit_params = updated_weights
 
