@@ -23,10 +23,7 @@ class CustomFedAvg(FedAvg):
         model,
         start_epoch=1,
         save_every=1,
-        #scale_fn=None, #!! Removed (unused)
         #save_best_model = True, #!! Removed
-        #scale_fn=simple_scale, ## !Removed
-        model_editing=False,
         use_wandb = False,
         wandb_config=None,
         *args,
@@ -41,6 +38,8 @@ class CustomFedAvg(FedAvg):
         self.wandb_config = wandb_config
         if use_wandb:
             self._init_wandb_project()
+
+    # -------- AGGREGATION -------- #
 
     def aggregate_fit(self, server_round, results, failures):
         
@@ -90,7 +89,13 @@ class CustomFedAvg(FedAvg):
         loss, metrics = super().evaluate(server_round, parameters)
         #logger.info(f"[Round {server_round}] Centralized Evaluation - Loss: {loss:.4f}, Metrics: {metrics}")
         print(f"[Round {server_round}] Centralized Evaluation - Loss: {loss:.4f}, Metrics: {metrics}")
+        self.wandb_log(
+            server_round=server_round,
+            results_dict={"centralized_loss": loss, **metrics},
+        )
         return loss, metrics
+
+    # -------- WANDB UTILITIES -------- #
 
     def _init_wandb_project(self):
         
@@ -113,16 +118,12 @@ class CustomFedAvg(FedAvg):
             resume="allow",
         )
 
-    ##! Unused (when does wandb save data?)
-    def store_results_and_log(self, server_round: int, tag: str, results_dict):
+    ##! Same as store_results_and_log, but skipping the local storage (as it was not done)
+    def wandb_log(self, server_round: int, results_dict):
         """A helper method that stores results and logs them to W&B if enabled."""
 
         if self.use_wandb:
             # Log centralized loss and metrics to W&B
             wandb.log(results_dict, step=self.start_epoch + server_round - 1)
-        else:
-            # Store results and save to disk
-            self._store_results(
-                tag=tag,
-                results_dict={"round": self.start_epoch + server_round - 1, **results_dict},
-            )
+
+    #! Removed _store_results and _update_best_acc
