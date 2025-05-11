@@ -65,8 +65,9 @@ def get_server_app(
     wandb_config=None,
 ):
     
+    # Load or create model if not found in checkpoint_dir
     model, start_epoch = load_or_create(
-        path=checkpoint_dir,
+        path=f"{checkpoint_dir}/{model_class.__name__}" if save_with_model_dir else checkpoint_dir,
         model_class=model_class,
         model_config=model_config,
         optimizer=optimizer,
