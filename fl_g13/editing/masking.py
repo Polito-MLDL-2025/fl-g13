@@ -3,6 +3,8 @@ import pickle
 import numpy as np
 import torch
 
+from fisher import masked_fisher_score
+
 def _local_mask(class_score, sparsity = 0.2):
     """Create a mask for each parameter
 
@@ -105,3 +107,26 @@ def uncompress_mask_sparse(mask_bytes, device=None):
             mask = mask.to(device)
         uncompressed.append(mask)
     return uncompressed
+
+def create_calibrated_mask(dataloader, model, sparsity = 0.2, mask_type = 'local', rounds = 5):
+    # Initialize mask (full 1)
+    mask = [torch.ones_like(p, device = p.device) for p in model.parameters()]
+    # Invert sparsity. Compute which parameters needs to be set to 0
+    sparsity = 1 - sparsity
+    
+    print(f'Computing calibrated mask for {rounds} rounds.')
+    for r in range(rounds):
+        print(f'Round {r + 1}.')
+        # Target sparsity
+        s = sparsity**((r + 1)/rounds)
+        print(f'\tTarget sparsity {s:.2f}')
+        
+        # Compute score
+        print(f'\tComputing the masked fisher score')
+        score = masked_fisher_score(dataloader, model, current_mask = mask)
+        
+        # Update the mask
+        print(f'\tUpdating the mask')
+        mask = create_gradiend_mask(score, sparsity = s, mask_type = mask_type)
+        
+    return mask
