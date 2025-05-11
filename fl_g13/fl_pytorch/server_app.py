@@ -15,12 +15,15 @@ from fl_g13.modeling.load import load_or_create
 
 def get_evaluate_fn(testloader, model, criterion):
     def evaluate(server_round, parameters_ndarrays, config):
-        set_weights(model, parameters_ndarrays)
-
+        # Debugging prints
         print(f"[Server Eval Round {server_round}] Model device: {next(model.parameters()).device}")
         if torch.cuda.is_available():
              print(f"[Server Eval Round {server_round}] CUDA available in server eval: {torch.cuda.is_available()}")
 
+        # Applies new parameters to model
+        set_weights(model, parameters_ndarrays)
+
+        # Run evaluation and return results
         test_loss, test_accuracy, _ = eval(testloader, model, criterion)
         return test_loss, {"centralized_accuracy": test_accuracy}
     return evaluate
@@ -73,6 +76,7 @@ def get_server_app(
 
     def server_fn(context):
         
+        # Debugging prints
         print(f"[Server] Server on device: {next(model.parameters()).device}")
         if torch.cuda.is_available():
              print(f"[Server] CUDA available in client: {torch.cuda.is_available()}")
@@ -103,8 +107,6 @@ def get_server_app(
             #on_fit_config_fn=on_fit_config, ##! Removed (on fit config was not used as config was never accessed when needed)
             fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
             evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
-            #scale_fn=simple_scale, ## !Removed
-            model_editing=model_editing,
             use_wandb=use_wandb,
             wandb_config=wandb_config,
         )
