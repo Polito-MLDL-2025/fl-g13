@@ -1,4 +1,4 @@
-from flwr.common import Context, ndarrays_to_parameters
+from flwr.common import ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 import torch
 from torch.utils.data import DataLoader

@@ -1,11 +1,7 @@
 from collections import OrderedDict
-from datetime import datetime
-from pathlib import Path
-
 import torch
-from flwr.common.typing import UserConfig
 
-def get_weights(model): #? May this lead to CUDA incompatibility?
+def get_weights(model):
     return [val.cpu().numpy() for _, val in model.state_dict().items()]
 
 def set_weights(model, parameters):

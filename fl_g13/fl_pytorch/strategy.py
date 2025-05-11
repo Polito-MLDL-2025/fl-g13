@@ -1,16 +1,12 @@
-import copy
 import os
 from pathlib import Path
 from logging import INFO
 
 import numpy as np
-import torch
-import torch.nn as nn
-from flwr.common import logger, parameters_to_ndarrays, ndarrays_to_parameters #! logger doesnt work
+from flwr.common import logger, parameters_to_ndarrays
 from flwr.server.strategy import FedAvg
 import wandb
 
-from fl_g13.editing.masking import create_gradiend_mask
 from fl_g13.fl_pytorch.task import set_weights
 from fl_g13.modeling import save
 
