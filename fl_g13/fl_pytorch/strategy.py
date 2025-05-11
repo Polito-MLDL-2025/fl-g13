@@ -1,6 +1,8 @@
 import copy
 import os
 from pathlib import Path
+from logging import INFO
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -20,9 +22,11 @@ class CustomFedAvg(FedAvg):
     def __init__(
         self,
         checkpoint_dir,
+        prefix, #!! Introduced without default value to force user to take care of this
         model,
         start_epoch=1,
         save_every=1,
+        save_with_model_dir=False, #!! Introduced
         #save_best_model = True, #!! Removed
         use_wandb = False,
         wandb_config=None,
@@ -31,6 +35,8 @@ class CustomFedAvg(FedAvg):
     ):
         super().__init__(*args, **kwargs)
         self.checkpoint_dir = checkpoint_dir
+        self.prefix = prefix
+        self.save_with_model_dir = save_with_model_dir
         self.model = model
         self.start_epoch = start_epoch
         self.save_every = save_every
@@ -49,7 +55,7 @@ class CustomFedAvg(FedAvg):
         # If no aggregate params are available then no client trained succesffuly, warn and skip
         if aggregated_params is None:
             #logger.warning(f"[Round {server_round}] No aggregated parameters (possibly all clients failed).")
-            print(f"[Round {server_round}] No aggregated parameters (possibly all clients failed).")
+            logger.log(INFO, f"[Round {server_round}] No aggregated parameters (possibly all clients failed).")
             return None, {}
 
         # Convert parameters to NumPy arrays for analysis
@@ -62,20 +68,20 @@ class CustomFedAvg(FedAvg):
             avg_drift = aggregated_metrics["avg_drift"]
             relative_drift = avg_drift / (global_l2_norm + 1e-8)
             #logger.info(f"[Round {server_round}] Avg Drift: {avg_drift:.4f} | Relative Drift: {relative_drift:.4f}")
-            print(f"[Round {server_round}] Avg Drift: {avg_drift:.4f} | Relative Drift: {relative_drift:.4f}")
+            logger.log(INFO, f"[Round {server_round}] Avg Drift: {avg_drift:.4f} | Relative Drift: {relative_drift:.4f}")
 
         # Optionally save model checkpoint
         epoch = self.start_epoch + server_round - 1
         if self.checkpoint_dir and self.save_every and epoch % self.save_every == 0:
             #logger.info(f"[Round {server_round}] Saving aggregated model at epoch {epoch}...")
-            print(f"[Round {server_round}] Saving aggregated model at epoch {epoch}...")
+            logger.log(INFO, f"[Round {server_round}] Saving aggregated model at epoch {epoch}...")
             set_weights(self.model, param_arrays)
             save(
                 checkpoint_dir=self.checkpoint_dir,
                 model=self.model,
-                prefix="FL",
+                prefix=f"fl_{self.prefix}",
                 epoch=epoch,
-                with_model_dir=False
+                with_model_dir=self.save_with_model_dir
             )
 
         return aggregated_params, aggregated_metrics
@@ -88,7 +94,7 @@ class CustomFedAvg(FedAvg):
     def evaluate(self, server_round, parameters):
         loss, metrics = super().evaluate(server_round, parameters)
         #logger.info(f"[Round {server_round}] Centralized Evaluation - Loss: {loss:.4f}, Metrics: {metrics}")
-        print(f"[Round {server_round}] Centralized Evaluation - Loss: {loss:.4f}, Metrics: {metrics}")
+        logger.log(INFO, f"[Round {server_round}] Centralized Evaluation - Loss: {loss:.4f}, Metrics: {metrics}")
         self.wandb_log(
             server_round=server_round,
             results_dict={"centralized_loss": loss, **metrics},

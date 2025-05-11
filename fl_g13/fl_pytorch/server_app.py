@@ -43,6 +43,7 @@ def evaluate_metrics_aggregation_fn(metrics):
 
 def get_server_app(
     checkpoint_dir,
+    prefix,
     model_class,
     model_config=None, ##! New 
     optimizer=None,
@@ -50,6 +51,7 @@ def get_server_app(
     scheduler=None,
     device=None,
     save_every=1,
+    save_with_model_dir=False,
     #save_best_model=False, ##! Removed
     #get_datatest_fn=get_data_set_default, ##! Removed
     get_evaluate_fn=get_evaluate_fn,
@@ -59,7 +61,6 @@ def get_server_app(
     min_fit_clients=10,         # Never sample less than 10 clients for training
     min_evaluate_clients=10,    # Never sample less than 10 clients for evaluation
     min_available_clients=100,  # Wait until all 100 clients are available
-    model_editing=False,
     use_wandb=False,
     wandb_config=None,
 ):
@@ -92,10 +93,12 @@ def get_server_app(
         # Call custom strategy for aggregating data
         strategy = CustomFedAvg(
             #run_config=context.run_config, ##! Removed
-            model=model,
             checkpoint_dir=checkpoint_dir,
+            prefix=prefix,
+            model=model,
             start_epoch=start_epoch,
             save_every=save_every,
+            save_with_model_dir=save_with_model_dir,
             #save_best_model=save_best_model, ##! Removed
             fraction_fit=fraction_fit,
             fraction_evaluate=fraction_evaluate,
