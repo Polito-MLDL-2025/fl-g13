@@ -162,17 +162,17 @@ def load_client_dataloaders(
     return trainloader, valloader
 
 def get_client_app(
+        model,
+        criterion,
+        optimizer,
+        scheduler,
+        device,
         load_data_fn=load_client_dataloaders,
-        partition_type="iid",
         batch_size=50,
+        partition_type="iid",
         num_shards_per_partition=2,
         train_test_split_ratio=0.2,
         local_epochs=4,
-        model=None,
-        criterion=None,
-        optimizer=None,
-        scheduler=None,
-        device=None,
         model_editing=False,
         mask_type='global',
         sparsity=0.2
