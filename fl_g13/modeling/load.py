@@ -43,8 +43,8 @@ def save(
         epoch (int): The current epoch number to include in the checkpoint file name.
         optimizer (Optional[Optimizer]): The optimizer to save, if provided.
         scheduler (Optional[_LRScheduler]): The learning rate scheduler to save, if provided.
-        filename (Optional[str]): set filename for save file if provided
-        with_model_dir
+        filename (Optional[str]): The filename for the checkpoint file, if provided.
+        with_model_dir (bool): Whether to save the checkpoint in a subdirectory named after the model's class.
     Returns:
         None
     """
