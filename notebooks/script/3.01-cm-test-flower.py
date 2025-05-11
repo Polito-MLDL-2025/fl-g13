@@ -13,50 +13,18 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 import flwr
 from flwr.simulation import run_simulation
 from fl_g13.architectures import BaseDino
-from fl_g13.fl_pytorch.client_app import get_client_app
-from fl_g13.fl_pytorch.server_app import get_server_app
+from fl_g13.fl_pytorch import get_client_app, get_server_app
+from fl_g13.fl_pytorch import build_fl_dependencies
 
 print(f"Flower {flwr.__version__} / PyTorch {torch.__version__}")
 
-
-import os
-import urllib.request
-
-# TODO: move in a "make client dependencies function"
-def download_if_not_exists(file_path: str, file_url: str):
-    """
-    Checks if a file exists at the given path. If it does not, downloads it from the specified URL.
-
-    Parameters:
-    - file_path (str): The local path to check and save the file.
-    - file_url (str): The URL from which to download the file.
-    """
-    if not os.path.exists(file_path):
-        print(f"'{file_path}' not found. Downloading from {file_url}...")
-        try:
-            urllib.request.urlretrieve(file_url, file_path)
-            print("Download complete.")
-        except Exception as e:
-            print(f"Failed to download file: {e}")
-    else:
-        print(f"'{file_path}' already exists.")
-
-download_if_not_exists(
-    "vision_transformer.py",
-    "https://raw.githubusercontent.com/facebookresearch/dino/refs/heads/main/vision_transformer.py"
-)
-
-download_if_not_exists(
-    "utils.py",
-    "https://raw.githubusercontent.com/facebookresearch/dino/refs/heads/main/utils.py"
-)
+build_fl_dependencies() #! Remind to always put this, it will download Dino dependencies for client
 
 
 # Settings
 CHECKPOINT_DIR = "/home/massimiliano/Projects/fl-g13/checkpoints"
 
 # Model hyper-parameters
-model_class = BaseDino
 head_layers=3
 head_hidden_size=512
 dropout_rate=0.0
@@ -70,16 +38,16 @@ T_max=8
 eta_min=1e-5
 
 # Federated Training setting
-batch_size = 64
-local_epochs = 2
-number_of_rounds = 2
-fraction_fit = 1
-fraction_evaluate = 0.1
-number_of_clients = 3
-min_num_clients = 3
-partition_type = "iid" # or "shard"
-num_shards_per_partition = 6
-use_wandb = False
+batch_size = 64 # Batch size for training #! Let's stick to 64 to make training fit also on RTX 3070
+local_epochs = 2 # Number of local epochs per client
+number_of_rounds = 5 # Total number of federated learning rounds
+fraction_fit = 1 # Fraction of clients participating in training per round
+fraction_evaluate = 0.1 # Fraction of clients participating in evaluation per round
+number_of_clients = 3 # Total number of clients in the simulation
+min_num_clients = 2 # Minimum number of clients required for training and evaluation
+partition_type = "iid" # Partitioning strategy for the dataset (e.g., "iid" or "shard")
+num_shards_per_partition = 6 # Number of shards per partition (used when partition_type is "shard")
+use_wandb = False # Whether to use Weights & Biases (wandb) for experiment tracking (#!TODO, double check it works)
 
 # Device settings
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -91,17 +59,16 @@ backend_config = {
 }
 
 # When running on GPU, assign an entire GPU for each client
+# Refer to Flower framework documentation for more details about Flower simulations
+# and how to set up the `backend_config`
 if device == "cuda":
     backend_config["client_resources"] = {"num_cpus": 1, "num_gpus": 1}
-
-    # Refer to our Flower framework documentation for more details about Flower simulations
-    # and how to set up the `backend_config`
 
 print(f"Training on {device}")
 
 
 # Model
-model = model_class(
+model = BaseDino(
     head_layers=head_layers, 
     head_hidden_size=head_hidden_size, 
     dropout_rate=dropout_rate, 
@@ -125,32 +92,35 @@ scheduler = CosineAnnealingLR(
 criterion = CrossEntropyLoss()
 
 client_app = get_client_app(
-    model=model, 
-    optimizer=optimizer, 
-    criterion=criterion, 
-    device=device, 
     partition_type=partition_type, 
-    local_epochs=local_epochs,
     batch_size=batch_size,
     num_shards_per_partition=num_shards_per_partition,
+    local_epochs=local_epochs,
+    model=model, 
+    criterion=criterion, 
+    optimizer=optimizer, 
     scheduler=scheduler,
+    device=device, 
 )
 server_app = get_server_app(
-    model_class=model_class,
+    checkpoint_dir=CHECKPOINT_DIR,
+    prefix='aron', #! Introduced, you are force to pass this to avoid overwrites, if you pass an already used name it will load the most recent checkpoint
+    model_class=model.__class__,
     model_config=model.get_config(), 
     optimizer=optimizer, 
     criterion=criterion, 
+    scheduler=scheduler,
     device=device, 
+    save_every=1,
+    save_with_model_dir=True, #! Introduced: will save under {checkpoint path provided}/BaseDino/ dir if set to True
     num_rounds=number_of_rounds, 
-    min_available_clients=number_of_clients,
-    min_fit_clients=min_num_clients,
-    min_evaluate_clients=min_num_clients,
-    checkpoint_dir=CHECKPOINT_DIR,
     fraction_fit=fraction_fit,
     fraction_evaluate=fraction_evaluate,
-    #use_wandb=use_wandb,
-    #wandb_config=wandb_config,
-    scheduler=scheduler,
+    min_fit_clients=min_num_clients,
+    min_evaluate_clients=min_num_clients,
+    min_available_clients=number_of_clients,
+    use_wandb=False,
+    wandb_config=None,
 )
 
 
