@@ -6,7 +6,7 @@ from torchvision import datasets
 
 from fl_g13.config import RAW_DATA_DIR
 from fl_g13.fl_pytorch.datasets import get_eval_transforms
-from fl_g13.fl_pytorch.strategy import MaskedFedAvg
+from fl_g13.fl_pytorch.strategy import CustomFedAvg
 from fl_g13.fl_pytorch.task import get_weights, set_weights
 from fl_g13.modeling.eval import eval
 from fl_g13.modeling.load import load_or_create
@@ -86,7 +86,7 @@ def get_server_app(
         params = ndarrays_to_parameters(get_weights(model))
         
         # Call custom strategy for aggregating data
-        strategy = MaskedFedAvg(
+        strategy = CustomFedAvg(
             #run_config=context.run_config, ##! Removed
             model=model,
             checkpoint_dir=checkpoint_dir,

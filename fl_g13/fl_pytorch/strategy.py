@@ -16,7 +16,7 @@ WANDB_PROJECT_NAME = "CIFAR100_FL_experiment"
 
 # *** -------- AGGREGATION SERVER STRATEGY -------- *** #
 
-class MaskedFedAvg(FedAvg):
+class CustomFedAvg(FedAvg):
     def __init__(
         self,
         checkpoint_dir,
@@ -43,8 +43,7 @@ class MaskedFedAvg(FedAvg):
             self._init_wandb_project()
 
     def aggregate_fit(self, server_round, results, failures):
-
-        print("Run FedAvg...")
+        
         # Retrieve results from standard FedAvg using masked results
         aggregated_params, aggregated_metrics = super().aggregate_fit(server_round, results, failures)
 
