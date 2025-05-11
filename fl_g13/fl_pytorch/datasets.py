@@ -20,7 +20,7 @@ def get_eval_transforms():
         transforms.Resize(256), # CIFRA100 is originally 32x32
         transforms.CenterCrop(224), # But Dino works on 224x224
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
     return eval_transform
 
@@ -30,7 +30,7 @@ def get_train_transforms():
         transforms.RandomCrop(224),  # But Dino works on 224x224
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
     return train_transform
 

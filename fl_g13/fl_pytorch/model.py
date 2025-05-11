@@ -66,6 +66,6 @@ def get_experiment_setting(
     else:
         optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
     criterion = nn.CrossEntropyLoss()
-    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=8, T_mult=2, eta_min=0.001)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=8, eta_min=1e-5)
     #model, _ = load_or_create(checkpoint_dir, model_class, dev, optimizer, scheduler)
     return model, optimizer, criterion, dev, scheduler
