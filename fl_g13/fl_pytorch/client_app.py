@@ -1,3 +1,5 @@
+import gc
+
 import numpy as np
 import torch
 from flwr.client import ClientApp, NumPyClient
@@ -120,7 +122,8 @@ class FlowerClient(NumPyClient):
         }
         if self.mask is not None: # Only include 'mask' if it was computed
             results["mask"] = self.mask
-            
+        gc.collect()
+        torch.cuda.empty_cache()
         return (
             updated_weights,
             len(self.trainloader.dataset),
@@ -131,6 +134,8 @@ class FlowerClient(NumPyClient):
     def evaluate(self, parameters, config):
         set_weights(self.model, parameters)
         test_loss, test_accuracy, _ = eval(self.valloader, self.model, self.criterion)
+        gc.collect()
+        torch.cuda.empty_cache()
 
         return test_loss, len(self.valloader.dataset), {"accuracy": test_accuracy}
 
