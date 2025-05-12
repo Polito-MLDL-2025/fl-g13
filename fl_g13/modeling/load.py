@@ -43,8 +43,8 @@ def save(
         epoch (int): The current epoch number to include in the checkpoint file name.
         optimizer (Optional[Optimizer]): The optimizer to save, if provided.
         scheduler (Optional[_LRScheduler]): The learning rate scheduler to save, if provided.
-        filename (Optional[str]): set filename for save file if provided
-        with_model_dir
+        filename (Optional[str]): The filename for the checkpoint file, if provided.
+        with_model_dir (bool): Whether to save the checkpoint in a subdirectory named after the model's class.
     Returns:
         None
     """
@@ -230,6 +230,11 @@ def load(
     # Load model weights from the checkpoint
     model.load_state_dict(checkpoint[ModelKeys.MODEL_STATE_DICT.value])
 
+    if device: # Only move if a device was specified
+        model.to(device)
+        if verbose:
+            print(f"➡️ Moved model to device: {device}")
+
     # Load optimizer state if an optimizer is provided and the checkpoint contains its state
     if optimizer and ModelKeys.OPTIMIZER_STATE_DICT.value in checkpoint:
         optimizer.load_state_dict(checkpoint[ModelKeys.OPTIMIZER_STATE_DICT.value])
@@ -251,33 +256,48 @@ def load(
 def load_or_create(
         path: str,
         model_class: Type[nn.Module] | Module,
+        model_config = None,
         device: Optional[torch.device] = None,
         optimizer: Optional[optim.Optimizer] = None,
         scheduler: Optional[_LRScheduler] = None,
         verbose: bool = False
 ) -> tuple[Module, int]:
     """
-    Loads a checkpoint into a new model and optionally restores optimizer and scheduler.
-    If no checkpoint is found, creates a new model and saves it.
-
-    Args:
-        path (str): Path to the checkpoint file or directory containing checkpoint files.
-        model_class (Type[nn.Module] | nn.Module): Model class or instance.
-        device (Optional[torch.device]): The device to map the checkpoint to.
-        optimizer (Optional[Optimizer]): Optimizer instance to load state into, if provided.
-        scheduler (Optional[_LRScheduler]): Scheduler instance to load state into, if provided.
-        verbose (bool): Whether to print loading info.
-    Returns:
-        Tuple[nn.Module, int]: The model with restored state and the epoch to resume training from.
+    Loads a model checkpoint or creates a new model if no checkpoint is found.
+    This function attempts to load a checkpoint from the specified path into a model. 
+    If no checkpoint is found, it creates a new model instance. Optionally, it can also 
+    restore the states of an optimizer and a learning rate scheduler.
+        model_class (Type[nn.Module] | nn.Module): The model class or an instance of the model.
+        model_config (Optional[dict]): Configuration dictionary for creating the model, 
+            used if no checkpoint is found. If provided, the model class must have a 
+            `from_config` method.
+        device (Optional[torch.device]): The device to map the model and checkpoint to. 
+            Defaults to "cuda:0" if available, otherwise "cpu".
+        optimizer (Optional[torch.optim.Optimizer]): Optimizer instance to restore state into, if provided.
+        scheduler (Optional[torch.optim.lr_scheduler._LRScheduler]): Learning rate scheduler 
+            instance to restore state into, if provided.
+        verbose (bool): If True, prints information about the loading process. Defaults to False.
+        tuple[nn.Module, int]: A tuple containing the model (with restored state if a checkpoint 
+        was found) and the epoch to resume training from. If no checkpoint is found, the epoch 
+        is set to 1.
+    Raises:
+        ValueError: If a model configuration is provided but the model class does not have 
+        a `from_config` method.
     """
     try:
-        return load(path, model_class, device, optimizer, scheduler, verbose)
+        return  load(path, model_class, device, optimizer, scheduler, verbose)
     except FileNotFoundError:
         if verbose:
             print(f"⚠️ No checkpoint found at {path}. Creating a new model.")
 
-        model = get_model(model_class)
-
+        if not model_config:
+            model = get_model(model_class)
+        elif hasattr(model_class, 'from_config'):
+            model = model_class.from_config(model_config)
+        else:
+            raise ValueError(f"You provided a model config but no method to load such was found in model_class {model_class}")
+        
+        device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if device:
             model.to(device)
 
