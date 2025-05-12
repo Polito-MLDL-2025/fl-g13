@@ -112,12 +112,15 @@ class CustomFedAvg(FedAvg):
                 f.write(run_id)
         
         # init W&B
+        name = self.wandb_config.get('name') or f"{self.model.__class__.__name__}-{self.wandb_config.get('partition_type','_')}"
+        project_name = self.wandb_config.get('project_name') or WANDB_PROJECT_NAME
+        resume = self.wandb_config.get('resume') or "allow"
         wandb.init(
-            project=WANDB_PROJECT_NAME, 
-            name=f"{self.model.__class__.__name__}-{self.wandb_config['partition_type']}",
+            project=project_name,
+            name=name,
             config=self.wandb_config,
             id=run_id,
-            resume="allow",
+            resume=resume,
         )
 
     ##! Same as store_results_and_log, but skipping the local storage (as it was not done)
