@@ -130,7 +130,7 @@ class FlowerClient(NumPyClient):
         self._save_layer_weights_to_state()
 
         if self.model_editing:
-            self._compute_task_vector(updated_weights, parameters)
+            fit_params = self._compute_task_vector(updated_weights, parameters)
         else:
             fit_params = updated_weights
 
