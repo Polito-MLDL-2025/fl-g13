@@ -70,7 +70,7 @@ eta_min = 1e-5
 K = 100
 C = 0.1
 J = 4
-num_rounds = 20
+num_rounds = 10
 partition_type = 'iid'
 
 ## only for partition_type = 'shard'
@@ -86,13 +86,17 @@ min_available_clients = 10  # Wait until all 10 clients are available
 device = DEVICE
 ## checkpoints directory
 current_path = Path.cwd()
-model_test_path = current_path / "../models/fl_baseline"
-checkpoint_dir = model_test_path.resolve()
+model_save_path = current_path / f"../models/fl_dino_baseline/{partition_type}"
+checkpoint_dir = model_save_path.resolve()
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 ## Wandb config
 use_wandb = True
 wandb_config = {
+    # wandb param
+    'name':'FL_Dino_Baseline_iid',
+    'project_name':"FL_Dino_CIFAR100_experiment2",
+    # model config param
     "fraction_fit": fraction_fit,
     "lr": lr,
     "momentum": momentum,
@@ -229,9 +233,6 @@ download_if_not_exists("utils.py",
 
 
 # 
-
-
-
 
 # Run simulation
 run_simulation(
