@@ -71,7 +71,8 @@ def get_data_set_default(context: Context):
     return DataLoader(testset, batch_size=32)
 
 def simple_scale(client, n_examples, rnd):
-    return 1.0 / n_examples**0.5       # or fixed =1, or metrics based
+    #return 1.0 / n_examples**0.5       # or fixed =1, or metrics based
+    return 0.1
 
 def get_server_app(checkpoint_dir,
                    model_class,
