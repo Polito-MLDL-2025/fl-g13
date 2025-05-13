@@ -1,16 +1,16 @@
-import gc
+import json
 
 import numpy as np
 import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import ArrayRecord, Context
 
-from fl_g13.modeling.train import train
-from fl_g13.modeling.eval import eval
 from fl_g13.editing import create_gradiend_mask, fisher_scores, mask_dict_to_list, compress_mask_sparse
-
-from fl_g13.fl_pytorch.task import get_weights, set_weights
 from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
+from fl_g13.fl_pytorch.task import get_weights, set_weights
+from fl_g13.modeling.eval import eval
+from fl_g13.modeling.train import train
+
 
 # *** ---------------- CLIENT CLASS ---------------- *** #
 
@@ -29,7 +29,8 @@ class FlowerClient(NumPyClient):
             model_editing=False,
             sparsity=0.2,
             mask_type='global',
-            is_save_weights_to_state=True,
+            is_save_weights_to_state=False,
+            verbose=False
     ):
         self.client_state = client_state
         self.local_epochs = local_epochs
@@ -40,7 +41,8 @@ class FlowerClient(NumPyClient):
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.device = device or torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.is_save_weights_to_state=is_save_weights_to_state
+        self.is_save_weights_to_state = is_save_weights_to_state
+        self.verbose = verbose
         self.mask = None
         if model_editing:
             self._compute_mask(sparsity=sparsity, mask_type=mask_type)
@@ -73,7 +75,6 @@ class FlowerClient(NumPyClient):
         # Add the state to the context (replace if already exists)
         self.client_state["full_model_state"] = arr_record
 
-
     def _load_weights_from_state(self):
         # Extract state from context
         state_dict = self.client_state["full_model_state"].to_torch_state_dict()
@@ -91,7 +92,7 @@ class FlowerClient(NumPyClient):
         set_weights(self.model, parameters)
 
         # Train using the new weights
-        all_training_losses, _, _, _ = train(
+        all_training_losses, _, all_training_accuracies, _ = train(
             checkpoint_dir=None,
             name=None,
             start_epoch=1,
@@ -105,6 +106,7 @@ class FlowerClient(NumPyClient):
             optimizer=self.optimizer,
             scheduler=self.scheduler,
             eval_every=None,
+            verbose=self.verbose
         )
 
         updated_weights = get_weights(self.model)
@@ -117,15 +119,19 @@ class FlowerClient(NumPyClient):
         # Client drift (Euclidean)
         drift = np.linalg.norm(flatten_updated_weights - flatten_global_weights)
 
-         # --- Modified: Conditionally include the mask in results ---
         results = {
-            "train_loss": sum(all_training_losses),
+            "train_loss":  all_training_losses[-1],
             "drift": drift.tolist(),
         }
-        if self.mask is not None: # Only include 'mask' if it was computed
+
+        if all_training_accuracies and all_training_losses:
+            results["training_accuracies"] = json.dumps(all_training_accuracies)
+            results["training_losses"] = json.dumps(all_training_losses)
+        # --- Modified: Conditionally include the mask in results ---
+
+        if self.mask is not None:  # Only include 'mask' if it was computed
             results["mask"] = self.mask
-        gc.collect()
-        torch.cuda.empty_cache()
+
         return (
             updated_weights,
             len(self.trainloader.dataset),
@@ -136,10 +142,9 @@ class FlowerClient(NumPyClient):
     def evaluate(self, parameters, config):
         set_weights(self.model, parameters)
         test_loss, test_accuracy, _ = eval(self.valloader, self.model, self.criterion)
-        gc.collect()
-        torch.cuda.empty_cache()
 
         return test_loss, len(self.valloader.dataset), {"accuracy": test_accuracy}
+
 
 # *** ---------------- CLIENT APP ---------------- *** #
 
@@ -150,8 +155,7 @@ def load_client_dataloaders(
         batch_size,
         train_test_split_ratio,
         transform=get_transforms
-    ):
-
+):
     # Retrive meta-data from context
     partition_id = context.node_config["partition-id"]  # assigned at runtime
     num_partitions = context.node_config["num-partitions"]
@@ -168,6 +172,7 @@ def load_client_dataloaders(
     )
     return trainloader, valloader
 
+
 def get_client_app(
         model,
         criterion,
@@ -183,13 +188,13 @@ def get_client_app(
         model_editing=False,
         mask_type='global',
         sparsity=0.2,
-        is_save_weights_to_state=True,
+        is_save_weights_to_state=False,
+        verbose=0
 ) -> ClientApp:
     def client_fn(context: Context):
-
         print(f"[Client] Client on device: {next(model.parameters()).device}")
         if torch.cuda.is_available():
-             print(f"[Client] CUDA available in client: {torch.cuda.is_available()}")
+            print(f"[Client] CUDA available in client: {torch.cuda.is_available()}")
 
         trainloader, valloader = load_data_fn(
             context=context,
@@ -212,7 +217,8 @@ def get_client_app(
             model_editing=model_editing,
             mask_type=mask_type,
             sparsity=sparsity,
-            is_save_weights_to_state=is_save_weights_to_state
+            is_save_weights_to_state=is_save_weights_to_state,
+            verbose=verbose
         ).to_client()
 
     app = ClientApp(client_fn=client_fn)

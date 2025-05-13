@@ -36,6 +36,7 @@ get_ipython().system('pip install wandb')
 
 ## read .env file
 import dotenv
+
 dotenv.load_dotenv()
 
 
@@ -49,6 +50,9 @@ wandb.login(key=WANDB_API_KEY)
 # # FL
 
 # ## Configs
+
+DEBUG = True
+
 
 # Model config
 
@@ -70,7 +74,7 @@ eta_min = 1e-5
 K = 100
 C = 0.1
 J = 4
-num_rounds = 10
+num_rounds = 30
 partition_type = 'iid'
 
 ## only for partition_type = 'shard'
@@ -94,8 +98,8 @@ os.makedirs(checkpoint_dir, exist_ok=True)
 use_wandb = True
 wandb_config = {
     # wandb param
-    'name':'FL_Dino_Baseline_iid',
-    'project_name':"FL_Dino_CIFAR100_experiment2",
+    'name': 'FL_Dino_Baseline_iid',
+    'project_name': "FL_test_chart",
     # model config param
     "fraction_fit": fraction_fit,
     "lr": lr,
@@ -108,7 +112,12 @@ wandb_config = {
 
 ## simulation run config
 NUM_CLIENTS = 100
-MAX_PARALLEL_CLIENTS = 10 
+MAX_PARALLEL_CLIENTS = 10
+
+if DEBUG:
+    use_wandb = True
+    num_rounds = 2
+    J = 2
 
 
 # ## Define model , optimizer and loss function
@@ -153,6 +162,7 @@ client = get_client_app(
     batch_size=batch_size,
     num_shards_per_partition=num_shards_per_partition,
     scheduler=scheduler,
+    verbose=0
     # load_data_fn=load_data_clients
 )
 
