@@ -265,9 +265,11 @@ class ClientSideTaskArithmetic(SaveModelFedAvg):
             for aggregated_parameters_layer in aggregated_parameters
         ])
 
-        _, aggregated_metrics = FedAvg.aggregate_fit(
-            server_round, results, failures
-        )
+        aggregated_metrics = {}
+        
+        eval_metrics = [(res.num_examples, res.metrics) for _, res in results]
+        aggregated_metrics = self.evaluate_metrics_aggregation_fn(eval_metrics)
+
 
         if aggregated_parameters is not None:
             epoch = self.start_epoch + server_round - 1
