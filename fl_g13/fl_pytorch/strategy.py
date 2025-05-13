@@ -267,8 +267,8 @@ class ClientSideTaskArithmetic(SaveModelFedAvg):
 
         aggregated_metrics = {}
         
-        eval_metrics = [(res.num_examples, res.metrics) for _, res in results]
-        aggregated_metrics = self.evaluate_metrics_aggregation_fn(eval_metrics)
+        fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
+        aggregated_metrics = self.fit_metrics_aggregation_fn(fit_metrics)
 
 
         if aggregated_parameters is not None:
