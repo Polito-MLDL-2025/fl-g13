@@ -265,7 +265,7 @@ class ClientSideTaskArithmetic(SaveModelFedAvg):
             for aggregated_parameters_layer in aggregated_parameters
         ])
 
-        _, aggregated_metrics = super().aggregate_fit(
+        _, aggregated_metrics = FedAvg.aggregate_fit(
             server_round, results, failures
         )
 
