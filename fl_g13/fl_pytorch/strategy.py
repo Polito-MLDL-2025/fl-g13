@@ -141,7 +141,7 @@ class CustomFedAvg(FedAvg):
             with open(run_id_path, "r") as f:
                 run_id = f.read().strip()
         else:
-            run_id = wandb.util.generate_id()
+            run_id = self.wandb_config.get("run_id") or wandb.util.generate_id()
             with open(run_id_path, "w") as f:
                 f.write(run_id)
 
