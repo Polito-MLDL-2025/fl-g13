@@ -30,7 +30,7 @@ class FlowerClient(NumPyClient):
             sparsity=0.2,
             mask_type='global',
             is_save_weights_to_state=False,
-            verbose=False
+            verbose=0
     ):
         self.client_state = client_state
         self.local_epochs = local_epochs
