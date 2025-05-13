@@ -136,14 +136,16 @@ class CustomFedAvg(FedAvg):
     def _init_wandb_project(self):
 
         # save or read run_id to be able to resume the run
-        run_id_path = Path.cwd() / "wandb_run_id.txt"
-        if os.path.exists(run_id_path):
-            with open(run_id_path, "r") as f:
-                run_id = f.read().strip()
-        else:
-            run_id = self.wandb_config.get("run_id") or wandb.util.generate_id()
-            with open(run_id_path, "w") as f:
-                f.write(run_id)
+        run_id = self.wandb_config.get("run_id") or None
+        if not run_id:
+            run_id_path = Path.cwd() / "wandb_run_id.txt"
+            if os.path.exists(run_id_path):
+                with open(run_id_path, "r") as f:
+                    run_id = f.read().strip()
+            else:
+                run_id = wandb.util.generate_id()
+                with open(run_id_path, "w") as f:
+                    f.write(run_id)
 
         # init W&B
         name = self.wandb_config.get(
