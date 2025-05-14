@@ -70,8 +70,7 @@ class FlowerClient(NumPyClient):
         self.set_mask(mask_list)
 
     def set_mask(self, mask):
-        if not hasattr(self.optimizer, "set_mask"):
-            raise Exception("The optimizer should have a set_mask method")
+        mask = [tensor.to(self.device) for tensor in mask]
         self.optimizer.set_mask(mask)
         self.mask = compress_mask_sparse(mask)
 

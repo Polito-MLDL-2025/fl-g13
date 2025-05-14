@@ -167,7 +167,7 @@ MAX_PARALLEL_CLIENTS = 10
 
 if DEBUG:
     use_wandb = False
-    num_rounds = 4
+    num_rounds = 2
     J = 4
 
 
