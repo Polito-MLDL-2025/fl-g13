@@ -8,23 +8,17 @@ get_ipython().run_line_magic('autoreload', '2')
 get_ipython().system('pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118')
 
 
+import os
 from pathlib import Path
 
 import flwr
 import torch
-from flwr.common import Context
 from flwr.simulation import run_simulation
-from torch.nn import CrossEntropyLoss
 from torch.optim import SGD
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
-from torch.utils.data import DataLoader
-from torchvision import datasets
-from torchvision.transforms import Compose, Resize, CenterCrop, RandomCrop, RandomHorizontalFlip, Normalize, ToTensor
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
-from fl_g13 import dataset as dataset_handler
 from fl_g13.architectures import BaseDino
-from fl_g13.config import RAW_DATA_DIR
-from fl_g13.dataset import train_test_split
+from fl_g13.fl_pytorch.client_app import get_client_app
 from fl_g13.fl_pytorch.server_app import get_server_app
 
 
@@ -35,77 +29,117 @@ print(f"Flower {flwr.__version__} / PyTorch {torch.__version__}")
 # disable_progress_bar()
 
 
-# # Load data
+# # Login wandb
 
-# Define preprocessing pipeline
-train_transform = Compose([
-    Resize(256),  # CIFRA100 is originally 32x32
-    RandomCrop(224),  # But Dino works on 224x224
-    RandomHorizontalFlip(),
-    ToTensor(),
-    Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
-])
-
-eval_transform = Compose([
-    Resize(256),  # CIFRA100 is originally 32x32
-    CenterCrop(224),  # But Dino works on 224x224
-    ToTensor(),
-    Normalize(mean=[0.5071, 0.4866, 0.4409], std=[0.2673, 0.2564, 0.2762]),
-])
-
-cifar100_train = datasets.CIFAR100(root=RAW_DATA_DIR, train=True, download=True, transform=train_transform)
-cifar100_test = datasets.CIFAR100(root=RAW_DATA_DIR, train=False, download=True, transform=eval_transform)
-
-train_dataset, val_dataset = train_test_split(cifar100_train, 0.8, random_state=None)
-test_dataset = cifar100_test
-
-print(f"Train dataset size: {len(train_dataset)}")
-print(f"Validation dataset size: {len(val_dataset)}")
-print(f"Test dataset size: {len(test_dataset)}")
+get_ipython().system('pip install wandb')
 
 
-# Dataloaders
-BATCH_SIZE = 128
-train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
-test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+## read .env file
+import dotenv
+
+dotenv.load_dotenv()
 
 
-# I.I.D Sharding Split
-## k client
-k = 10
-clients_dataset_train = dataset_handler.iid_sharding(train_dataset, k)
-clients_dataset_val = dataset_handler.iid_sharding(val_dataset, k)
+import wandb
+
+# login by key in .env file
+WANDB_API_KEY = dotenv.dotenv_values()["WANDB_API_KEY"]
+wandb.login(key=WANDB_API_KEY)
 
 
-clients_dataloader_train = [DataLoader(d, batch_size=BATCH_SIZE, shuffle=True) for d in clients_dataset_train]
-clients_dataloader_val = [DataLoader(d, batch_size=BATCH_SIZE, shuffle=True) for d in clients_dataset_val]
+# # FL
+
+# ## Configs
+
+DEBUG = True
 
 
-# ## Model
+# Model config
 
-# ## Init model , optimizer and loss function
+## Model Hyper-parameters
+head_layers = 3
+head_hidden_size = 512
+dropout_rate = 0.0
+unfreeze_blocks = 1
 
-# Hyper-parameters
-LR = 1e-2
+## Training Hyper-parameters
+batch_size = 128
+lr = 1e-3
+momentum = 0.9
+weight_decay = 1e-5
+T_max = 8
+eta_min = 1e-5
+
+# FL config
+K = 100
+C = 0.1
+J = 4
+num_rounds = 30
+partition_type = 'iid'
+
+## only for partition_type = 'shard'
+num_shards_per_partition = 10
+
+## Server App config
+save_every = 1
+fraction_fit = C  # Sample of available clients for training
+fraction_evaluate = 0.1  # Sample 50% of available clients for evaluation
+min_fit_clients = 10  # Never sample less than 10 clients for training
+min_evaluate_clients = 5  # Never sample less than 5 clients for evaluation
+min_available_clients = 10  # Wait until all 10 clients are available
+device = DEVICE
+## checkpoints directory
+current_path = Path.cwd()
+model_save_path = current_path / f"../models/fl_dino_baseline/{partition_type}"
+checkpoint_dir = model_save_path.resolve()
+os.makedirs(checkpoint_dir, exist_ok=True)
+
+## Wandb config
+use_wandb = True
+wandb_config = {
+    # wandb param
+    'name': 'FL_Dino_Baseline_iid',
+    'project_name': "FL_test_chart",
+    # model config param
+    "fraction_fit": fraction_fit,
+    "lr": lr,
+    "momentum": momentum,
+    'partition_type': partition_type,
+    'K': K,
+    'C': C,
+    'J': J,
+}
+
+## simulation run config
+NUM_CLIENTS = 100
+MAX_PARALLEL_CLIENTS = 10
+
+if DEBUG:
+    use_wandb = True
+    num_rounds = 2
+    J = 2
+
+
+# ## Define model , optimizer and loss function
 
 # Model
-model = BaseDino()
-model.to(DEVICE)
-print(f"Model: {model}")
-
-# Optimizer, scheduler, and loss function
-optimizer = SGD(model.parameters(), lr=LR)
-scheduler = CosineAnnealingWarmRestarts(
-    optimizer,
-    T_0=8,  # First restart after 8 epochs
-    T_mult=2,  # Double the interval between restarts each time
-    eta_min=1e-5  # Minimum learning rate after annealing
+model = BaseDino(
+    head_layers=head_layers,
+    head_hidden_size=head_hidden_size,
+    dropout_rate=dropout_rate,
+    unfreeze_blocks=unfreeze_blocks
 )
-criterion = CrossEntropyLoss()
+model.to(DEVICE)
+optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
+criterion = torch.nn.CrossEntropyLoss()
+scheduler = CosineAnnealingLR(
+    optimizer=optimizer,
+    T_max=T_max,
+    eta_min=eta_min
+)
 
 
-# # Define the ClientApp
+# ## Define the ClientApp
 
 # ## Build module local
 # 
@@ -114,31 +148,23 @@ criterion = CrossEntropyLoss()
 get_ipython().system('pip install -e ..')
 
 
-# ## create FlowerClient instances  
-
-'''
-Function load data client is to simulate the distribution data into each client
-In the real case, each client will have its dataset
-'''
-
-
-def load_data_client(context: Context,**kwargs):
-    partition_id = context.node_config["partition-id"]
-    print(f"Client {partition_id} is ready to train")
-    return clients_dataloader_train[partition_id], clients_dataloader_val[partition_id]
-
+# ## Create FlowerClient instances  
 
 # ### Create instant of ClientApp
 
-from fl_g13.fl_pytorch.client_app import get_client_app
-
-local_epochs = 2
-
-client = get_client_app(load_data_fn=load_data_client,
-                        model=model, optimizer=optimizer, criterion=criterion,
-                        device=DEVICE,
-                        local_epochs=local_epochs
-                        )
+client = get_client_app(
+    model=model,
+    optimizer=optimizer,
+    criterion=criterion,
+    device=DEVICE,
+    partition_type=partition_type,
+    local_epochs=J,
+    batch_size=batch_size,
+    num_shards_per_partition=num_shards_per_partition,
+    scheduler=scheduler,
+    verbose=0
+    # load_data_fn=load_data_clients
+)
 
 
 # # Define the Flower ServerApp
@@ -149,31 +175,11 @@ client = get_client_app(load_data_fn=load_data_client,
 
 # ## Create instant of ServerApp
 
-def get_datatest_fn(context: Context):
-    return test_dataloader
-
-
-## checkpoints directory
-current_path = Path.cwd()
-model_test_path = current_path / "../models/fl_baseline"
-model_test_path.resolve()
-
-num_rounds = 2
-save_every = 1
-fraction_fit = 1.0  # Sample 100% of available clients for training
-fraction_evaluate = 0.5  # Sample 50% of available clients for evaluation
-min_fit_clients = 10  # Never sample less than 10 clients for training
-min_evaluate_clients = 5  # Never sample less than 5 clients for evaluation
-min_available_clients = 10  # Wait until all 10 clients are available
-device = DEVICE
-use_wandb = False
-
-server = get_server_app(checkpoint_dir=model_test_path.resolve(),
-                        model_class=BaseDino,
+server = get_server_app(checkpoint_dir=checkpoint_dir,
+                        model_class=model,
                         optimizer=optimizer,
                         criterion=criterion,
                         scheduler=scheduler,
-                        get_datatest_fn=get_datatest_fn,
                         num_rounds=num_rounds,
                         fraction_fit=fraction_fit,
                         fraction_evaluate=fraction_evaluate,
@@ -182,7 +188,9 @@ server = get_server_app(checkpoint_dir=model_test_path.resolve(),
                         min_available_clients=min_available_clients,
                         device=device,
                         use_wandb=use_wandb,
-                        save_every=save_every
+                        wandb_config=wandb_config,
+                        save_every=save_every,
+                        prefix='fl_baseline'
                         )
 
 
@@ -236,15 +244,12 @@ download_if_not_exists("utils.py",
 
 # 
 
-NUM_CLIENTS = 10
-
-
 # Run simulation
 run_simulation(
     server_app=server,
     client_app=client,
     num_supernodes=NUM_CLIENTS,
-    backend_config=backend_config,
+    backend_config=backend_config
 )
 
 
