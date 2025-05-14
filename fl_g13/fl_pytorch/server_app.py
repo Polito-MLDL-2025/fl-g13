@@ -68,7 +68,7 @@ def get_server_app(
     min_available_clients=100,  # Wait until all 100 clients are available
     use_wandb=False,
     wandb_config=None,
-    strategy_name="custom_fedavg",
+    strategy_name="custom_fedavg", ##! New introduced to choose between strategies from notebook
 ):
     
     # Load or create model if not found in checkpoint_dir
