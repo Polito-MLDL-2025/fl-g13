@@ -68,6 +68,7 @@ def get_server_app(
     min_available_clients=100,  # Wait until all 100 clients are available
     use_wandb=False,
     wandb_config=None,
+    strategy_name="custom_fedavg",
 ):
     
     # Load or create model if not found in checkpoint_dir
@@ -95,30 +96,57 @@ def get_server_app(
 
         # Retrive parameters
         params = ndarrays_to_parameters(get_weights(model))
+
+        if strategy_name == "custom_fedavg":
         
-        # Call custom strategy for aggregating data
-        strategy = CustomFedAvg(
-            #run_config=context.run_config, ##! Removed
-            checkpoint_dir=checkpoint_dir,
-            prefix=prefix,
-            model=model,
-            start_epoch=start_epoch,
-            save_every=save_every,
-            save_with_model_dir=save_with_model_dir,
-            #save_best_model=save_best_model, ##! Removed
-            fraction_fit=fraction_fit,
-            fraction_evaluate=fraction_evaluate,
-            min_fit_clients=min_fit_clients,
-            min_evaluate_clients=min_evaluate_clients,
-            min_available_clients=min_available_clients,
-            evaluate_fn=evaluate_fn,
-            initial_parameters=params,
-            #on_fit_config_fn=on_fit_config, ##! Removed (on fit config was not used as config was never accessed when needed)
-            fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
-            evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
-            use_wandb=use_wandb,
-            wandb_config=wandb_config,
-        )
+            # Call custom strategy for aggregating data
+            strategy = CustomFedAvg(
+                #run_config=context.run_config, ##! Removed
+                checkpoint_dir=checkpoint_dir,
+                prefix=prefix,
+                model=model,
+                start_epoch=start_epoch,
+                save_every=save_every,
+                save_with_model_dir=save_with_model_dir,
+                #save_best_model=save_best_model, ##! Removed
+                fraction_fit=fraction_fit,
+                fraction_evaluate=fraction_evaluate,
+                min_fit_clients=min_fit_clients,
+                min_evaluate_clients=min_evaluate_clients,
+                min_available_clients=min_available_clients,
+                evaluate_fn=evaluate_fn,
+                initial_parameters=params,
+                #on_fit_config_fn=on_fit_config, ##! Removed (on fit config was not used as config was never accessed when needed)
+                fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
+                evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
+                use_wandb=use_wandb,
+                wandb_config=wandb_config,
+            )
+        elif strategy_name == "client_side_task_arithmetic":
+
+            strategy = ClientSideTaskArithmetic(
+                #run_config=context.run_config, ##! Removed
+                checkpoint_dir=checkpoint_dir,
+                prefix=prefix,
+                model=model,
+                start_epoch=start_epoch,
+                save_every=save_every,
+                save_with_model_dir=save_with_model_dir,
+                #save_best_model=save_best_model, ##! Removed
+                fraction_fit=fraction_fit,
+                fraction_evaluate=fraction_evaluate,
+                min_fit_clients=min_fit_clients,
+                min_evaluate_clients=min_evaluate_clients,
+                min_available_clients=min_available_clients,
+                evaluate_fn=evaluate_fn,
+                initial_parameters=params,
+                #on_fit_config_fn=on_fit_config, ##! Removed (on fit config was not used as config was never accessed when needed)
+                fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
+                evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
+                use_wandb=use_wandb,
+                wandb_config=wandb_config,
+                scale_fn=simple_scale,
+            )
 
         # Prepare server config
         rounds = context.run_config.get("num-server-rounds") or num_rounds
