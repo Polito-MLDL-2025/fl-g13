@@ -60,6 +60,13 @@ def get_experiment_setting(
     ):
     """Get the experiment setting."""
     dev = device("cuda:0" if cuda.is_available() else "cpu")
+    model, start_epoch = load_or_create(
+        path=f"{checkpoint_dir}/{model_class.__name__}" if save_with_model_dir else checkpoint_dir,
+        model_class=model_class,
+        model_config=model_config,
+        device=dev,
+        verbose=True,
+    )
     if model_editing:
         mask = [ones_like(p, device = p.device) for p in model.parameters()] # Must be done AFTER the model is moved to the device
         optimizer = SparseSGDM(model.parameters(), mask=mask, lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
@@ -67,13 +74,4 @@ def get_experiment_setting(
         optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
     criterion = nn.CrossEntropyLoss()
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=8, eta_min=1e-5)
-    model, start_epoch = load_or_create(
-        path=f"{checkpoint_dir}/{model_class.__name__}" if save_with_model_dir else checkpoint_dir,
-        model_class=model_class,
-        model_config=model_config,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        device=dev,
-        verbose=True,
-    )
     return model, optimizer, criterion, dev, scheduler
