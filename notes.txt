@@ -4,6 +4,9 @@
 
 ### Questions
 
+13/05 Questions for Riccardo and Iurada
+- Notes on paper
+
 06/05 Questions for Riccardo
 - Does it make sense to do a dropout also on frozen layers?
 - Is it ok to overfitt the training if the validation is still increasing?
@@ -27,22 +30,3 @@
 - Use same normalization as ImageNet
 - Use same transformations as Dino
 - No fancy params: weight decay, momentum, warm restart, ...
-
-### Notes
-- Cross validation
-	X Try different learning_rates -> done by the scheduler
-	X Try different batch_size -> 64, 128, 256
-	X Try different layer_size -> 1024, 2048
-	X Try different number_of_layers -> 3, 5, 8
-	- Try CosineAnihilatorLR with right number of T steps (can you rather pass eta_min?)
-	- Choose number of epochs
-X Transformations to use:
-	X Normalization
-	X Random Crop
-	X Horizontal Flip (no vert!) 
-	X (Only normalization for Test)
-X Optimizer? SGD
-X Scheduler? CosineAnihilatorWarmRestart
-X Dropout? No
-X Drop paths? No
-X momentum? weight_decay? nesterov? No
