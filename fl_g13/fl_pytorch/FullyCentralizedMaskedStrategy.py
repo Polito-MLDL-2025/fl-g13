@@ -11,7 +11,54 @@ class TrainingPhase(Enum):
     TRAINING = "TRAINING"
 
 #! TODO: For some reason, if this class is runned, the clients will not run the fit() function
-#!       I suspect it is due to the use of configure_fit() 
+#!       I suspect it is due to the use of configure_fit()
+# 
+# # Pseudo-code for pure centralized masking
+# Client (each round):
+# 	Receives: 	Global model parameters, Mask (optional).
+# 	Sends: 		Trained model parameter, Fisher scores (optional), Stats
+	
+# 	Performs local training or Fisher score estimation based on phase.
+	
+# Server (each round):
+# 	Receives:	Client parameters, Client Fisher scores (optional), Client Masks (Optional, Stats
+# 	Sends:		New global parameters, Mask (optional)
+	
+# 	IF current round < WARMUP_ROUND:
+# 	    # Warmup phase
+# 	    - Do normal FedAvg aggregation with all client weights.
+# 	    - Mask is all ones (no pruning).
+# 	    - Proceed with next round.
+
+# 	ELSE IF current round is within MASK_CALIBRATION_ROUNDS:
+# 	    # Masking phase begins
+# 	    - Round 1 of masking:
+# 		- Receive Fisher scores from all clients.
+# 		- Aggregate Fisher scores.
+# 		- Compute a mask based on highest Fisher scores (e.g., top-k).
+# 		- Save mask.
+# 		- Send new mask to clients for re-evaluation of Fisher scores.
+
+# 	    - Round 2 of masking:
+# 		- Receive updated Fisher scores from clients (under new mask).
+# 		- Aggregate again.
+# 		- Refine the mask.
+# 		- Send refined mask back.
+
+# 	    - ... (Repeat as needed until desired sparsity is reached)
+
+# 	    - Final round of masking:
+# 		- Finalize global mask.
+# 		- Set `masking_done = True`.
+# 		- Do **not** update global model yet (or use dummy aggregation).
+
+# 	ELSE:
+# 	    # Standard masked aggregation
+# 	    - Apply saved global mask to all client model updates: masked_params = params * mask
+# 	    - Do FedAvg using these masked parameters.
+# 	    - Return updated global weights and continue.
+#  
+
 class FullyCentralizedMaskedFedAvg(CustomFedAvg):
     def __init__(
         self,
