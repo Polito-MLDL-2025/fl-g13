@@ -5,9 +5,10 @@
 ### Questions
 
 13/05 Questions for Riccardo and Iurada
-- Notes on paper
+- Warmup the model before doing sparse fine tuning, or experiment yourself
+- Should do few-shots mask calibration
 
-06/05 Questions for Riccardo
+06/05 Questions for Riccardo and Iurada
 - Does it make sense to do a dropout also on frozen layers?
 - Is it ok to overfitt the training if the validation is still increasing?
 - Should we use test in the valudation phase? Or rather split a validation set from the train?
