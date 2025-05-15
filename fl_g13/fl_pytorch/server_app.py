@@ -6,11 +6,11 @@ from torchvision import datasets
 
 from fl_g13.config import RAW_DATA_DIR
 from fl_g13.fl_pytorch.datasets import get_eval_transforms
-from fl_g13.fl_pytorch.FullyCentralizedMaskedStrategy import FullyCentralizedMaskedFedAvg
-from fl_g13.fl_pytorch.strategy import CustomFedAvg
 from fl_g13.fl_pytorch.task import get_weights, set_weights
 from fl_g13.modeling.eval import eval
 from fl_g13.modeling.load import load_or_create
+from fl_g13.fl_pytorch.FullyCentralizedMaskedStrategy import FullyCentralizedMaskedFedAvg
+from fl_g13.fl_pytorch.strategy import CustomFedAvg
 
 # *** -------- UTILITY FUNCTIONS FOR SERVER -------- *** #
 

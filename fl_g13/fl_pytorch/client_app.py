@@ -4,8 +4,8 @@ from flwr.client import ClientApp
 from flwr.common import Context
 
 from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
-
-from fl_g13 import CustomNumpyClient, FullyCentralizedMaskedClient
+from fl_g13.fl_pytorch.client import CustomNumpyClient
+from fl_g13.fl_pytorch.FullyCentralizedMaskedClient import FullyCentralizedMaskedClient
 
 
 # *** ---------------- UTILITY FUNCTIONS FOR CLIENT ---------------- *** # 
