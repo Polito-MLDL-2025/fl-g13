@@ -38,7 +38,8 @@ def fit_metrics_aggregation_fn(metrics):
 def evaluate_metrics_aggregation_fn(metrics):
     accuracies = [n * m["accuracy"] for n, m in metrics]
     total = sum(n for n, _ in metrics)
-    return {"federated_evaluate_accuracy": sum(accuracies) / total}
+
+    return {"decentralized_avg_eval_accuracy": sum(accuracies) / total}
 
 # *** -------- SERVER APP -------- *** #
 

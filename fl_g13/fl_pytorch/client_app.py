@@ -1,10 +1,12 @@
+import numpy as np
 import torch
 from flwr.client import ClientApp
 from flwr.common import Context
 
-from fl_g13.fl_pytorch.FullyCentralizedMaskedClient import FullyCentralizedMaskedClient
-from fl_g13.fl_pytorch.client import CustomNumpyClient
 from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
+
+from fl_g13 import CustomNumpyClient, FullyCentralizedMaskedClient
+
 
 # *** ---------------- UTILITY FUNCTIONS FOR CLIENT ---------------- *** # 
 
@@ -15,12 +17,11 @@ def load_client_dataloaders(
         batch_size,
         train_test_split_ratio,
         transform=get_transforms
-    ):
-    
+):
     # Retrive meta-data from context
     partition_id = context.node_config["partition-id"]  # assigned at runtime
     num_partitions = context.node_config["num-partitions"]
-    
+
     # Load flower datasets for clients
     trainloader, valloader = load_flwr_datasets(
         partition_id=partition_id,
@@ -50,13 +51,15 @@ def get_client_app(
         local_epochs=4,
         model_editing=False,
         mask_type='global',
-        sparsity=0.2
+        sparsity=0.2,
+        is_save_weights_to_state=False,
+        verbose=0,
+        mask=None
 ) -> ClientApp:
     def client_fn(context: Context):
-        
         print(f"[Client] Client on device: {next(model.parameters()).device}")
         if torch.cuda.is_available():
-             print(f"[Client] CUDA available in client: {torch.cuda.is_available()}")
+            print(f"[Client] CUDA available in client: {torch.cuda.is_available()}")
 
         trainloader, valloader = load_data_fn(
             context=context,
