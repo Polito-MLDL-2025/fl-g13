@@ -30,3 +30,29 @@
 - Use same normalization as ImageNet
 - Use same transformations as Dino
 - No fancy params: weight decay, momentum, warm restart, ...
+
+### What to ask to TA on private call
+- In FL, should we start by a checkpoint? Or we start completely from scratch? Stefano approach vs Thanh approach
+- What improvemente do you expect in model editing
+- Too many hyper-parameters
+- Proposals here below
+
+--- [ Standard Proposals ] ---
+
+1. Train clients with its mask local → send params (already masked) to server → server compute FedAvg as normal
+2. Client send its fisher scores to server → server aggregate fisher score and compute the global mask → send to all client for training
+3. Clients send masks to server → server aggregate mask and send back to all clients to keep training. Potential aggregate mask methods:
+	Union
+	Intersection
+	Most common params ( more than k % clients want to update)
+	Personalized mask for each client, based on their drift (lin combination of masks, in which drifts are the weights of such linear combination)
+4. Arbitrary freeze part of the backbone and compare results
+
+--- [ Hardcore Proposals ] ---
+
+1. Learnable masks (meta-learning)
+
+--- [ Other approaches, not really on ME ] ---
+
+1. Completely decentralized FL --> P2P
+2. Scores and masks compressions and quantizations
