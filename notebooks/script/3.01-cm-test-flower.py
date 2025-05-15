@@ -92,15 +92,16 @@ scheduler = CosineAnnealingLR(
 criterion = CrossEntropyLoss()
 
 client_app = get_client_app(
-    partition_type=partition_type, 
-    batch_size=batch_size,
-    num_shards_per_partition=num_shards_per_partition,
-    local_epochs=local_epochs,
     model=model, 
     criterion=criterion, 
     optimizer=optimizer, 
     scheduler=scheduler,
     device=device, 
+    partition_type=partition_type, 
+    batch_size=batch_size,
+    num_shards_per_partition=num_shards_per_partition,
+    local_epochs=local_epochs,
+    model_editing=False,
 )
 server_app = get_server_app(
     checkpoint_dir=CHECKPOINT_DIR,
