@@ -69,6 +69,7 @@ def get_server_app(
     use_wandb=False,
     wandb_config=None,
     strategy_name="custom_fedavg", ##! New introduced to choose between strategies from notebook
+    has_task_scale_fn=False,
 ):
     
     # Load or create model if not found in checkpoint_dir
@@ -145,7 +146,7 @@ def get_server_app(
                 evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
                 use_wandb=use_wandb,
                 wandb_config=wandb_config,
-                scale_fn=simple_scale,
+                scale_fn=simple_scale if has_task_scale_fn else None,
             )
 
         # Prepare server config

@@ -187,8 +187,9 @@ class ClientSideTaskArithmetic(CustomFedAvg):
     and then apply it to the global model to teach it the specific tasks learnt by each client.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, scale_fn, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.scale_fn = scale_fn
         
     def aggregate_fit(
             self,
@@ -202,27 +203,31 @@ class ClientSideTaskArithmetic(CustomFedAvg):
         global_params = get_weights(self.model)
         #global_vector = np.concatenate([gp.flatten() for gp in global_params])
         global_params = [torch.tensor(w, device=dev) for w in global_params]
-        task_vecs, lambdas = [], [] 
 
-        for client, fit_res in results:
-            # one list of ndarrays per client (one ndarray per layer)
-            task_vecs.append(parameters_to_ndarrays(fit_res.parameters))
-            lambdas.append(self.scale_fn(client, fit_res.num_examples, server_round))  # λ_c
+        if self.scale_fn is None:
+            task_vecs, lambdas = [], [] 
 
-        # sum of the task vectors of all clients per each layer
-        merged_task_vectors = [torch.zeros_like(layer_params) for layer_params in global_params]
+            for client, fit_res in results:
+                # one list of ndarrays per client (one ndarray per layer)
+                task_vecs.append(parameters_to_ndarrays(fit_res.parameters))
+                lambdas.append(self.scale_fn(client, fit_res.num_examples, server_round))  # λ_c
 
-        for lam, tau in zip(lambdas, task_vecs):
-            for i, layer_params in enumerate(tau):
-                merged_task_vectors[i] += lam * torch.tensor(layer_params, device=dev)
+            # sum of the task vectors of all clients per each layer
+            merged_task_vectors = [torch.zeros_like(layer_params) for layer_params in global_params]
 
+            for lam, tau in zip(lambdas, task_vecs):
+                for i, layer_params in enumerate(tau):
+                    merged_task_vectors[i] += lam * torch.tensor(layer_params, device=dev)
+        
+        else:
+            merged_task_vectors, _ = super().aggregate_fit(server_round, results, failures)
 
+        # apply merged task vectors to the global model
         aggregated_parameters = [
             global_layer + merged_vectors_layer 
             for global_layer, merged_vectors_layer in zip(global_params, merged_task_vectors) 
         ]
 
-        #aggregated_parameters = ndarrays_to_parameters([aggregated_parameters.cpu().numpy()])
         aggregated_parameters = ndarrays_to_parameters([
             aggregated_parameters_layer.cpu().numpy()
             for aggregated_parameters_layer in aggregated_parameters

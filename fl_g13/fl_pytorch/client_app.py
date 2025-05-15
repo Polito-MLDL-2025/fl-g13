@@ -49,6 +49,8 @@ class FlowerClient(NumPyClient):
         self.is_save_weights_to_state = is_save_weights_to_state
         self.verbose = verbose
         self.mask = None
+        self.sparsity = sparsity
+        self.mask_type = mask_type
         if model_editing:
             self._compute_mask(sparsity=sparsity, mask_type=mask_type)
 
@@ -102,9 +104,23 @@ class FlowerClient(NumPyClient):
         # Apply the state found in context to the model
         self.model.load_state_dict(state_dict, strict=True)
 
+    def _fine_tune_classification_head(self, model):
+        optimizer = torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=8, eta_min=1e-5)
+        criterion = torch.nn.CrossEntropyLoss()
+        print(f"Fine-tuning classification head")
+
     # --- FIT AND EVALUATE --- #
 
     def fit(self, parameters, config):
+
+        first_time = "has_participated" not in self.client_state
+        if first_time and self.model_editing:
+            print(f"First time participating in training")
+            self.client_state["has_participated"] = True
+            self._fine_tune_classification_head(self.model)
+            self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
+
         # Save weights from global models
         flatten_global_weights = np.concatenate([p.flatten() for p in parameters])
 
