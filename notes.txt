@@ -48,6 +48,7 @@
 	Most common params ( more than k % clients want to update)
 	Personalized mask for each client, based on their drift (lin combination of masks, in which drifts are the weights of such linear combination)
 4. Arbitrary freeze part of the backbone and compare results
+5. log-scaled scores (or exp-scaled scores) for mask calibration
 
 --- [ Hardcore Proposals ] ---
 
