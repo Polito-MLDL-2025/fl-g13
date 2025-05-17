@@ -10,6 +10,7 @@ from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
 from fl_g13.fl_pytorch.task import get_weights, set_weights
 from fl_g13.modeling.eval import eval
 from fl_g13.modeling.train import train
+from fl_g13.fl_pytorch.talos_client import TalosClient
 
 
 # *** ---------------- CLIENT CLASS ---------------- *** #
@@ -64,22 +65,6 @@ class FlowerClient(NumPyClient):
         mask_list = mask_dict_to_list(self.model, mask)
         self.mask_list = mask_list
         self.set_mask(mask_list)
-
-    def _compute_task_vector(self, updated_weights, pre_trained_weights):
-        """compute τ = (θ* − θ₀) ⊙ mask"""
-        fine_tuned_weights_tensors = [torch.tensor(w, device=self.device) for w in updated_weights]
-        pre_trained_weights_tensors = [torch.tensor(w, device=self.device) for w in pre_trained_weights]
-        task_vector = [
-            mask_layer * (fine_tuned_layer - pre_trained_layer)
-            for fine_tuned_layer, pre_trained_layer, mask_layer in zip(
-                fine_tuned_weights_tensors, 
-                pre_trained_weights_tensors, 
-                self.mask_list
-            )
-        ]
-        # Convert to type required by Flower
-        fit_params = [layer.cpu().numpy() for layer in task_vector]
-        return fit_params
         
 
     def set_mask(self, mask):
@@ -104,22 +89,9 @@ class FlowerClient(NumPyClient):
         # Apply the state found in context to the model
         self.model.load_state_dict(state_dict, strict=True)
 
-    def _fine_tune_classification_head(self, model):
-        optimizer = torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=8, eta_min=1e-5)
-        criterion = torch.nn.CrossEntropyLoss()
-        print(f"Fine-tuning classification head")
-
     # --- FIT AND EVALUATE --- #
 
     def fit(self, parameters, config):
-
-        first_time = "has_participated" not in self.client_state
-        if first_time and self.model_editing:
-            print(f"First time participating in training")
-            self.client_state["has_participated"] = True
-            self._fine_tune_classification_head(self.model)
-            self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
 
         # Save weights from global models
         flatten_global_weights = np.concatenate([p.flatten() for p in parameters])
@@ -155,11 +127,8 @@ class FlowerClient(NumPyClient):
 
         # Client drift (Euclidean)
         drift = np.linalg.norm(flatten_updated_weights - flatten_global_weights)
-
-        if self.model_editing:
-            fit_params = self._compute_task_vector(updated_weights, parameters)
-        else:
-            fit_params = updated_weights
+        
+        fit_params = updated_weights
 
         results = {
             "train_loss":  all_training_losses[-1],
@@ -246,22 +215,40 @@ def get_client_app(
             train_test_split_ratio=train_test_split_ratio
         )
         client_state = context.state
-        return FlowerClient(
-            client_state=client_state,
-            local_epochs=local_epochs,
-            trainloader=trainloader,
-            valloader=valloader,
-            model=model,
-            criterion=criterion,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            device=device,
-            model_editing=model_editing,
-            mask_type=mask_type,
-            sparsity=sparsity,
-            is_save_weights_to_state=is_save_weights_to_state,
-            verbose=verbose
-        ).to_client()
+
+        if model_editing:
+            return TalosClient(
+                client_state=client_state,
+                local_epochs=local_epochs,
+                trainloader=trainloader,
+                valloader=valloader,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                device=device,
+                mask_type=mask_type,
+                sparsity=sparsity,
+                is_save_weights_to_state=is_save_weights_to_state,
+                verbose=verbose
+            ).to_client()
+        else:
+            return FlowerClient(
+                client_state=client_state,
+                local_epochs=local_epochs,
+                trainloader=trainloader,
+                valloader=valloader,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                device=device,
+                model_editing=model_editing,
+                mask_type=mask_type,
+                sparsity=sparsity,
+                is_save_weights_to_state=is_save_weights_to_state,
+                verbose=verbose
+            ).to_client()
 
     app = ClientApp(client_fn=client_fn)
     return app

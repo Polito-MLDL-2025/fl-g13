@@ -51,7 +51,7 @@ def get_default_model():
 def get_experiment_setting(
         checkpoint_dir: str, 
         model_class: Type[nn.Module] | nn.Module, 
-        learning_rate: float = 0.25, 
+        learning_rate: float = 1e-3, 
         momentum: float = 0.9,
         weight_decay: float = 1e-5,
         model_editing: bool = False,
