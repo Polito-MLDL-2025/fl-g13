@@ -109,9 +109,7 @@ class TalosClient(FlowerClient):
     def fit(self, parameters, config):
 
         first_time = "has_participated" not in self.client_state
-        print(f"first_time: {first_time}")
-        print(f"client_state: {self.client_state}")
-        if first_time and self.model_editing:
+        if first_time:
             print(f"First time participating in training")
             self.client_state["has_participated"] = True
             self._catch_up_classification_head()
