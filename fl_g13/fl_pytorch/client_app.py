@@ -4,6 +4,7 @@ from flwr.common import Context
 from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
 from fl_g13.fl_pytorch.base_client import FlowerClient
 from fl_g13.fl_pytorch.talos_client import TalosClient
+from flwr.common import RecordDict
 
 
 # *** ---------------- CLIENT APP ---------------- *** #
@@ -63,7 +64,7 @@ def get_client_app(
             num_shards_per_partition=num_shards_per_partition,
             train_test_split_ratio=train_test_split_ratio
         )
-        client_state = context.state
+        client_state: RecordDict = context.state
 
         if model_editing:
             return TalosClient(

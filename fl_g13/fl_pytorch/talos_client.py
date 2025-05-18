@@ -5,12 +5,13 @@ from fl_g13.fl_pytorch.model import get_experiment_setting
 import json
 import numpy as np
 from fl_g13.modeling import train
+from flwr.common import RecordDict, ConfigRecord
 
 class TalosClient(FlowerClient):
 
     def __init__(
             self,
-            client_state,
+            client_state: RecordDict,
             local_epochs,
             trainloader,
             valloader,
@@ -108,10 +109,10 @@ class TalosClient(FlowerClient):
     
     def fit(self, parameters, config):
 
-        first_time = "has_participated" not in self.client_state
+        first_time = "has_participated" not in self.client_state["participation"]
         if first_time:
             print(f"First time participating in training")
-            self.client_state["has_participated"] = True
+            self.client_state["participation"] = ConfigRecord({"has_participated": True})
             self._catch_up_classification_head()
             self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
 
