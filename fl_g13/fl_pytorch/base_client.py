@@ -1,13 +1,16 @@
-from fl_g13.fl_pytorch.base_client import FlowerClient
-import torch
-from fl_g13.fl_pytorch.task import get_weights, set_weights
-from fl_g13.fl_pytorch.model import get_experiment_setting
 import json
+
 import numpy as np
-from fl_g13.modeling import train
+import torch
+from flwr.client import NumPyClient
+from flwr.common import ArrayRecord
 
-class TalosClient(FlowerClient):
+from fl_g13.editing import create_gradiend_mask, fisher_scores, mask_dict_to_list, compress_mask_sparse
+from fl_g13.fl_pytorch.task import get_weights, set_weights
+from fl_g13.modeling.eval import eval
+from fl_g13.modeling.train import train
 
+class FlowerClient(NumPyClient):
     def __init__(
             self,
             client_state,
@@ -44,76 +47,46 @@ class TalosClient(FlowerClient):
         self.mask = None
         self.sparsity = sparsity
         self.mask_type = mask_type
+        if model_editing:
+            self._compute_mask(sparsity=sparsity, mask_type=mask_type)
 
         self.model.to(self.device)
 
-    def _compute_task_vector(self, updated_weights, pre_trained_weights):
-        """compute τ = (θ* − θ₀) ⊙ mask"""
-        fine_tuned_weights_tensors = [torch.tensor(w, device=self.device) for w in updated_weights]
-        pre_trained_weights_tensors = [torch.tensor(w, device=self.device) for w in pre_trained_weights]
-        task_vector = [
-            mask_layer * (fine_tuned_layer - pre_trained_layer)
-            for fine_tuned_layer, pre_trained_layer, mask_layer in zip(
-                fine_tuned_weights_tensors, 
-                pre_trained_weights_tensors, 
-                self.mask_list
-            )
-        ]
-        # Convert to type required by Flower
-        fit_params = [layer.cpu().numpy() for layer in task_vector]
-        return fit_params
-    
-    def _catch_up_classification_head(self):
-        print(f"Fine-tuning classification head")
-        lw_dino_config = {
-            "dropout_rate": 0.0,
-            "head_hidden_size": 512,
-            "head_layers": 3,
-            "unfreeze_blocks": 0,
-        }
-        (
-            model, 
-            optimizer, 
-            criterion, 
-            device, 
-            scheduler,
-        ) = get_experiment_setting(
-            model_editing=False, 
-            model_config=lw_dino_config,
-        )
+    # --- MASKING --- #
 
-        accuracy = 0
-        epoch = 0
-        while accuracy < 0.6 and epoch < 16:
-            _, _, accuracy, _ = train(
-                checkpoint_dir=None,
-                name=None,
-                start_epoch=1,
-                num_epochs=1,
-                save_every=None,
-                backup_every=None,
-                train_dataloader=self.trainloader,
-                val_dataloader=None,
-                model=model,
-                criterion=criterion,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                eval_every=None,
-                verbose=self.verbose
-            )
-            epoch += 1
+    def _compute_mask(self, sparsity, mask_type):
+        scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
+        mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
+        mask_list = mask_dict_to_list(self.model, mask)
+        self.mask_list = mask_list
+        self.set_mask(mask_list)
         
-        fine_tuned_head_params = get_weights(model)
-        set_weights(self.model, fine_tuned_head_params)
-    
-    def fit(self, parameters, config):
 
-        first_time = "has_participated" not in self.client_state
-        if first_time and self.model_editing:
-            print(f"First time participating in training")
-            self.client_state["has_participated"] = True
-            self._catch_up_classification_head()
-            self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
+    def set_mask(self, mask):
+        if not hasattr(self.optimizer, "set_mask"):
+            raise Exception("The optimizer should have a set_mask method")
+        self.optimizer.set_mask(mask)
+        self.mask = compress_mask_sparse(mask)
+
+    # --- SAVE AND LOAD WEIGHTS TO STATE --- #
+
+    def _save_weights_to_state(self):
+        # Convert model state dictionary to ArrayDict
+        arr_record = ArrayRecord(self.model.state_dict())
+
+        # Add the state to the context (replace if already exists)
+        self.client_state["full_model_state"] = arr_record
+
+    def _load_weights_from_state(self):
+        # Extract state from context
+        state_dict = self.client_state["full_model_state"].to_torch_state_dict()
+
+        # Apply the state found in context to the model
+        self.model.load_state_dict(state_dict, strict=True)
+
+    # --- FIT AND EVALUATE --- #
+
+    def fit(self, parameters, config):
 
         # Save weights from global models
         flatten_global_weights = np.concatenate([p.flatten() for p in parameters])
@@ -149,8 +122,8 @@ class TalosClient(FlowerClient):
 
         # Client drift (Euclidean)
         drift = np.linalg.norm(flatten_updated_weights - flatten_global_weights)
-
-        fit_params = self._compute_task_vector(updated_weights, parameters)
+        
+        fit_params = updated_weights
 
         results = {
             "train_loss":  all_training_losses[-1],
@@ -171,3 +144,9 @@ class TalosClient(FlowerClient):
             results,
             # if you have more complex metrics you have to serialize them with json since Metrics value allow only Scalar
         )
+
+    def evaluate(self, parameters, config):
+        set_weights(self.model, parameters)
+        test_loss, test_accuracy, _ = eval(self.valloader, self.model, self.criterion)
+
+        return test_loss, len(self.valloader.dataset), {"accuracy": test_accuracy}
