@@ -82,11 +82,10 @@ class TalosClient(FlowerClient):
             model_editing=False, 
             model_config=lw_dino_config,
         )
-
         accuracy = 0
         epoch = 0
         while accuracy < 0.6 and epoch < 16:
-            _, _, accuracy, _ = train(
+            _, _, all_training_accuracies, _ = train(
                 checkpoint_dir=None,
                 name=None,
                 start_epoch=1,
@@ -102,6 +101,7 @@ class TalosClient(FlowerClient):
                 eval_every=None,
                 verbose=self.verbose
             )
+            accuracy = all_training_accuracies[-1]
             epoch += 1
         
         fine_tuned_head_params = get_weights(model)
