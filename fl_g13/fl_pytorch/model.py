@@ -49,8 +49,8 @@ def get_default_model():
     return Net()
 
 def get_experiment_setting(
-        checkpoint_dir: str, 
-        model_class: Type[nn.Module] | nn.Module, 
+        checkpoint_dir: str = None, 
+        model_class: Type[nn.Module] | nn.Module = BaseDino, 
         learning_rate: float = 1e-3, 
         momentum: float = 0.9,
         weight_decay: float = 1e-5,
