@@ -204,7 +204,7 @@ class ClientSideTaskArithmetic(CustomFedAvg):
         #global_vector = np.concatenate([gp.flatten() for gp in global_params])
         global_params = [torch.tensor(w, device=dev) for w in global_params]
 
-        if self.scale_fn is None:
+        if self.scale_fn is not None:
             task_vecs, lambdas = [], [] 
 
             for client, fit_res in results:
