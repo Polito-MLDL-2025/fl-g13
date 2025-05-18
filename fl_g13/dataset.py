@@ -6,7 +6,7 @@ from loguru import logger
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit
 import torch
-from torch.utils.data import Subset
+from torch.utils.data import Subset, DataLoader
 from torchvision import datasets, transforms
 import typer
 
@@ -98,6 +98,25 @@ def load_cifar100(data_dir="data/raw", train=True):
     print(f"{'Training' if train else 'Test'} set downloaded to: {data_dir}")
     return dataset
 
+
+def update_dataloader(dataloader, new_batch_size,shuffle=False):
+    return DataLoader(
+        dataset=dataloader.dataset,
+        batch_size=new_batch_size,
+        shuffle=shuffle,
+        sampler=dataloader.sampler,
+        prefetch_factor=dataloader.prefetch_factor,
+        num_workers=dataloader.num_workers,
+        collate_fn=dataloader.collate_fn,
+        pin_memory=dataloader.pin_memory,
+        drop_last=dataloader.drop_last,
+        timeout=dataloader.timeout,
+        worker_init_fn=dataloader.worker_init_fn,
+        multiprocessing_context=dataloader.multiprocessing_context,
+        generator=dataloader.generator,
+        in_order=dataloader.in_order,
+        persistent_workers=dataloader.persistent_workers
+    )
 
 @app.command()
 def main(

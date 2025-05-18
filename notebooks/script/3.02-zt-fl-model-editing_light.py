@@ -160,6 +160,7 @@ model_editing = True
 mask_type = 'global'
 sparsity = 0.2
 mask = None
+model_editing_batch_size = 16
 
 ## simulation run config
 NUM_CLIENTS = 100
@@ -209,8 +210,9 @@ scheduler = CosineAnnealingLR(
 )
 
 
-## unfreeze all blocks
-model.unfreeze_blocks("all")
+## unfreeze blocks
+num_blocks = 3 
+model.unfreeze_blocks(num_blocks)
 
 
 # ## Define the Client, Server Apps

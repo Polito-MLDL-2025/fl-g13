@@ -5,6 +5,7 @@ import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import ArrayRecord, Context, ConfigRecord
 
+from fl_g13.dataset import update_dataloader
 from fl_g13.editing import create_gradiend_mask, fisher_scores, mask_dict_to_list, compress_mask_sparse
 from fl_g13.editing.masking import uncompress_mask_sparse
 from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
@@ -33,6 +34,8 @@ class FlowerClient(NumPyClient):
             is_save_weights_to_state=False,
             verbose=0,
             mask=None,
+            mask_func=None,
+            model_editing_batch_size=16,
     ):
         self.client_state = client_state
         self.local_epochs = local_epochs
@@ -46,6 +49,9 @@ class FlowerClient(NumPyClient):
         self.is_save_weights_to_state = is_save_weights_to_state
         self.verbose = verbose
         self.mask = mask
+        self.model_editing_batch_size =model_editing_batch_size
+        self.mask_type = mask_type
+        self.sparsity = sparsity
         # check model editing condition
         if model_editing:
             # require set_mask method to update mask to optimizer
@@ -53,19 +59,25 @@ class FlowerClient(NumPyClient):
                 raise Exception("Model Editting require optimizer have to implement set_mask method to update mask to itself")
             # if mask is None, the client compute the mask itself by fisher score and save to state
             if not mask:
-                self._load_mask_from_state()
-                if not self.mask:
-                    self._compute_mask(sparsity=sparsity, mask_type=mask_type)
-                    self._save_mask_to_state()
+                if mask_func and callable(mask_func):
+                    ## call mask func to get mask for model editing
+                    mask_func(self)
+                else:
+                    self._load_mask_from_state()
+                    if not self.mask:
+                        self._compute_mask()
+                        self._save_mask_to_state()
+
             else:
                 self.set_mask(mask)
 
         self.model.to(self.device)
     # --- MASKING --- #
 
-    def _compute_mask(self, sparsity, mask_type):
-        scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
-        mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
+    def _compute_mask(self):
+        mask_dataloader = update_dataloader(self.trainloader, self.model_editing_batch_size)
+        scores = fisher_scores(dataloader=mask_dataloader, model=self.model, verbose=1, loss_fn=self.criterion)
+        mask = create_gradiend_mask(class_score=scores, sparsity=self.sparsity, mask_type=self.mask_type)
         mask_list = mask_dict_to_list(self.model, mask)
         self.set_mask(mask_list)
 
@@ -207,7 +219,9 @@ def get_client_app(
         sparsity=0.2,
         is_save_weights_to_state=False,
         verbose=0,
-        mask=None
+        mask=None,
+        mask_func=None,
+        model_editing_batch_size=16
 ) -> ClientApp:
     def client_fn(context: Context):
         print(f"[Client] Client on device: {next(model.parameters()).device}")
@@ -237,7 +251,9 @@ def get_client_app(
             sparsity=sparsity,
             is_save_weights_to_state=is_save_weights_to_state,
             verbose=verbose,
-            mask=mask
+            mask=mask,
+            mask_func=mask_func,
+            model_editing_batch_size=model_editing_batch_size
         ).to_client()
 
     app = ClientApp(client_fn=client_fn)
