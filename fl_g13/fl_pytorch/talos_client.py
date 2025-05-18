@@ -109,10 +109,16 @@ class TalosClient(FlowerClient):
     
     def fit(self, parameters, config):
 
-        first_time = "has_participated" not in self.client_state["participation"]
+        if "participation" not in self.client_state:
+            self.client_state["participation"] = ConfigRecord()
+
+        participation_record = self.client_state["participation"]
+
+        first_time = not participation_record.get("has_participated", False)
+
         if first_time:
             print(f"First time participating in training")
-            self.client_state["participation"] = ConfigRecord({"has_participated": True})
+            participation_record["has_participated"] = True
             self._catch_up_classification_head()
             self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
 
