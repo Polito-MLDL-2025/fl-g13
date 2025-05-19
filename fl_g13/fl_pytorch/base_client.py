@@ -55,7 +55,7 @@ class FlowerClient(NumPyClient):
     # --- MASKING --- #
 
     def _compute_mask(self, sparsity, mask_type):
-        scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
+        scores = fisher_scores(dataloader=self.trainloader, model=self.model, verbose=1, loss_fn=self.criterion)
         mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
         mask_list = mask_dict_to_list(self.model, mask)
         self.mask_list = mask_list
