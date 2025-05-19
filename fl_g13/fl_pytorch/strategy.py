@@ -221,6 +221,8 @@ class ClientSideTaskArithmetic(CustomFedAvg):
         
         else:
             merged_task_vectors, _ = super().aggregate_fit(server_round, results, failures)
+            merged_task_vectors = [torch.tensor(layer_params, device=dev) for layer_params in parameters_to_ndarrays(merged_task_vectors)]
+            
 
         # apply merged task vectors to the global model
         aggregated_parameters = [
@@ -245,12 +247,12 @@ class ClientSideTaskArithmetic(CustomFedAvg):
             aggregated_ndarrays: list[np.ndarray] = parameters_to_ndarrays(
                 aggregated_parameters
             )
-            if self.checkpoint and self.save_every and epoch % self.save_every == 0:
+            if self.checkpoint_dir and self.save_every and epoch % self.save_every == 0:
                 print(f"Saving centralized model epoch {epoch} aggregated_parameters...")
 
                 set_weights(self.model, aggregated_ndarrays)
                 save(
-                    checkpoint_dir=self.checkpoint,
+                    checkpoint_dir=self.checkpoint_dir,
                     model=self.model,
                     prefix="FL",
                     epoch=epoch,
