@@ -49,6 +49,10 @@ class TalosClient(FlowerClient):
 
         self.model.to(self.device)
 
+        #print(f"First time participating in training")
+        #self._catch_up_classification_head()
+        #self._compute_mask(sparsity=sparsity, mask_type=mask_type)
+
     def _compute_task_vector(self, updated_weights, pre_trained_weights):
         """compute τ = (θ* − θ₀) ⊙ mask"""
         fine_tuned_weights_tensors = [torch.tensor(w, device=self.device) for w in updated_weights]
@@ -110,17 +114,17 @@ class TalosClient(FlowerClient):
     
     def fit(self, parameters, config):
 
-        # if "participation" not in self.client_state:
-        #     self.client_state["participation"] = ConfigRecord()
+        if "participation" not in self.client_state:
+            self.client_state["participation"] = ConfigRecord()
 
-        # participation_record = self.client_state["participation"]
+        participation_record = self.client_state["participation"]
 
-        # first_time = not participation_record.get("has_participated", False)
+        first_time = not participation_record.get("has_participated", False)
 
-        if self.first_time:
+        if first_time:
             print(f"First time participating in training")
-            #participation_record["has_participated"] = True
-            self.first_time = False
+            participation_record["has_participated"] = True
+            #self.first_time = False
             self._catch_up_classification_head()
             self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
 
