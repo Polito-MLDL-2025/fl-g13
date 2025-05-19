@@ -60,7 +60,7 @@ class FlowerClient(NumPyClient):
         mask_list = mask_dict_to_list(self.model, mask)
         #self.mask_list = mask_list
         self.set_mask(mask_list)
-        self.client_state.config_records["mask"] = ConfigRecord({"mask_list": mask_list})
+        self.client_state.config_records["mask"] = ConfigRecord({"mask_list": self.mask})
         
 
     def set_mask(self, mask):
