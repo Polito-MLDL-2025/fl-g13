@@ -45,6 +45,7 @@ class TalosClient(FlowerClient):
         self.mask = None
         self.sparsity = sparsity
         self.mask_type = mask_type
+        self.first_time = True
 
         self.model.to(self.device)
 
@@ -109,16 +110,17 @@ class TalosClient(FlowerClient):
     
     def fit(self, parameters, config):
 
-        if "participation" not in self.client_state:
-            self.client_state["participation"] = ConfigRecord()
+        # if "participation" not in self.client_state:
+        #     self.client_state["participation"] = ConfigRecord()
 
-        participation_record = self.client_state["participation"]
+        # participation_record = self.client_state["participation"]
 
-        first_time = not participation_record.get("has_participated", False)
+        # first_time = not participation_record.get("has_participated", False)
 
-        if first_time:
+        if self.first_time:
             print(f"First time participating in training")
-            participation_record["has_participated"] = True
+            #participation_record["has_participated"] = True
+            self.first_time = False
             self._catch_up_classification_head()
             self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
 
