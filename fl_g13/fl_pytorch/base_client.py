@@ -61,7 +61,7 @@ class FlowerClient(NumPyClient):
         #self.mask_list = mask_list
         self.set_mask(mask_list)
         #self.client_state.config_records["mask"] = ConfigRecord({"mask_list": self.mask})
-        self.client_state.array_records["mask"] = ArrayRecord(mask_list)
+        self.client_state.array_records["mask"] = ArrayRecord([mask.cpu().numpy() for mask in mask_list])
         
 
     def set_mask(self, mask):

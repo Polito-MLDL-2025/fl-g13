@@ -61,6 +61,7 @@ class TalosClient(FlowerClient):
         #compressed_mask_list = self.client_state.config_records['mask']['mask_list']
         #mask_list = uncompress_mask_sparse(compressed_mask_list, device=self.device)
         mask_list = self.client_state.array_records['mask']
+        mask_list = [torch.tensor(mask, device=self.device) for mask in mask_list]
         task_vector = [
             mask_layer * (fine_tuned_layer - pre_trained_layer)
             for fine_tuned_layer, pre_trained_layer, mask_layer in zip(
@@ -135,6 +136,7 @@ class TalosClient(FlowerClient):
             #compressed_mask_list = self.client_state.config_records['mask']['mask_list']
             #mask_list = uncompress_mask_sparse(compressed_mask_list, device=self.device)
             mask_list = self.client_state.array_records['mask']
+            mask_list = [torch.tensor(mask, device=self.device) for mask in mask_list]
             self.set_mask(mask_list)
 
         # Save weights from global models
