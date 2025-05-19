@@ -60,7 +60,7 @@ class TalosClient(FlowerClient):
         pre_trained_weights_tensors = [torch.tensor(w, device=self.device) for w in pre_trained_weights]
         #compressed_mask_list = self.client_state.config_records['mask']['mask_list']
         #mask_list = uncompress_mask_sparse(compressed_mask_list, device=self.device)
-        mask_list = self.client_state.array_records['mask']
+        mask_list = self.client_state.array_records['mask'].to_numpy_ndarrays()
         mask_list = [torch.tensor(mask, device=self.device) for mask in mask_list]
         task_vector = [
             mask_layer * (fine_tuned_layer - pre_trained_layer)
@@ -135,7 +135,7 @@ class TalosClient(FlowerClient):
         else:
             #compressed_mask_list = self.client_state.config_records['mask']['mask_list']
             #mask_list = uncompress_mask_sparse(compressed_mask_list, device=self.device)
-            mask_list = self.client_state.array_records['mask']
+            mask_list = self.client_state.array_records['mask'].to_numpy_ndarrays()
             mask_list = [torch.tensor(mask, device=self.device) for mask in mask_list]
             self.set_mask(mask_list)
 
