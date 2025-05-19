@@ -57,12 +57,13 @@ class TalosClient(FlowerClient):
         """compute τ = (θ* − θ₀) ⊙ mask"""
         fine_tuned_weights_tensors = [torch.tensor(w, device=self.device) for w in updated_weights]
         pre_trained_weights_tensors = [torch.tensor(w, device=self.device) for w in pre_trained_weights]
+        mask_list = self.client_state.config_records['mask']
         task_vector = [
             mask_layer * (fine_tuned_layer - pre_trained_layer)
             for fine_tuned_layer, pre_trained_layer, mask_layer in zip(
                 fine_tuned_weights_tensors, 
                 pre_trained_weights_tensors, 
-                self.mask_list
+                mask_list
             )
         ]
         # Convert to type required by Flower
@@ -127,6 +128,9 @@ class TalosClient(FlowerClient):
             #self.first_time = False
             self._catch_up_classification_head()
             self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
+        else:
+            mask_list = self.client_state.config_records['mask']
+            self.set_mask(mask_list)
 
         # Save weights from global models
         flatten_global_weights = np.concatenate([p.flatten() for p in parameters])

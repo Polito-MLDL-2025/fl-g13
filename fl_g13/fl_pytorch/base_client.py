@@ -3,7 +3,7 @@ import json
 import numpy as np
 import torch
 from flwr.client import NumPyClient
-from flwr.common import ArrayRecord
+from flwr.common import ArrayRecord, RecordDict
 
 from fl_g13.editing import create_gradiend_mask, fisher_scores, mask_dict_to_list, compress_mask_sparse
 from fl_g13.fl_pytorch.task import get_weights, set_weights
@@ -13,7 +13,7 @@ from fl_g13.modeling.train import train
 class FlowerClient(NumPyClient):
     def __init__(
             self,
-            client_state,
+            client_state: RecordDict,
             local_epochs,
             trainloader,
             valloader,
@@ -58,8 +58,9 @@ class FlowerClient(NumPyClient):
         scores = fisher_scores(dataloader=self.trainloader, model=self.model, verbose=1, loss_fn=self.criterion)
         mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
         mask_list = mask_dict_to_list(self.model, mask)
-        self.mask_list = mask_list
+        #self.mask_list = mask_list
         self.set_mask(mask_list)
+        self.client_state.config_records["mask"] = mask_list
         
 
     def set_mask(self, mask):
