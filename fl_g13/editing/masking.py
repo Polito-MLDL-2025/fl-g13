@@ -7,10 +7,10 @@ import torch
 
 from .fisher import masked_fisher_score
 
-def _local_mask(class_score: Dict[str, torch.Tensor], density: float = 0.2) -> Dict[str, torch.Tensor]:
+def _local_mask(score: Dict[str, torch.Tensor], density: float = 0.2) -> Dict[str, torch.Tensor]:
     gradient_mask = {}
 
-    for name, scores in class_score.items():
+    for name, scores in score.items():
         scores_flat = scores.view(-1)
         total_elements_layer = scores_flat.numel()
 
@@ -43,14 +43,14 @@ def _local_mask(class_score: Dict[str, torch.Tensor], density: float = 0.2) -> D
 
     return gradient_mask
 
-def _global_mask(class_score: Dict[str, torch.Tensor], density: float = 0.2) -> Dict[str, torch.Tensor]:
+def _global_mask(score: Dict[str, torch.Tensor], density: float = 0.2) -> Dict[str, torch.Tensor]:
     gradient_mask = {}
     param_info = [] # Stores (name, shape, start_flat_idx) to reshape later
 
     # Flatten scores and store info for reshaping
     all_scores_flat_list = []
     current_flat_idx = 0
-    for name, scores in class_score.items():
+    for name, scores in score.items():
         shape = scores.shape
         num_elements = scores.numel()
         param_info.append((name, shape, current_flat_idx))
@@ -96,18 +96,11 @@ def _global_mask(class_score: Dict[str, torch.Tensor], density: float = 0.2) -> 
 
     return gradient_mask
 
-
-def create_gradiend_mask(class_score, density = 0.2, mask_type = 'local'):
-    """
-    class_score: dict of {param_name: tensor}
-    sparsity: fraction of parameters to keep editable (lowest scores values)
-
-    Returns: dict {param_name: binary_mask_tensor}
-    """
+def _create_gradiend_mask(score: Dict[str, torch.Tensor], density: float = 0.2, mask_type: str = 'local') -> Dict[str, torch.Tensor]:
     if mask_type == 'local':
-        gradient_mask = _local_mask(class_score, density)
+        gradient_mask = _local_mask(score, density)
     elif mask_type == 'global':
-        gradient_mask = _global_mask(class_score, density)
+        gradient_mask = _global_mask(score, density)
     else:
         raise ValueError(f'Invalid mask type: {mask_type}, expected "local" or "global".')
 
@@ -156,24 +149,58 @@ def uncompress_mask_sparse(mask_bytes, device=None):
         uncompressed.append(mask)
     return uncompressed
 
-def create_calibrated_mask(dataloader, model, sparsity = 0.8, mask_type = 'local', rounds = 5):
-    # Initialize mask (full 1)
-    mask = {name: torch.ones_like(param.data, device = param.device) for name, param in model.named_parameters()}
-    # Invert sparsity. Compute which parameters needs to be set to 0
-    density = 1 - sparsity
+def create_mask(
+    dataloader: torch.utils.data.DataLoader,
+    model: torch.nn.Module,
+    sparsity: float | None = None,
+    density: float | None = None,
+    mask_type: str = 'local',
+    rounds: int = 1
+) -> Dict[str, torch.Tensor]:
+    # --- Parameter Validation ---
+    if sparsity is not None and density is not None:
+        raise ValueError("Only one of 'sparsity' or 'density' should be provided.")
+    if sparsity is None and density is None:
+        raise ValueError("Either 'sparsity' or 'density' must be provided.")
     
-    print(f'Computing calibrated mask for {rounds} rounds.')
-    for r in range(rounds):
-        print(f'Round {r + 1}.')
-        # Target density
-        d = density**((r + 1)/rounds)
-        print(f'\tTarget density {d:.2f}')
+    if sparsity is not None:
+        if not (0.0 <= sparsity <= 1.0):
+            raise ValueError(f"Sparsity value out of range, {sparsity} was given. Expected value between 0.0 and 1.0")
+        target_density = 1 - sparsity
+        print_param_info = f"sparsity ({sparsity:.4f})"
+    else: # density is not None
+        if not (0.0 <= density <= 1.0):
+            raise ValueError(f"Density value out of range, {density} was given. Expected value between 0.0 and 1.0")
+        target_density = density
+        print_param_info = f"density ({density:.4f})"
         
-        # Compute score
+    if mask_type not in ['local', 'global']:
+        raise ValueError(f'Invalid mask type: {mask_type}, expected "local" or "global"')
+    if rounds < 1:
+        raise ValueError(f"Rounds must be a positive integer, {rounds} was given")
+    
+    # --- Initialization ---
+    # Initialize mask to all ones
+    mask = {name: torch.ones_like(param.data, device = param.device) for name, param in model.named_parameters()}
+    
+    # --- Calibration Rounds ---
+    if rounds == 1:
+        print(f'Computing simple {mask_type} mask with target {print_param_info}.')
+    else:
+        print(f'Computing calibrated {mask_type} mask for {rounds} rounds with initial target {print_param_info}.')
+        
+    for r in range(rounds):
+        print(f'Round {r + 1}/{rounds}.')
+        
+        # --- Round Density ---
+        current_round_density = target_density**((r + 1)/rounds)
+        print(f'\tTarget density {(100*current_round_density):.2f}%')
+        
+        # --- Compute Score ---
         print(f'\tComputing the masked fisher score')
         score = masked_fisher_score(dataloader, model, current_mask = mask)
         
-        # Update the mask
+        # --- Update Mask ---
         print(f'\tUpdating the mask')
-        mask = create_gradiend_mask(score, sparsity = d, mask_type = mask_type)
+        mask = _create_gradiend_mask(score, density = current_round_density, mask_type = mask_type)
     return mask
