@@ -49,10 +49,12 @@
 	Personalized mask for each client, based on their drift (lin combination of masks, in which drifts are the weights of such linear combination)
 4. Arbitrary freeze part of the backbone and compare results
 5. log-scaled scores (or exp-scaled scores) for mask calibration
+6. Different sparsity level at different epochs
 
 --- [ Hardcore Proposals ] ---
 
 1. Learnable masks (meta-learning)
+	- Learning mu and sigma of a normal random distribution to pick the weights
 
 --- [ Other approaches, not really on ME ] ---
 
