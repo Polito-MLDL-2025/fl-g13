@@ -1,3 +1,7 @@
+# Ignore any Facebook Dino dependency that may appear at root level
+/utils.py
+/vision_transformer.py
+
 # Ignore any 'data' folder
 data/
 
