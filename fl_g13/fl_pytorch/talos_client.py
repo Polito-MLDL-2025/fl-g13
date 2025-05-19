@@ -57,7 +57,7 @@ class TalosClient(FlowerClient):
         """compute τ = (θ* − θ₀) ⊙ mask"""
         fine_tuned_weights_tensors = [torch.tensor(w, device=self.device) for w in updated_weights]
         pre_trained_weights_tensors = [torch.tensor(w, device=self.device) for w in pre_trained_weights]
-        mask_list = self.client_state.config_records['mask']
+        mask_list = self.client_state.config_records['mask']['mask_list']
         task_vector = [
             mask_layer * (fine_tuned_layer - pre_trained_layer)
             for fine_tuned_layer, pre_trained_layer, mask_layer in zip(
@@ -129,7 +129,7 @@ class TalosClient(FlowerClient):
             self._catch_up_classification_head()
             self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
         else:
-            mask_list = self.client_state.config_records['mask']
+            mask_list = self.client_state.config_records['mask']['mask_list']
             self.set_mask(mask_list)
 
         # Save weights from global models
