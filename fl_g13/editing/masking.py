@@ -187,14 +187,14 @@ def create_mask(
     if rounds == 1:
         print(f'Computing simple {mask_type} mask with target {print_param_info}.')
     else:
-        print(f'Computing calibrated {mask_type} mask for {rounds} rounds with initial target {print_param_info}.')
+        print(f'Computing calibrated {mask_type} mask for {rounds} rounds with target {print_param_info}.')
         
     for r in range(rounds):
         print(f'Round {r + 1}/{rounds}.')
         
         # --- Round Density ---
         current_round_density = target_density**((r + 1)/rounds)
-        print(f'\tTarget density {current_round_density:.2f}%')
+        print(f'\tCurrent round density {current_round_density:.2f}%')
         
         # --- Compute Score ---
         print(f'\tComputing the masked fisher score')
