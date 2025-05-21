@@ -122,7 +122,7 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
             if first_time:
                 print(f"First time participating in training")
                 participation_record["has_participated"] = True
-                #self._warm_up_classification_head()
+                self._warm_up_classification_head(params=parameters)
                 self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
                 self._save_mask_to_state()
             else:
