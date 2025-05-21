@@ -27,6 +27,7 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
             is_save_weights_to_state=False,
             verbose=0,
             mask_calibration_round=1,
+            warm_up_rounds=4,
             *args, 
             **kwargs
     ):
@@ -53,11 +54,12 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
         self.sparsity = sparsity
         self.mask_type = mask_type
         self.first_time = True
+        self.warm_up_rounds = warm_up_rounds
 
         self.model.to(self.device)
         
     
-    def _warm_up_classification_head(self):
+    def _warm_up_classification_head(self, params):
         print(f"Fine-tuning classification head")
         warm_up_dino_config = {
             "dropout_rate": 0.0,
@@ -75,6 +77,7 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
             model_editing=False, 
             model_config=warm_up_dino_config,
         )
+        set_weights(model=classification_head, parameters=params)
         accuracy = 0
         epoch = 0
         while accuracy < 0.6 and epoch < 16:
@@ -102,45 +105,52 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
     
     def fit(self, parameters, config):
 
-        if "participation" not in self.client_state:
-            self.client_state["participation"] = ConfigRecord()
+        num_server_round = config.get("server_round", 0)
 
-        participation_record = self.client_state["participation"]
-
-        first_time = not participation_record.get("has_participated", False)
-
-        if first_time:
-            print(f"First time participating in training")
-            participation_record["has_participated"] = True
-            self._warm_up_classification_head()
-            self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
-            self._save_mask_to_state()
+        if num_server_round < self.warm_up_rounds:
+            self._warm_up_classification_head(params=parameters)
+        
         else:
-            self._load_mask_from_state()
+            print("finished warm up")
+            if "participation" not in self.client_state:
+                self.client_state["participation"] = ConfigRecord()
 
-        # Save weights from global models
-        flatten_global_weights = np.concatenate([p.flatten() for p in parameters])
+            participation_record = self.client_state["participation"]
 
-        # Apply weights from global models (the whole local model weights are replaced)
-        set_weights(self.model, parameters)
+            first_time = not participation_record.get("has_participated", False)
 
-        # Train using the new weights
-        all_training_losses, _, all_training_accuracies, _ = train(
-            checkpoint_dir=None,
-            name=None,
-            start_epoch=1,
-            num_epochs=self.local_epochs,
-            save_every=None,
-            backup_every=None,
-            train_dataloader=self.trainloader,
-            val_dataloader=None,
-            model=self.model,
-            criterion=self.criterion,
-            optimizer=self.optimizer,
-            scheduler=self.scheduler,
-            eval_every=None,
-            verbose=self.verbose
-        )
+            if first_time:
+                print(f"First time participating in training")
+                participation_record["has_participated"] = True
+                #self._warm_up_classification_head()
+                self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
+                self._save_mask_to_state()
+            else:
+                self._load_mask_from_state()
+
+            # Save weights from global models
+            flatten_global_weights = np.concatenate([p.flatten() for p in parameters])
+
+            # Apply weights from global models (the whole local model weights are replaced)
+            set_weights(self.model, parameters)
+
+            # Train using the new weights
+            all_training_losses, _, all_training_accuracies, _ = train(
+                checkpoint_dir=None,
+                name=None,
+                start_epoch=1,
+                num_epochs=self.local_epochs,
+                save_every=None,
+                backup_every=None,
+                train_dataloader=self.trainloader,
+                val_dataloader=None,
+                model=self.model,
+                criterion=self.criterion,
+                optimizer=self.optimizer,
+                scheduler=self.scheduler,
+                eval_every=None,
+                verbose=self.verbose
+            )
 
         # fine tuned weights
         updated_weights = get_weights(self.model)

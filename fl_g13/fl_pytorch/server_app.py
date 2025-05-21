@@ -41,9 +41,11 @@ def evaluate_metrics_aggregation_fn(metrics):
 
     return {"decentralized_avg_eval_accuracy": sum(accuracies) / total}
 
-def simple_scale(client, n_examples, rnd):
-    #return 1.0 / n_examples**0.5       # or fixed =1, or metrics based
-    return 0.1
+def on_fit_config_fn(server_round):
+    config = {
+        "server_round": server_round,
+    }
+    return config
 
 # *** -------- SERVER APP -------- *** #
 
@@ -119,6 +121,7 @@ def get_server_app(
                 evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
                 use_wandb=use_wandb,
                 wandb_config=wandb_config,
+                on_fit_config_fn=on_fit_config_fn,
             )
         elif strategy == 'fully_centralized':
             print("Using strategy 'CentralizedMaskedFedAvg'")
