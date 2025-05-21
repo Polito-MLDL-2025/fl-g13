@@ -128,9 +128,6 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
             else:
                 self._load_mask_from_state()
 
-            # Save weights from global models
-            flatten_global_weights = np.concatenate([p.flatten() for p in parameters])
-
             # Apply weights from global models (the whole local model weights are replaced)
             set_weights(self.model, parameters)
 
@@ -151,6 +148,9 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
                 eval_every=None,
                 verbose=self.verbose
             )
+        
+        # Save weights from global models
+        flatten_global_weights = np.concatenate([p.flatten() for p in parameters])
 
         # fine tuned weights
         updated_weights = get_weights(self.model)
