@@ -1,4 +1,4 @@
-from fl_g13.fl_pytorch.base_client import FlowerClient
+from fl_g13.fl_pytorch.client import CustomNumpyClient
 import torch
 from fl_g13.fl_pytorch.task import get_weights, set_weights
 from fl_g13.fl_pytorch.model import get_experiment_setting
@@ -8,7 +8,7 @@ from fl_g13.modeling import train
 from flwr.common import RecordDict, ConfigRecord
 from fl_g13.editing.masking import uncompress_mask_sparse
 
-class TalosClient(FlowerClient):
+class WarmUpHeadTalosClient(CustomNumpyClient):
 
     def __init__(
             self,
@@ -22,28 +22,34 @@ class TalosClient(FlowerClient):
             scheduler=None,
             device=None,
             model_editing=False,
-            sparsity=0.2,
+            sparsity=0.8,
             mask_type='global',
             is_save_weights_to_state=False,
-            verbose=0
+            verbose=0,
+            mask_calibration_round=1,
+            *args, 
+            **kwargs
     ):
+        super().__init__(
+            client_state=client_state,
+            local_epochs=local_epochs,
+            trainloader=trainloader, 
+            valloader=valloader,
+            model=model,
+            criterion=criterion,
+            optimizer=optimizer, 
+            scheduler=scheduler,
+            device=device,
+            verbose=verbose,
+            mask_calibration_round=mask_calibration_round,
+            *args, 
+            **kwargs
+        )
         self.client_state = client_state
-        self.local_epochs = local_epochs
-        self.trainloader = trainloader
-        self.valloader = valloader
-        self.model = model
-        self.criterion = criterion
-        self.optimizer = optimizer
-        self.local_layer_name = "classification-head"
-        self.last_global_weights = None
-        self.mask = False
         self.mask_list = None
         self.model_editing = model_editing
-        self.scheduler = scheduler
-        self.device = device or torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.is_save_weights_to_state = is_save_weights_to_state
         self.verbose = verbose
-        self.mask = None
         self.sparsity = sparsity
         self.mask_type = mask_type
         self.first_time = True
@@ -51,23 +57,23 @@ class TalosClient(FlowerClient):
         self.model.to(self.device)
         
     
-    def _catch_up_classification_head(self):
+    def _warm_up_classification_head(self):
         print(f"Fine-tuning classification head")
-        lw_dino_config = {
+        warm_up_dino_config = {
             "dropout_rate": 0.0,
             "head_hidden_size": 512,
             "head_layers": 3,
             "unfreeze_blocks": 0,
         }
         (
-            model, 
+            classification_head, 
             optimizer, 
             criterion, 
             device, 
             scheduler,
         ) = get_experiment_setting(
             model_editing=False, 
-            model_config=lw_dino_config,
+            model_config=warm_up_dino_config,
         )
         accuracy = 0
         epoch = 0
@@ -81,7 +87,7 @@ class TalosClient(FlowerClient):
                 backup_every=None,
                 train_dataloader=self.trainloader,
                 val_dataloader=None,
-                model=model,
+                model=classification_head,
                 criterion=criterion,
                 optimizer=optimizer,
                 scheduler=scheduler,
@@ -91,8 +97,8 @@ class TalosClient(FlowerClient):
             accuracy = all_training_accuracies[-1]
             epoch += 1
         
-        fine_tuned_head_params = get_weights(model)
-        set_weights(self.model, fine_tuned_head_params)
+        warm_up_head_params = get_weights(classification_head)
+        set_weights(self.model, warm_up_head_params)
     
     def fit(self, parameters, config):
 
@@ -107,7 +113,7 @@ class TalosClient(FlowerClient):
             print(f"First time participating in training")
             participation_record["has_participated"] = True
             #self.first_time = False
-            self._catch_up_classification_head()
+            self._warm_up_classification_head()
             self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
         else:
             #compressed_mask_list = self.client_state.config_records['mask']['mask_list']
@@ -159,10 +165,6 @@ class TalosClient(FlowerClient):
         if all_training_accuracies and all_training_losses:
             results["training_accuracies"] = json.dumps(all_training_accuracies)
             results["training_losses"] = json.dumps(all_training_losses)
-        # --- Modified: Conditionally include the mask in results ---
-
-        if self.mask is not None:  # Only include 'mask' if it was computed
-            results["mask"] = self.mask
 
         return (
             updated_weights,
