@@ -6,10 +6,11 @@ from torchvision import datasets
 
 from fl_g13.config import RAW_DATA_DIR
 from fl_g13.fl_pytorch.datasets import get_eval_transforms
-from fl_g13.fl_pytorch.strategy import CustomFedAvg
 from fl_g13.fl_pytorch.task import get_weights, set_weights
 from fl_g13.modeling.eval import eval
 from fl_g13.modeling.load import load_or_create
+from fl_g13.fl_pytorch.FullyCentralizedMaskedStrategy import FullyCentralizedMaskedFedAvg
+from fl_g13.fl_pytorch.strategy import CustomFedAvg
 
 # *** -------- UTILITY FUNCTIONS FOR SERVER -------- *** #
 
@@ -50,17 +51,16 @@ def get_server_app(
     checkpoint_dir,
     prefix,
     model_class,
-    model_config=None, ##! New 
+    model_config=None,
     optimizer=None,
     criterion=None,
     scheduler=None,
     device=None,
     save_every=1,
     save_with_model_dir=False,
-    #save_best_model=False, ##! Removed
-    #get_datatest_fn=get_data_set_default, ##! Removed
-    get_evaluate_fn=get_evaluate_fn,
-    num_rounds=200,
+    strategy=None,                   # Strategy at choice, chose among classes defined in the codebase
+    get_evaluate_fn=get_evaluate_fn, # Factory for running centralized evaluation at end of each round
+    num_rounds=200,             # Number of Federated Rounds to run (warmup and mask calibration included)
     fraction_fit=0.1,           # Sample 10% of available clients for training
     fraction_evaluate=0.1,      # Sample 10% of available clients for evaluation
     min_fit_clients=10,         # Never sample less than 10 clients for training
@@ -70,7 +70,7 @@ def get_server_app(
     wandb_config=None,
 ):
     
-    # Load or create model if not found in checkpoint_dir
+    # Load or create model if not found in checkpoint_dir (if found will always load the most recent one)
     model, start_epoch = load_or_create(
         path=f"{checkpoint_dir}/{model_class.__name__}" if save_with_model_dir else checkpoint_dir,
         model_class=model_class,
@@ -80,7 +80,7 @@ def get_server_app(
         device=device,
         verbose=True,
     )
-
+    
     def server_fn(context):
         
         # Debugging prints
@@ -97,29 +97,50 @@ def get_server_app(
         params = ndarrays_to_parameters(get_weights(model))
 
         
-            # Call custom strategy for aggregating data
-        strategy = CustomFedAvg(
-                #run_config=context.run_config, ##! Removed
+        # Call custom strategy for aggregating data
+        nonlocal strategy # Make strategy defined as param accessible under server_fn
+        if strategy == 'standard' or not strategy:
+            print("Using strategy 'CustomFedAvg' (default option)")
+            strategy = CustomFedAvg(
                 checkpoint_dir=checkpoint_dir,
                 prefix=prefix,
                 model=model,
+                initial_parameters=params,
                 start_epoch=start_epoch,
                 save_every=save_every,
                 save_with_model_dir=save_with_model_dir,
-                #save_best_model=save_best_model, ##! Removed
                 fraction_fit=fraction_fit,
                 fraction_evaluate=fraction_evaluate,
                 min_fit_clients=min_fit_clients,
                 min_evaluate_clients=min_evaluate_clients,
                 min_available_clients=min_available_clients,
                 evaluate_fn=evaluate_fn,
-                initial_parameters=params,
-                #on_fit_config_fn=on_fit_config, ##! Removed (on fit config was not used as config was never accessed when needed)
                 fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
                 evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
                 use_wandb=use_wandb,
                 wandb_config=wandb_config,
-        )
+            )
+        elif strategy == 'fully_centralized':
+            print("Using strategy 'CentralizedMaskedFedAvg'")
+            strategy = FullyCentralizedMaskedFedAvg(
+                checkpoint_dir=checkpoint_dir,
+                prefix=prefix,
+                model=model,
+                initial_parameters=params,
+                start_epoch=start_epoch,
+                save_every=save_every,
+                save_with_model_dir=save_with_model_dir,
+                fraction_fit=fraction_fit,
+                fraction_evaluate=fraction_evaluate,
+                min_fit_clients=min_fit_clients,
+                min_evaluate_clients=min_evaluate_clients,
+                min_available_clients=min_available_clients,
+                evaluate_fn=evaluate_fn,
+                fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
+                evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
+                use_wandb=use_wandb,
+                wandb_config=wandb_config,
+            )
 
         # Prepare server config
         rounds = context.run_config.get("num-server-rounds") or num_rounds

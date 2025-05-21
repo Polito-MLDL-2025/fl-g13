@@ -2,7 +2,6 @@
 import os
 import urllib
 
-
 def download_if_not_exists(file_path: str, file_url: str):
     """
     Checks if a file exists at the given path. If it does not, downloads it from the specified URL.
@@ -22,6 +21,20 @@ def download_if_not_exists(file_path: str, file_url: str):
         print(f"'{file_path}' already exists.")
 
 def build_fl_dependencies():
+    """
+    Downloads necessary dependencies for the project if they do not already exist locally.
+    This function ensures that the required files, such as "vision_transformer.py" and "utils.py",
+    are downloaded from their respective URLs and saved locally. If the files already exist,
+    the download is skipped.
+    Dependencies:
+        - "vision_transformer.py": Retrieved from the Facebook Research Dino repository.
+        - "utils.py": Retrieved from the Facebook Research Dino repository.
+    Note:
+        The `download_if_not_exists` function is assumed to handle the downloading process
+        and check for the existence of the files.
+    Raises:
+        Any exceptions raised by `download_if_not_exists` will propagate to the caller.
+    """
     download_if_not_exists(
         "vision_transformer.py",
         "https://raw.githubusercontent.com/facebookresearch/dino/refs/heads/main/vision_transformer.py"

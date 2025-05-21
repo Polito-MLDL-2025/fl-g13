@@ -4,7 +4,11 @@
 
 ### Questions
 
-06/05 Questions for Riccardo
+13/05 Questions for Riccardo and Iurada
+- Warmup the model before doing sparse fine tuning, or experiment yourself
+- Should do few-shots mask calibration
+
+06/05 Questions for Riccardo and Iurada
 - Does it make sense to do a dropout also on frozen layers?
 - Is it ok to overfitt the training if the validation is still increasing?
 - Should we use test in the valudation phase? Or rather split a validation set from the train?
@@ -28,21 +32,29 @@
 - Use same transformations as Dino
 - No fancy params: weight decay, momentum, warm restart, ...
 
-### Notes
-- Cross validation
-	X Try different learning_rates -> done by the scheduler
-	X Try different batch_size -> 64, 128, 256
-	X Try different layer_size -> 1024, 2048
-	X Try different number_of_layers -> 3, 5, 8
-	- Try CosineAnihilatorLR with right number of T steps (can you rather pass eta_min?)
-	- Choose number of epochs
-X Transformations to use:
-	X Normalization
-	X Random Crop
-	X Horizontal Flip (no vert!) 
-	X (Only normalization for Test)
-X Optimizer? SGD
-X Scheduler? CosineAnihilatorWarmRestart
-X Dropout? No
-X Drop paths? No
-X momentum? weight_decay? nesterov? No
+### What to ask to TA on private call
+- In FL, should we start by a checkpoint? Or we start completely from scratch? Stefano approach vs Thanh approach
+- What improvemente do you expect in model editing
+- Too many hyper-parameters
+- Proposals here below
+
+--- [ Standard Proposals ] ---
+
+1. Train clients with its mask local → send params (already masked) to server → server compute FedAvg as normal
+2. Client send its fisher scores to server → server aggregate fisher score and compute the global mask → send to all client for training
+3. Clients send masks to server → server aggregate mask and send back to all clients to keep training. Potential aggregate mask methods:
+	Union
+	Intersection
+	Most common params ( more than k % clients want to update)
+	Personalized mask for each client, based on their drift (lin combination of masks, in which drifts are the weights of such linear combination)
+4. Arbitrary freeze part of the backbone and compare results
+5. log-scaled scores (or exp-scaled scores) for mask calibration
+
+--- [ Hardcore Proposals ] ---
+
+1. Learnable masks (meta-learning)
+
+--- [ Other approaches, not really on ME ] ---
+
+1. Completely decentralized FL --> P2P
+2. Scores and masks compressions and quantizations

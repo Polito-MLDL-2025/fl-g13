@@ -1,13 +1,15 @@
+import numpy as np
 import torch
 from flwr.client import ClientApp
 from flwr.common import Context
+
 from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
-from fl_g13.fl_pytorch.base_client import FlowerClient
+from fl_g13.fl_pytorch.client import CustomNumpyClient
+from fl_g13.fl_pytorch.FullyCentralizedMaskedClient import FullyCentralizedMaskedClient
 from fl_g13.fl_pytorch.talos_client import TalosClient
-from flwr.common import RecordDict
 
 
-# *** ---------------- CLIENT APP ---------------- *** #
+# *** ---------------- UTILITY FUNCTIONS FOR CLIENT ---------------- *** # 
 
 def load_client_dataloaders(
         context: Context,
@@ -33,6 +35,7 @@ def load_client_dataloaders(
     )
     return trainloader, valloader
 
+# *** ---------------- CLIENT APP ---------------- *** # 
 
 def get_client_app(
         model,
@@ -40,8 +43,9 @@ def get_client_app(
         optimizer,
         scheduler,
         device,
+        strategy=None,
         load_data_fn=load_client_dataloaders,
-        batch_size=50,
+        batch_size=64,
         partition_type="iid",
         num_shards_per_partition=2,
         train_test_split_ratio=0.2,
@@ -50,7 +54,8 @@ def get_client_app(
         mask_type='global',
         sparsity=0.2,
         is_save_weights_to_state=False,
-        verbose=0
+        verbose=0,
+        mask=None
 ) -> ClientApp:
     def client_fn(context: Context):
         print(f"[Client] Client on device: {next(model.parameters()).device}")
@@ -64,9 +69,40 @@ def get_client_app(
             num_shards_per_partition=num_shards_per_partition,
             train_test_split_ratio=train_test_split_ratio
         )
-        client_state: RecordDict = context.state
+        client_state = context.state
 
-        if model_editing:
+        nonlocal strategy # Make strategy defined as param accessible under client_fn
+        if strategy == 'standard' or not strategy:
+            return CustomNumpyClient(
+                client_state=client_state,
+                local_epochs=local_epochs,
+                trainloader=trainloader,
+                valloader=valloader,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                device=device,
+                model_editing=model_editing,
+                mask_type=mask_type,
+                sparsity=sparsity
+            ).to_client()
+        elif strategy == 'fully_centralized':
+            return FullyCentralizedMaskedClient(
+                client_state=client_state,
+                local_epochs=local_epochs,
+                trainloader=trainloader,
+                valloader=valloader,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                device=device,
+                model_editing=model_editing,
+                mask_type=mask_type,
+                sparsity=sparsity
+            ).to_client()
+        elif strategy == 'talos':
             return TalosClient(
                 client_state=client_state,
                 local_epochs=local_epochs,
@@ -82,23 +118,6 @@ def get_client_app(
                 is_save_weights_to_state=is_save_weights_to_state,
                 verbose=verbose
             ).to_client()
-        else:
-            return FlowerClient(
-                client_state=client_state,
-                local_epochs=local_epochs,
-                trainloader=trainloader,
-                valloader=valloader,
-                model=model,
-                criterion=criterion,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                device=device,
-                model_editing=model_editing,
-                mask_type=mask_type,
-                sparsity=sparsity,
-                is_save_weights_to_state=is_save_weights_to_state,
-                verbose=verbose
-            ).to_client()
-
+        
     app = ClientApp(client_fn=client_fn)
     return app
