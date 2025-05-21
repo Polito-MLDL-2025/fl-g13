@@ -80,8 +80,10 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
         set_weights(model=classification_head, parameters=params)
         accuracy = 0
         epoch = 0
+        all_training_losses = []
+        all_training_accuracies = []
         while accuracy < 0.6 and epoch < 16:
-            _, _, all_training_accuracies, _ = train(
+            training_losses, _, training_accuracies, _ = train(
                 checkpoint_dir=None,
                 name=None,
                 start_epoch=1,
@@ -97,18 +99,21 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
                 eval_every=None,
                 verbose=self.verbose
             )
-            accuracy = all_training_accuracies[-1]
+            accuracy = training_accuracies[-1]
+            all_training_losses.append(training_losses[-1])
+            all_training_accuracies.append(training_accuracies[-1])
             epoch += 1
         
         warm_up_head_params = get_weights(classification_head)
         set_weights(self.model, warm_up_head_params)
+        return all_training_losses, all_training_accuracies
     
     def fit(self, parameters, config):
 
         num_server_round = config.get("server_round", 0)
 
         if num_server_round < self.warm_up_rounds:
-            self._warm_up_classification_head(params=parameters)
+            all_training_losses, all_training_accuracies = self._warm_up_classification_head(params=parameters)
         
         else:
             print("finished warm up")
