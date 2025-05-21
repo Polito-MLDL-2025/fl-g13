@@ -112,15 +112,11 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
         if first_time:
             print(f"First time participating in training")
             participation_record["has_participated"] = True
-            #self.first_time = False
             self._warm_up_classification_head()
             self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
+            self._save_mask_to_state()
         else:
-            #compressed_mask_list = self.client_state.config_records['mask']['mask_list']
-            #mask_list = uncompress_mask_sparse(compressed_mask_list, device=self.device)
-            mask_list = self.client_state.array_records['mask'].to_numpy_ndarrays()
-            mask_list = [torch.tensor(mask, device=self.device) for mask in mask_list]
-            self.set_mask(mask_list)
+            self._load_mask_from_state()
 
         # Save weights from global models
         flatten_global_weights = np.concatenate([p.flatten() for p in parameters])
