@@ -49,30 +49,7 @@ class TalosClient(FlowerClient):
         self.first_time = True
 
         self.model.to(self.device)
-
-        #print(f"First time participating in training")
-        #self._catch_up_classification_head()
-        #self._compute_mask(sparsity=sparsity, mask_type=mask_type)
-
-    def _compute_task_vector(self, updated_weights, pre_trained_weights):
-        """compute τ = (θ* − θ₀) ⊙ mask"""
-        fine_tuned_weights_tensors = [torch.tensor(w, device=self.device) for w in updated_weights]
-        pre_trained_weights_tensors = [torch.tensor(w, device=self.device) for w in pre_trained_weights]
-        #compressed_mask_list = self.client_state.config_records['mask']['mask_list']
-        #mask_list = uncompress_mask_sparse(compressed_mask_list, device=self.device)
-        mask_list = self.client_state.array_records['mask'].to_numpy_ndarrays()
-        mask_list = [torch.tensor(mask, device=self.device) for mask in mask_list]
-        task_vector = [
-            mask_layer * (fine_tuned_layer - pre_trained_layer)
-            for fine_tuned_layer, pre_trained_layer, mask_layer in zip(
-                fine_tuned_weights_tensors, 
-                pre_trained_weights_tensors, 
-                mask_list
-            )
-        ]
-        # Convert to type required by Flower
-        fit_params = [layer.cpu().numpy() for layer in task_vector]
-        return fit_params
+        
     
     def _catch_up_classification_head(self):
         print(f"Fine-tuning classification head")
@@ -174,8 +151,6 @@ class TalosClient(FlowerClient):
         # Client drift (Euclidean)
         drift = np.linalg.norm(flatten_updated_weights - flatten_global_weights)
 
-        fit_params = self._compute_task_vector(updated_weights, parameters)
-
         results = {
             "train_loss":  all_training_losses[-1],
             "drift": drift.tolist(),
@@ -190,7 +165,7 @@ class TalosClient(FlowerClient):
             results["mask"] = self.mask
 
         return (
-            fit_params,
+            updated_weights,
             len(self.trainloader.dataset),
             results,
             # if you have more complex metrics you have to serialize them with json since Metrics value allow only Scalar

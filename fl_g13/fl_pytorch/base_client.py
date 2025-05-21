@@ -124,8 +124,6 @@ class FlowerClient(NumPyClient):
 
         # Client drift (Euclidean)
         drift = np.linalg.norm(flatten_updated_weights - flatten_global_weights)
-        
-        fit_params = updated_weights
 
         results = {
             "train_loss":  all_training_losses[-1],
@@ -141,7 +139,7 @@ class FlowerClient(NumPyClient):
             results["mask"] = self.mask
 
         return (
-            fit_params,
+            updated_weights,
             len(self.trainloader.dataset),
             results,
             # if you have more complex metrics you have to serialize them with json since Metrics value allow only Scalar
