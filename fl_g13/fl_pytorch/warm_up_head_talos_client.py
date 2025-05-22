@@ -116,7 +116,7 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
         print("mask distribtion")
         mask_list = uncompress_mask_sparse(self.mask)
         mask_list = [mask.to(self.device) for mask in mask_list]
-        for (name, _), mask in zip(self.model.named_modules(), mask_list):
+        for (name, _), mask in zip(self.model.named_parameters(), mask_list):
             percent1 = (mask == 1).float().mean().item() * 100
             print(f"Layer: {name}, Mask percent of 1: {percent1:.2f}%")
                 
