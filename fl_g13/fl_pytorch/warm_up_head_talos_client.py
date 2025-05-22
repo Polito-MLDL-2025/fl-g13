@@ -28,6 +28,8 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
             verbose=0,
             mask_calibration_round=1,
             warm_up_rounds=4,
+            warm_up_max_epochs=16,
+            warm_up_acc_threshold=0.6,
             *args, 
             **kwargs
     ):
@@ -55,6 +57,8 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
         self.mask_type = mask_type
         self.first_time = True
         self.warm_up_rounds = warm_up_rounds
+        self.warm_up_max_epochs = warm_up_max_epochs
+        self.warm_up_acc_threshold = warm_up_acc_threshold
 
         self.model.to(self.device)
         
@@ -82,7 +86,7 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
         epoch = 0
         all_training_losses = []
         all_training_accuracies = []
-        while accuracy < 0.6 and epoch < 16:
+        while accuracy < self.warm_up_acc_threshold and epoch < self.warm_up_max_epochs:
             training_losses, _, training_accuracies, _ = train(
                 checkpoint_dir=None,
                 name=None,
@@ -108,6 +112,15 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
         set_weights(self.model, warm_up_head_params)
         return all_training_losses, all_training_accuracies
     
+    def _print_mask_distribution(self):
+        print("mask distribtion")
+        mask_list = uncompress_mask_sparse(self.mask)
+        mask_list = [mask.to(self.device) for mask in mask_list]
+        for (name, _), mask in zip(self.model.named_modules(), mask_list):
+            percent1 = (mask == 1).float().mean().item() * 100
+            print(f"Layer: {name}, Mask percent of 1: {percent1:.2f}%")
+                
+    
     def fit(self, parameters, config):
 
         num_server_round = config.get("server_round", 0)
@@ -116,7 +129,6 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
             all_training_losses, all_training_accuracies = self._warm_up_classification_head(params=parameters)
         
         else:
-            print("finished warm up")
             if "participation" not in self.client_state:
                 self.client_state["participation"] = ConfigRecord()
 
@@ -125,10 +137,11 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
             first_time = not participation_record.get("has_participated", False)
 
             if first_time:
-                print(f"First time participating in training")
+                print(f"First time participating in sparse training")
                 participation_record["has_participated"] = True
                 self._warm_up_classification_head(params=parameters)
                 self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
+                self._print_mask_distribution()
                 self._save_mask_to_state()
             else:
                 self._load_mask_from_state()

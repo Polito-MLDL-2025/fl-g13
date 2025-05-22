@@ -57,7 +57,9 @@ def get_client_app(
         verbose=0,
         mask=None,
         mask_calibration_round=1,
-        warm_up_rounds=4,
+        warm_up_rounds=0,
+        warm_up_max_epochs=16,
+        warm_up_acc_threshold=0.6,
 ) -> ClientApp:
     def client_fn(context: Context):
         print(f"[Client] Client on device: {next(model.parameters()).device}")
@@ -122,6 +124,8 @@ def get_client_app(
                 verbose=verbose,
                 mask_calibration_round=mask_calibration_round,
                 warm_up_rounds=warm_up_rounds,
+                warm_up_max_epochs=warm_up_max_epochs,
+                warm_up_acc_threshold=warm_up_acc_threshold,
             ).to_client()
         
     app = ClientApp(client_fn=client_fn)
