@@ -2,7 +2,7 @@ from collections import defaultdict
 from enum import Enum
 
 import torch
-from fl_g13.editing.masking import create_gradiend_mask
+from fl_g13.editing.masking import _create_gradiend_mask
 from fl_g13.fl_pytorch.strategy import CustomFedAvg
 
 class TrainingPhase(Enum):
@@ -124,7 +124,7 @@ class FullyCentralizedMaskedFedAvg(CustomFedAvg):
                     fisher_scores[name] += score
 
             # Calculate mask based on fisher scores
-            self.mask = create_gradiend_mask(
+            self.mask = _create_gradiend_mask(
                 class_score=fisher_scores,
                 sparsity=self.sparsity,
                 mask_type='global'

@@ -41,6 +41,12 @@ def evaluate_metrics_aggregation_fn(metrics):
 
     return {"decentralized_avg_eval_accuracy": sum(accuracies) / total}
 
+def on_fit_config_fn(server_round):
+    config = {
+        "server_round": server_round,
+    }
+    return config
+
 # *** -------- SERVER APP -------- *** #
 
 def get_server_app(
@@ -91,6 +97,7 @@ def get_server_app(
 
         # Retrive parameters
         params = ndarrays_to_parameters(get_weights(model))
+
         
         # Call custom strategy for aggregating data
         nonlocal strategy # Make strategy defined as param accessible under server_fn
@@ -114,6 +121,7 @@ def get_server_app(
                 evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
                 use_wandb=use_wandb,
                 wandb_config=wandb_config,
+                on_fit_config_fn=on_fit_config_fn,
             )
         elif strategy == 'fully_centralized':
             print("Using strategy 'CentralizedMaskedFedAvg'")

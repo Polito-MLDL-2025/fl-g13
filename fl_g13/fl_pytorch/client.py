@@ -7,7 +7,7 @@ from flwr.common import ArrayRecord, ConfigRecord
 
 from fl_g13.modeling.train import train
 from fl_g13.modeling.eval import eval
-from fl_g13.editing import create_gradiend_mask, fisher_scores, mask_dict_to_list, compress_mask_sparse, uncompress_mask_sparse
+from fl_g13.editing import create_mask, fisher_scores, mask_dict_to_list, compress_mask_sparse, uncompress_mask_sparse
 
 from fl_g13.fl_pytorch.task import get_weights, set_weights
 from fl_g13.modeling.eval import eval
@@ -30,11 +30,12 @@ class CustomNumpyClient(NumPyClient):
             scheduler=None,
             device=None,
             model_editing=False,
-            sparsity=0.2,
+            sparsity=0.8,
             mask_type='global',
             is_save_weights_to_state=False,
             verbose=0,
             mask=None,
+            mask_calibration_round=1
     ):
         self.client_state = client_state
         self.local_epochs = local_epochs
@@ -48,6 +49,7 @@ class CustomNumpyClient(NumPyClient):
         self.is_save_weights_to_state = is_save_weights_to_state
         self.verbose = verbose
         self.mask = mask
+        self.mask_calibration_round = mask_calibration_round
 
         # Check model editing condition
         if model_editing:
@@ -69,8 +71,13 @@ class CustomNumpyClient(NumPyClient):
     # --- MASKING --- #
 
     def _compute_mask(self, sparsity, mask_type):
-        scores = fisher_scores(dataloader=self.valloader, model=self.model, verbose=1, loss_fn=self.criterion)
-        mask = create_gradiend_mask(class_score=scores, sparsity=sparsity, mask_type=mask_type)
+        mask = create_mask(
+            model=self.model,
+            dataloader=self.trainloader, 
+            sparsity=sparsity, 
+            mask_type=mask_type, 
+            rounds=self.mask_calibration_round
+        )
         mask_list = mask_dict_to_list(self.model, mask)
         self.set_mask(mask_list)
 
@@ -109,8 +116,6 @@ class CustomNumpyClient(NumPyClient):
     # --- FIT AND EVALUATE --- #
 
     def fit(self, parameters, config):
-        # Save weights from global models
-        flatten_global_weights = np.concatenate([p.flatten() for p in parameters])
 
         # Apply weights from global models (the whole local model weights are replaced)
         set_weights(self.model, parameters)
@@ -134,18 +139,13 @@ class CustomNumpyClient(NumPyClient):
         )
 
         updated_weights = get_weights(self.model)
-        flatten_updated_weights = np.concatenate([w.flatten() for w in updated_weights])
 
         # Save mdoel to context's state to use in a future fit() call
         if self.is_save_weights_to_state:
             self._save_weights_to_state()
 
-        # Client drift (Euclidean)
-        drift = np.linalg.norm(flatten_updated_weights - flatten_global_weights)
-
         results = {
             "train_loss":  all_training_losses[-1],
-            "drift": drift.tolist(),
         }
 
         if all_training_accuracies and all_training_losses:

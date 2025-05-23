@@ -1,8 +1,10 @@
 from typing import Type
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import Tensor, optim, device, cuda, nn
+from torch import Tensor, optim, device, cuda, nn, ones_like
 from fl_g13.modeling.load import load_or_create, get_model
+from fl_g13.editing import SparseSGDM
+from fl_g13.architectures import BaseDino
 
 
 class Net(nn.Module):
@@ -47,16 +49,29 @@ def get_default_model():
     return Net()
 
 def get_experiment_setting(
-        checkpoint_dir: str, 
-        model_class: Type[nn.Module] | nn.Module, 
-        learning_rate: float = 0.25, 
-        momentum: float = 0.9
+        checkpoint_dir: str = "", 
+        model_class: Type[nn.Module] | nn.Module = BaseDino, 
+        learning_rate: float = 1e-3, 
+        momentum: float = 0.9,
+        weight_decay: float = 1e-5,
+        model_editing: bool = False,
+        model_config: dict = None,
+        save_with_model_dir: bool = False,
     ):
     """Get the experiment setting."""
-    model = get_model(model_class)
-    optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
-    criterion = nn.CrossEntropyLoss()
     dev = device("cuda:0" if cuda.is_available() else "cpu")
-    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=8, T_mult=2, eta_min=0.001)
-    #model, _ = load_or_create(checkpoint_dir, model_class, dev, optimizer, scheduler)
+    model, start_epoch = load_or_create(
+        path=f"{checkpoint_dir}/{model_class.__name__}" if save_with_model_dir else checkpoint_dir,
+        model_class=model_class,
+        model_config=model_config,
+        device=dev,
+        verbose=True,
+    )
+    if model_editing:
+        mask = [ones_like(p, device = p.device) for p in model.parameters()] # Must be done AFTER the model is moved to the device
+        optimizer = SparseSGDM(model.parameters(), mask=mask, lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+    else:
+        optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+    criterion = nn.CrossEntropyLoss()
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=8, eta_min=1e-5)
     return model, optimizer, criterion, dev, scheduler
