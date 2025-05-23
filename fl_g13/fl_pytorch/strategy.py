@@ -65,15 +65,20 @@ class CustomFedAvg(FedAvg):
         total_accuracy = 0.0
         total_loss = 0.0
         total_examples = 0
+        drift = 0.0
         for _, fit_res in results:
             num_examples = fit_res.num_examples
             client_metrics = fit_res.metrics
+            global_params = np.concatenate([p.flatten() for p in get_weights(self.model)])
+            client_params = np.concatenate([p.flatten() for p in parameters_to_ndarrays(fit_res.parameters)])
+            drift += np.linalg.norm(client_params - global_params)
             total_accuracy += json.loads(client_metrics["training_accuracies"])[-1] * num_examples
             total_loss += json.loads(client_metrics["training_losses"])[-1] * num_examples
             total_examples += num_examples
 
         avg_accuracy = total_accuracy / total_examples if total_examples > 0 else None
         avg_loss = total_loss / total_examples if total_examples > 0 else None
+        avg_drift = drift / total_examples if total_examples > 0 else None
 
         self.wandb_log(
             server_round=server_round,
@@ -93,13 +98,11 @@ class CustomFedAvg(FedAvg):
         flat_params = np.concatenate([arr.flatten() for arr in param_arrays])
         global_l2_norm = np.linalg.norm(flat_params)
 
-        # Compute and log drift if available
-        if "avg_drift" in aggregated_metrics:
-            avg_drift = aggregated_metrics["avg_drift"]
-            relative_drift = avg_drift / (global_l2_norm + 1e-8)
-            # logger.info(f"[Round {server_round}] Avg Drift: {avg_drift:.4f} | Relative Drift: {relative_drift:.4f}")
-            logger.log(INFO,
-                       f"[Round {server_round}] Avg Drift: {avg_drift:.4f} | Relative Drift: {relative_drift:.4f}")
+        
+        relative_drift = avg_drift / (global_l2_norm + 1e-8)
+        # logger.info(f"[Round {server_round}] Avg Drift: {avg_drift:.4f} | Relative Drift: {relative_drift:.4f}")
+        logger.log(INFO,
+                    f"[Round {server_round}] Avg Drift: {avg_drift:.4f} | Relative Drift: {relative_drift:.4f}")
 
         # Optionally save model checkpoint
         epoch = self.start_epoch + server_round - 1

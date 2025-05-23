@@ -116,8 +116,6 @@ class CustomNumpyClient(NumPyClient):
     # --- FIT AND EVALUATE --- #
 
     def fit(self, parameters, config):
-        # Save weights from global models
-        flatten_global_weights = np.concatenate([p.flatten() for p in parameters])
 
         # Apply weights from global models (the whole local model weights are replaced)
         set_weights(self.model, parameters)
@@ -141,18 +139,13 @@ class CustomNumpyClient(NumPyClient):
         )
 
         updated_weights = get_weights(self.model)
-        flatten_updated_weights = np.concatenate([w.flatten() for w in updated_weights])
 
         # Save mdoel to context's state to use in a future fit() call
         if self.is_save_weights_to_state:
             self._save_weights_to_state()
 
-        # Client drift (Euclidean)
-        drift = np.linalg.norm(flatten_updated_weights - flatten_global_weights)
-
         results = {
             "train_loss":  all_training_losses[-1],
-            "drift": drift.tolist(),
         }
 
         if all_training_accuracies and all_training_losses:

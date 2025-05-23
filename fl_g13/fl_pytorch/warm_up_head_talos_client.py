@@ -141,7 +141,8 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
                 participation_record["has_participated"] = True
                 self._warm_up_classification_head(params=parameters)
                 self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
-                self._print_mask_distribution()
+                if self.verbose == 1:
+                    self._print_mask_distribution()
                 self._save_mask_to_state()
             else:
                 self._load_mask_from_state()

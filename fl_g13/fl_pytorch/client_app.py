@@ -126,6 +126,7 @@ def get_client_app(
                 warm_up_rounds=warm_up_rounds,
                 warm_up_max_epochs=warm_up_max_epochs,
                 warm_up_acc_threshold=warm_up_acc_threshold,
+                verbose=verbose,
             ).to_client()
         
     app = ClientApp(client_fn=client_fn)
