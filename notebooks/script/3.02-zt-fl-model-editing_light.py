@@ -158,7 +158,7 @@ wandb_config = {
 # model editing config
 model_editing = True
 mask_type = 'global'
-sparsity = 0.2
+sparsity = 0.8
 mask = None
 model_editing_batch_size = 16
 

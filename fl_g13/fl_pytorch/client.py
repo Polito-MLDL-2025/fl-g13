@@ -5,6 +5,7 @@ import torch
 from flwr.client import NumPyClient
 from flwr.common import ArrayRecord, ConfigRecord
 
+from fl_g13.dataset import update_dataloader
 from fl_g13.modeling.train import train
 from fl_g13.modeling.eval import eval
 from fl_g13.editing import create_mask, fisher_scores, mask_dict_to_list, compress_mask_sparse, uncompress_mask_sparse
@@ -35,7 +36,9 @@ class CustomNumpyClient(NumPyClient):
             is_save_weights_to_state=False,
             verbose=0,
             mask=None,
-            mask_calibration_round=1
+            mask_calibration_round=1,
+            model_editing_batch_size=16,
+            mask_func=None,
     ):
         self.client_state = client_state
         self.local_epochs = local_epochs
@@ -50,19 +53,26 @@ class CustomNumpyClient(NumPyClient):
         self.verbose = verbose
         self.mask = mask
         self.mask_calibration_round = mask_calibration_round
+        self.model_editing_batch_size = model_editing_batch_size
+        self.mask_type = mask_type
+        self.sparsity = sparsity
 
         # Check model editing condition
         if model_editing:
             # Require set_mask method to update mask to optimizer
             if not hasattr(self.optimizer, "set_mask"):
                 raise Exception("Model Editting require optimizer have to implement set_mask method to update mask to itself")
-            
+
             # If mask is None, the client compute the mask itself by fisher score and save to state
             if not mask:
-                self._load_mask_from_state()
-                if not self.mask:
-                    self._compute_mask(sparsity=sparsity, mask_type=mask_type)
-                    self._save_mask_to_state()
+                if mask_func and callable(mask_func):
+                    ## call mask func to get mask for model editing
+                    mask_func(self)
+                else:
+                    self._load_mask_from_state()
+                    if not self.mask:
+                        self._compute_mask(sparsity,  mask_type)
+                        self._save_mask_to_state()
             else:
                 self.set_mask(mask)
 
@@ -71,11 +81,12 @@ class CustomNumpyClient(NumPyClient):
     # --- MASKING --- #
 
     def _compute_mask(self, sparsity, mask_type):
+        mask_dataloader = update_dataloader(self.trainloader, self.model_editing_batch_size)
         mask = create_mask(
             model=self.model,
-            dataloader=self.trainloader, 
-            sparsity=sparsity, 
-            mask_type=mask_type, 
+            dataloader=mask_dataloader,
+            sparsity=sparsity,
+            mask_type=mask_type,
             rounds=self.mask_calibration_round
         )
         mask_list = mask_dict_to_list(self.model, mask)
