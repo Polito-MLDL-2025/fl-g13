@@ -1,11 +1,11 @@
-import numpy as np
 import torch
 from flwr.client import ClientApp
 from flwr.common import Context
 
-from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
-from fl_g13.fl_pytorch.client import CustomNumpyClient
 from fl_g13.fl_pytorch.FullyCentralizedMaskedClient import FullyCentralizedMaskedClient
+from fl_g13.fl_pytorch.client import CustomNumpyClient
+from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
+from fl_g13.fl_pytorch.warm_up_head_talos_client import WarmUpHeadTalosClient
 
 
 # *** ---------------- UTILITY FUNCTIONS FOR CLIENT ---------------- *** # 
@@ -34,7 +34,8 @@ def load_client_dataloaders(
     )
     return trainloader, valloader
 
-# *** ---------------- CLIENT APP ---------------- *** # 
+
+# *** ---------------- CLIENT APP ---------------- *** #
 
 def get_client_app(
         model,
@@ -54,7 +55,13 @@ def get_client_app(
         sparsity=0.2,
         is_save_weights_to_state=False,
         verbose=0,
-        mask=None
+        mask=None,
+        mask_calibration_round=1,
+        warm_up_rounds=0,
+        warm_up_max_epochs=16,
+        warm_up_acc_threshold=0.6,
+        model_editing_batch_size=16,
+        mask_func=None,
 ) -> ClientApp:
     def client_fn(context: Context):
         print(f"[Client] Client on device: {next(model.parameters()).device}")
@@ -70,7 +77,7 @@ def get_client_app(
         )
         client_state = context.state
 
-        nonlocal strategy # Make strategy defined as param accessible under client_fn
+        nonlocal strategy  # Make strategy defined as param accessible under client_fn
         if strategy == 'standard' or not strategy:
             return CustomNumpyClient(
                 client_state=client_state,
@@ -84,7 +91,11 @@ def get_client_app(
                 device=device,
                 model_editing=model_editing,
                 mask_type=mask_type,
-                sparsity=sparsity
+                sparsity=sparsity,
+                mask_calibration_round=mask_calibration_round,
+                model_editing_batch_size=model_editing_batch_size,
+                mask_func=mask_func,
+                mask=mask
             ).to_client()
         elif strategy == 'fully_centralized':
             return FullyCentralizedMaskedClient(
@@ -101,6 +112,26 @@ def get_client_app(
                 mask_type=mask_type,
                 sparsity=sparsity
             ).to_client()
-        
+        elif strategy == 'talos':
+            return WarmUpHeadTalosClient(
+                client_state=client_state,
+                local_epochs=local_epochs,
+                trainloader=trainloader,
+                valloader=valloader,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                device=device,
+                mask_type=mask_type,
+                sparsity=sparsity,
+                is_save_weights_to_state=is_save_weights_to_state,
+                verbose=verbose,
+                mask_calibration_round=mask_calibration_round,
+                warm_up_rounds=warm_up_rounds,
+                warm_up_max_epochs=warm_up_max_epochs,
+                warm_up_acc_threshold=warm_up_acc_threshold,
+            ).to_client()
+
     app = ClientApp(client_fn=client_fn)
     return app
