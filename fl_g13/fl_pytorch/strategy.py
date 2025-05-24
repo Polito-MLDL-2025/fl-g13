@@ -100,6 +100,8 @@ class CustomFedAvg(FedAvg):
 
         
         relative_drift = avg_drift / (global_l2_norm + 1e-8)
+        aggregated_metrics["avg_drift"] = avg_drift
+        aggregated_metrics["relative_drift"] = relative_drift
         # logger.info(f"[Round {server_round}] Avg Drift: {avg_drift:.4f} | Relative Drift: {relative_drift:.4f}")
         logger.log(INFO,
                     f"[Round {server_round}] Avg Drift: {avg_drift:.4f} | Relative Drift: {relative_drift:.4f}")

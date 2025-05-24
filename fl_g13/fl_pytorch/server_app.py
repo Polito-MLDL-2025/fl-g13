@@ -31,9 +31,12 @@ def get_evaluate_fn(testloader, model, criterion):
 
 def fit_metrics_aggregation_fn(metrics):
     losses = [n * m["train_loss"] for n, m in metrics]
-    drifts = [n * m["drift"] for n, m in metrics]
+    # drifts = [n * m["drift"] for n, m in metrics] --> remove
     total = sum(n for n, _ in metrics)
-    return {"avg_train_loss": sum(losses) / total, "avg_drift": sum(drifts) / total}
+    return {
+        "avg_train_loss": sum(losses) / total,
+        # "avg_drift": sum(drifts) / total --> remove
+    }
 
 def evaluate_metrics_aggregation_fn(metrics):
     accuracies = [n * m["accuracy"] for n, m in metrics]

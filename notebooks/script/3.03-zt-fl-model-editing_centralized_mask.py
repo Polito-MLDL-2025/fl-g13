@@ -209,8 +209,50 @@ scheduler = CosineAnnealingLR(
 )
 
 
-## unfreeze all blocks
-model.unfreeze_blocks("all")
+# ## Calculate the centralized mask
+
+from fl_g13.editing import fisher_scores
+from fl_g13.fl_pytorch.datasets import load_flwr_datasets, get_transforms
+
+## calculate fisher score of each client with idd sharding
+clients_fisher_scores = []
+train_test_split_ratio = 0.2
+for i in range(NUM_CLIENTS):
+    partition_id = i
+    num_partitions = NUM_CLIENTS
+    client_trainloader, client_valloader = load_flwr_datasets(partition_id=partition_id,
+        partition_type=partition_type,
+        num_partitions=num_partitions,
+        num_shards_per_partition=num_shards_per_partition,
+        batch_size=batch_size,
+        train_test_split_ratio=train_test_split_ratio,
+        transform=get_transforms)
+    scores = fisher_scores(dataloader=client_valloader, model=model, verbose=1, loss_fn=criterion)
+    clients_fisher_scores.append(scores)
+    
+
+
+from collections import defaultdict
+import torch
+
+agg_scores = defaultdict(list)
+
+# Collect all scores for each parameter
+for client_scores in clients_fisher_scores:
+    for name, score in client_scores.items():
+        agg_scores[name].append(score)
+
+# Average scores across clients , this is fisher scores on server size
+avg_fisher_scores = {name: torch.mean(torch.stack(scores), dim=0) for name, scores in agg_scores.items()}
+
+
+from fl_g13.editing import create_gradiend_mask, mask_dict_to_list
+
+# compute the centralized mask
+mask_dict = create_gradiend_mask(class_score=avg_fisher_scores, sparsity=sparsity, mask_type=mask_type)
+mask = mask_dict_to_list(model, mask_dict)
+
+optimizer.set_mask(mask)
 
 
 # ## Define the Client, Server Apps
@@ -273,7 +315,7 @@ backend_config = {"client_resources": {"num_cpus": 1, "num_gpus": 0.0}}
 
 # When running on GPU, assign an entire GPU for each client
 if DEVICE == "cuda":
-    backend_config["client_resources"] = {"num_cpus": 1, "num_gpus": 1}
+    backend_config["client_resources"] = {"num_cpus": 1, "num_gpus": 0.5}
     # Refer to our Flower framework documentation for more details about Flower simulations
     # and how to set up the `backend_config`
 

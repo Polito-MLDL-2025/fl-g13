@@ -116,6 +116,17 @@ class BaseDino(nn.Module):
             f"_do{int(cfg['dropout_rate'] * 100)}_ub{cfg['unfreeze_blocks']}"
         )
 
+    def unfreeze_blocks(self, num_blocks: int|str = 'all'):
+        """Unfreeze the last `num_blocks` transformer blocks and LayerNorm."""
+        if num_blocks == 'all':
+            num_blocks = len(self.backbone.blocks)
+        if num_blocks > 0:
+            for param in self.backbone.blocks[-num_blocks:].parameters():
+                param.requires_grad = True
+
+            # Make LayerNorm fine-tunable
+            for param in self.backbone.norm.parameters():
+                param.requires_grad = True
     @classmethod
     def from_config(cls, config: dict) -> 'BaseDino':
         # Map string activation name back to class
