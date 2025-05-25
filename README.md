@@ -93,11 +93,35 @@ Federated Learning Project, Group 13
     ├── architectures           <- Classes for models architectures
     │   └── BaseDino.py          
     │
-    └── modeling                
-        ├── load.py             <- Code to load models
-        ├── test.py             <- Code to test models     
-        ├── train.py            <- Code to train models
-        └── utils.py            <- Code with utility functions
+    ├── modeling                <- Code for train, test, save and load models
+    │   ├── load.py             
+    │   ├── test.py                  
+    │   ├── train.py            
+    │   └── utils.py            
+    │
+    ├── editing                 <- Code for model editing
+    │   ├── dataloader_utils.py
+    │   ├── fisher.py
+    │   ├── __init__.py
+    │   ├── masking.py
+    │   ├── pruner.py
+    │   ├── sparse-fine-tuning.py
+    │   └── sparseSGDM.py
+    │
+    └── fl_pytorch              <- Code for Flower federated learning apps
+        ├── client_app.py
+        ├── client.py
+        ├── constants.py
+        ├── datasets.py
+        ├── FLOWER.md
+        ├── FullyCentralizedMaskedClient.py
+        ├── FullyCentralizedMaskedStrategy.py
+        ├── model.py
+        ├── server_app.py
+        ├── strategy.py
+        ├── task.py
+        ├── utils.py
+        └── warm_up_head_talos_client.py
 ```
 
 ---
