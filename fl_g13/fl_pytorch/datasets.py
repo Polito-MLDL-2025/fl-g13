@@ -8,18 +8,6 @@ import torchvision.transforms as transforms
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner, ShardPartitioner
 from flwr_datasets.visualization import plot_label_distributions
-import itertools
-
-class LimitedDataLoader:
-    def __init__(self, dataloader, max_iters):
-        self.dl = dataloader
-        self.max_iters = max_iters
-
-    def __iter__(self):
-        return itertools.islice(self.dl, self.max_iters)
-
-    def __len__(self):
-        return min(len(self.dl), self.max_iters)
 
 fds = None # Cache the FederatedDataset
 
