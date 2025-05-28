@@ -3,6 +3,7 @@ from flwr.client import ClientApp
 from flwr.common import Context
 
 from fl_g13.fl_pytorch.FullyCentralizedMaskedClient import FullyCentralizedMaskedClient
+from fl_g13.fl_pytorch.LRUpdateWarmUpHeadTalosClient import LRUpdateWarmUpHeadTalosClient
 from fl_g13.fl_pytorch.client import CustomNumpyClient
 from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
 from fl_g13.fl_pytorch.warm_up_head_talos_client import WarmUpHeadTalosClient
@@ -132,6 +133,27 @@ def get_client_app(
                 warm_up_max_epochs=warm_up_max_epochs,
                 warm_up_acc_threshold=warm_up_acc_threshold,
             ).to_client()
+        elif strategy == 'scheduling-lr':
+            return LRUpdateWarmUpHeadTalosClient(
+                client_state=client_state,
+                local_epochs=local_epochs,
+                trainloader=trainloader,
+                valloader=valloader,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                device=device,
+                mask_type=mask_type,
+                sparsity=sparsity,
+                is_save_weights_to_state=is_save_weights_to_state,
+                verbose=verbose,
+                mask_calibration_round=mask_calibration_round,
+                warm_up_rounds=warm_up_rounds,
+                warm_up_max_epochs=warm_up_max_epochs,
+                warm_up_acc_threshold=warm_up_acc_threshold,
+            ).to_client()
+            
 
     app = ClientApp(client_fn=client_fn)
     return app

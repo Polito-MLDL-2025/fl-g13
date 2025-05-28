@@ -5,3 +5,5 @@ from .strategy import CustomFedAvg
 from .client import CustomNumpyClient
 from .FullyCentralizedMaskedStrategy import FullyCentralizedMaskedFedAvg
 from .FullyCentralizedMaskedClient import FullyCentralizedMaskedClient
+from .LRUpdateFedAvg import LRUpdateFedAvg
+from .LRUpdateWarmUpHeadTalosClient import LRUpdateWarmUpHeadTalosClient
