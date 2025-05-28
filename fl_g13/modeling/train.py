@@ -58,6 +58,7 @@ def train_one_epoch(
     for batch_idx, (X, y) in enumerate(batch_iterator):
 
         # If num_steps is specified, stop training after reaching the limit
+        print(f"Batch {batch_idx + 1}/{total_batches} | Batch size: {X.size(0)}")
         if num_steps is not None and batch_idx > num_steps:
             break
 
