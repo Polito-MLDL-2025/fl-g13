@@ -49,7 +49,8 @@ def get_client_app(
         partition_type="iid",
         num_shards_per_partition=2,
         train_test_split_ratio=0.2,
-        local_epochs=4,
+        local_epochs=1,
+        local_steps=4,
         model_editing=False,
         mask_type='global',
         sparsity=0.2,
@@ -95,7 +96,8 @@ def get_client_app(
                 mask_calibration_round=mask_calibration_round,
                 model_editing_batch_size=model_editing_batch_size,
                 mask_func=mask_func,
-                mask=mask
+                mask=mask,
+                local_steps=local_steps,
             ).to_client()
         elif strategy == 'fully_centralized':
             return FullyCentralizedMaskedClient(
@@ -131,6 +133,7 @@ def get_client_app(
                 warm_up_rounds=warm_up_rounds,
                 warm_up_max_epochs=warm_up_max_epochs,
                 warm_up_acc_threshold=warm_up_acc_threshold,
+                local_steps=local_steps,
             ).to_client()
 
     app = ClientApp(client_fn=client_fn)

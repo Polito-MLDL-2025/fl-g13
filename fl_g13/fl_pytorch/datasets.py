@@ -8,14 +8,20 @@ import torchvision.transforms as transforms
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner, ShardPartitioner
 from flwr_datasets.visualization import plot_label_distributions
+import itertools
+
+class LimitedDataLoader:
+    def __init__(self, dataloader, max_iters):
+        self.dl = dataloader
+        self.max_iters = max_iters
+
+    def __iter__(self):
+        return itertools.islice(self.dl, self.max_iters)
+
+    def __len__(self):
+        return min(len(self.dl), self.max_iters)
 
 fds = None # Cache the FederatedDataset
-
-def my_collate(batch):
-    """Custom collate function to handle the batch of data. Necessary to iterate over the dataset."""
-    imgs  = torch.stack([b["img"] for b in batch]).float()
-    labels= torch.tensor([b["fine_label"] for b in batch], dtype=torch.long)
-    return imgs, labels
 
 def get_eval_transforms():
     eval_transform = transforms.Compose([

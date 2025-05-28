@@ -14,6 +14,7 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
             self,
             client_state: RecordDict,
             local_epochs,
+            local_steps,
             trainloader,
             valloader,
             model,
@@ -36,6 +37,7 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
         super().__init__(
             client_state=client_state,
             local_epochs=local_epochs,
+            local_steps=local_steps,
             trainloader=trainloader, 
             valloader=valloader,
             model=model,
