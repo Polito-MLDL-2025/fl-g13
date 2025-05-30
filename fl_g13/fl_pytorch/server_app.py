@@ -10,6 +10,7 @@ from fl_g13.fl_pytorch.task import get_weights, set_weights
 from fl_g13.modeling.eval import eval
 from fl_g13.modeling.load import load_or_create
 from fl_g13.fl_pytorch.FullyCentralizedMaskedStrategy import FullyCentralizedMaskedFedAvg
+from fl_g13.fl_pytorch.LRUpdateFedAvg import LRUpdateFedAvg
 from fl_g13.fl_pytorch.strategy import CustomFedAvg
 
 # *** -------- UTILITY FUNCTIONS FOR SERVER -------- *** #
@@ -147,6 +148,28 @@ def get_server_app(
                 use_wandb=use_wandb,
                 wandb_config=wandb_config,
             )
+        elif strategy == 'scheduling-lr':
+            print("Using strategy 'LRUpdateFedAvg'")
+            strategy = LRUpdateFedAvg(
+                checkpoint_dir=checkpoint_dir,
+                prefix=prefix,
+                model=model,
+                initial_parameters=params,
+                start_epoch=start_epoch,
+                save_every=save_every,
+                save_with_model_dir=save_with_model_dir,
+                fraction_fit=fraction_fit,
+                fraction_evaluate=fraction_evaluate,
+                min_fit_clients=min_fit_clients,
+                min_evaluate_clients=min_evaluate_clients,
+                min_available_clients=min_available_clients,
+                evaluate_fn=evaluate_fn,
+                fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
+                evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
+                use_wandb=use_wandb,
+                wandb_config=wandb_config,
+            )
+               
 
         # Prepare server config
         rounds = context.run_config.get("num-server-rounds") or num_rounds

@@ -3,6 +3,7 @@ from flwr.client import ClientApp
 from flwr.common import Context
 
 from fl_g13.fl_pytorch.FullyCentralizedMaskedClient import FullyCentralizedMaskedClient
+from fl_g13.fl_pytorch.LRUpdateWarmUpHeadTalosClient import LRUpdateWarmUpHeadTalosClient
 from fl_g13.fl_pytorch.client import CustomNumpyClient
 from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
 from fl_g13.fl_pytorch.warm_up_head_talos_client import WarmUpHeadTalosClient
@@ -49,7 +50,8 @@ def get_client_app(
         partition_type="iid",
         num_shards_per_partition=2,
         train_test_split_ratio=0.2,
-        local_epochs=4,
+        local_epochs=1,
+        local_steps=4,
         model_editing=False,
         mask_type='global',
         sparsity=0.2,
@@ -58,8 +60,6 @@ def get_client_app(
         mask=None,
         mask_calibration_round=1,
         warm_up_rounds=0,
-        warm_up_max_epochs=16,
-        warm_up_acc_threshold=0.6,
         model_editing_batch_size=16,
         mask_func=None,
 ) -> ClientApp:
@@ -95,7 +95,8 @@ def get_client_app(
                 mask_calibration_round=mask_calibration_round,
                 model_editing_batch_size=model_editing_batch_size,
                 mask_func=mask_func,
-                mask=mask
+                mask=mask,
+                local_steps=local_steps,
             ).to_client()
         elif strategy == 'fully_centralized':
             return FullyCentralizedMaskedClient(
@@ -129,9 +130,29 @@ def get_client_app(
                 verbose=verbose,
                 mask_calibration_round=mask_calibration_round,
                 warm_up_rounds=warm_up_rounds,
+                local_steps=local_steps,
+            ).to_client()
+        elif strategy == 'scheduling-lr':
+            return LRUpdateWarmUpHeadTalosClient(
+                client_state=client_state,
+                local_epochs=local_epochs,
+                trainloader=trainloader,
+                valloader=valloader,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                device=device,
+                mask_type=mask_type,
+                sparsity=sparsity,
+                is_save_weights_to_state=is_save_weights_to_state,
+                verbose=verbose,
+                mask_calibration_round=mask_calibration_round,
+                warm_up_rounds=warm_up_rounds,
                 warm_up_max_epochs=warm_up_max_epochs,
                 warm_up_acc_threshold=warm_up_acc_threshold,
             ).to_client()
+            
 
     app = ClientApp(client_fn=client_fn)
     return app
