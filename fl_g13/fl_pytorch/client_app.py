@@ -59,8 +59,6 @@ def get_client_app(
         mask=None,
         mask_calibration_round=1,
         warm_up_rounds=0,
-        warm_up_max_epochs=16,
-        warm_up_acc_threshold=0.6,
         model_editing_batch_size=16,
         mask_func=None,
 ) -> ClientApp:
@@ -131,8 +129,6 @@ def get_client_app(
                 verbose=verbose,
                 mask_calibration_round=mask_calibration_round,
                 warm_up_rounds=warm_up_rounds,
-                warm_up_max_epochs=warm_up_max_epochs,
-                warm_up_acc_threshold=warm_up_acc_threshold,
                 local_steps=local_steps,
             ).to_client()
 
