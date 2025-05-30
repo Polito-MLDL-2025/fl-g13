@@ -18,7 +18,8 @@ def train_one_epoch(
     model: Module,
     criterion: Module,
     optimizer: Optimizer,
-    verbose: int = 1
+    verbose: int = 1,
+    num_steps: Optional[int] = None
 ) -> Tuple[float, float, List[float]]:
     """
     Train the model for a single epoch.
@@ -55,6 +56,11 @@ def train_one_epoch(
     total_batches = len(dataloader)
 
     for batch_idx, (X, y) in enumerate(batch_iterator):
+
+        # If num_steps is specified, stop training after reaching the limit
+        if num_steps is not None and batch_idx > num_steps:
+            break
+
         # Move input data and labels to the same device as the model
         X, y = X.to(device), y.to(device)
         # Zero the gradients for the optimizer
@@ -114,6 +120,7 @@ def train(
     all_training_accuracies: Optional[List[float]] = None,       # Pre-allocated list to store training accuracies (optional)
     all_validation_accuracies: Optional[List[float]] = None,     # Pre-allocated list to store validation accuracies (optional)
     eval_every: Optional[int] = 1,    #  Frequency (in epochs) to run evaluation model
+    num_steps: Optional[int] = None,  # Number of steps to train the model (optional)
 ) -> Tuple[List[float], List[float], List[float], List[float]]:
     """
     Train the model for a given number of epochs, periodically saving checkpoints and tracking performance metrics.
@@ -181,6 +188,7 @@ def train(
             criterion=criterion,
             optimizer=optimizer,
             verbose=verbose,
+            num_steps=num_steps
         )
         # Append the per-iteration training losses and accuracy to the total lists
         all_training_losses.append(train_loss)

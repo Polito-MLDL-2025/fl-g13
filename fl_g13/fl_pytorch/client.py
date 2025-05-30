@@ -28,6 +28,7 @@ class CustomNumpyClient(NumPyClient):
             model,
             criterion,
             optimizer,
+            local_steps,
             scheduler=None,
             device=None,
             model_editing=False,
@@ -42,6 +43,7 @@ class CustomNumpyClient(NumPyClient):
     ):
         self.client_state = client_state
         self.local_epochs = local_epochs
+        self.local_steps = local_steps
         self.trainloader = trainloader
         self.valloader = valloader
         self.model = model
@@ -146,7 +148,8 @@ class CustomNumpyClient(NumPyClient):
             optimizer=self.optimizer,
             scheduler=self.scheduler,
             eval_every=None,
-            verbose=self.verbose
+            verbose=self.verbose,
+            num_steps=self.local_steps,
         )
 
         updated_weights = get_weights(self.model)

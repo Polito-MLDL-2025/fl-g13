@@ -11,12 +11,6 @@ from flwr_datasets.visualization import plot_label_distributions
 
 fds = None # Cache the FederatedDataset
 
-def my_collate(batch):
-    """Custom collate function to handle the batch of data. Necessary to iterate over the dataset."""
-    imgs  = torch.stack([b["img"] for b in batch]).float()
-    labels= torch.tensor([b["fine_label"] for b in batch], dtype=torch.long)
-    return imgs, labels
-
 def get_eval_transforms():
     eval_transform = transforms.Compose([
         transforms.Resize(256), # CIFRA100 is originally 32x32
