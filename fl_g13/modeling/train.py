@@ -34,6 +34,7 @@ def train_for_steps(
     step = 0
     data_iter = iter(batch_iterator)
     while step < num_steps:
+        print(f"Step {step + 1}/{num_steps} | Total batches: {total_batches}")
         try:
             X, y = next(data_iter)
         except StopIteration:
