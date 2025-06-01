@@ -12,6 +12,58 @@ from fl_g13.modeling.eval import eval
 from fl_g13.modeling.load import save, save_loss_and_accuracy
 from fl_g13.modeling.utils import generate_goofy_name
 
+def train_for_steps(
+    dataloader: DataLoader,
+    model: Module,
+    criterion: Module,
+    optimizer: Optimizer,
+    verbose: int = 1,
+    num_steps: Optional[int] = None
+) -> Tuple[float, float, List[float]]:
+    device = next(model.parameters()).device
+    model.train()
+    if verbose == 1:
+        batch_iterator = tqdm(dataloader, desc='Training progress', unit='batch')
+    else:
+        batch_iterator = dataloader
+
+    total_loss, correct, total = 0.0, 0, 0
+    iteration_losses = []
+    total_batches = len(dataloader)
+
+    step = 0
+    data_iter = iter(batch_iterator)
+    while step < num_steps:
+        print(f"Step {step + 1}/{num_steps} | Total batches: {total_batches}")
+        try:
+            X, y = next(data_iter)
+        except StopIteration:
+            # Restart the iterator if it runs out of data
+            data_iter = iter(batch_iterator)
+            X, y = next(data_iter)
+        X, y = X.to(device), y.to(device)
+        optimizer.zero_grad()
+        logits = model(X)
+        loss = criterion(logits, y)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+        iteration_losses.append(loss.item())
+        _, predicted = torch.max(logits, 1)
+        batch_correct = (predicted == y).sum().item()
+        batch_total = y.size(0)
+        correct += batch_correct
+        total += batch_total
+        step += 1
+        if num_steps is not None and step >= num_steps:
+            break
+        if verbose > 1 and (step % (10 if verbose == 2 else 1) == 0):
+            print(f"  ↳ Step {step} | Loss: {loss.item():.4f}")
+
+    training_loss = total_loss / step
+    training_accuracy = correct / total
+    return training_loss, training_accuracy, iteration_losses
+
 
 def train_one_epoch(
     dataloader: DataLoader,
@@ -19,7 +71,6 @@ def train_one_epoch(
     criterion: Module,
     optimizer: Optimizer,
     verbose: int = 1,
-    num_steps: Optional[int] = None
 ) -> Tuple[float, float, List[float]]:
     """
     Train the model for a single epoch.
@@ -56,10 +107,6 @@ def train_one_epoch(
     total_batches = len(dataloader)
 
     for batch_idx, (X, y) in enumerate(batch_iterator):
-
-        # If num_steps is specified, stop training after reaching the limit
-        if num_steps is not None and batch_idx > num_steps:
-            break
 
         # Move input data and labels to the same device as the model
         X, y = X.to(device), y.to(device)
@@ -181,15 +228,25 @@ def train(
         # Start the timer for the epoch
         start_time = time.time()
 
-        # Train the model for one epoch
-        train_loss, training_accuracy, _ = train_one_epoch(
-            dataloader=train_dataloader,
-            model=model,
-            criterion=criterion,
-            optimizer=optimizer,
-            verbose=verbose,
-            num_steps=num_steps
-        )
+        if num_steps is not None:
+            # Train the model for a specified number of steps
+            train_loss, training_accuracy, _ = train_for_steps(
+                dataloader=train_dataloader,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                verbose=verbose,
+                num_steps=num_steps
+            )
+        else:
+            # Train the model for one epoch
+            train_loss, training_accuracy, _ = train_one_epoch(
+                dataloader=train_dataloader,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                verbose=verbose,
+            )
         # Append the per-iteration training losses and accuracy to the total lists
         all_training_losses.append(train_loss)
         all_training_accuracies.append(training_accuracy)

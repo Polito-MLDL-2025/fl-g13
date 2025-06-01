@@ -155,7 +155,8 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
                 optimizer=self.optimizer,
                 scheduler=self.scheduler,
                 eval_every=None,
-                verbose=self.verbose
+                verbose=self.verbose,
+                num_steps=self.local_steps,
             )
         
         # Save weights from global models
