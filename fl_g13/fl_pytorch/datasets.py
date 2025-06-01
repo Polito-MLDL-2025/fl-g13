@@ -1,24 +1,24 @@
-from typing import Callable, Optional, Tuple
 import matplotlib.pyplot as plt
-
 import torch
-from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
-
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner, ShardPartitioner
 from flwr_datasets.visualization import plot_label_distributions
+from torch.utils.data import DataLoader
 
-fds = None # Cache the FederatedDataset
+fds = None  # Cache the FederatedDataset
+
 
 def get_eval_transforms():
     eval_transform = transforms.Compose([
-        transforms.Resize(256), # CIFRA100 is originally 32x32
-        transforms.CenterCrop(224), # But Dino works on 224x224
+        transforms.Resize(256),  # CIFRA100 is originally 32x32
+        transforms.CenterCrop(224),  # But Dino works on 224x224
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
     return eval_transform
+
+
 # *** -------- TRANSFORMS -------- *** #
 
 def get_train_transforms():
@@ -27,19 +27,21 @@ def get_train_transforms():
         transforms.RandomCrop(224),  # But Dino works on 224x224
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]), # Use ImageNet stats
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),  # Use ImageNet stats
     ])
 
     return train_transform
 
+
 def get_eval_transforms():
     eval_transform = transforms.Compose([
-        transforms.Resize(256), # CIFRA100 is originally 32x32
-        transforms.CenterCrop(224), # But Dino works on 224x224
+        transforms.Resize(256),  # CIFRA100 is originally 32x32
+        transforms.CenterCrop(224),  # But Dino works on 224x224
         transforms.ToTensor(),
-        transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]), # Use ImageNet stats
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),  # Use ImageNet stats
     ])
     return eval_transform
+
 
 def get_transforms(type):
     def apply_transforms(batch):
@@ -49,13 +51,14 @@ def get_transforms(type):
             pytorch_transforms = get_eval_transforms()
         else:
             raise ValueError(f"No transform types with type name: {type}, try one among 'train' and 'eval'")
-        
+
         batch["img"] = [pytorch_transforms(img) for img in batch["img"]]
         batch["fine_label"] = [int(lbl) for lbl in batch["fine_label"]]
 
         return batch
 
     return apply_transforms
+
 
 # *** -------- DATALOADER -------- *** #
 
@@ -68,8 +71,8 @@ def load_flwr_datasets(
         dataset="cifar100",
         train_test_split_ratio=0.2,
         transform=get_transforms,
-    ):
-
+        seed=42
+):
     global fds
     if fds is None:
         if partition_type == "iid":
@@ -92,13 +95,14 @@ def load_flwr_datasets(
                     )
                 },
             )
-    
+
     # Load data on the partition
     partition = fds.load_partition(partition_id)
 
     # Divide data on each node: 80% train, 20% test
-    partition_train_test = partition.train_test_split(test_size=train_test_split_ratio, seed=42) # Using arbitrary seed for reproducibility
-    
+    partition_train_test = partition.train_test_split(test_size=train_test_split_ratio,
+                                                      seed=seed)  # Using arbitrary seed for reproducibility
+
     # Apply transforms on the parititions
     partition_train_test = partition_train_test.with_transform(transform(type='train'))
 
@@ -111,6 +115,7 @@ def load_flwr_datasets(
     )
     return trainloader, valloader
 
+
 # *** -------- UTILITY FUNCTIONS -------- *** #
 
 def collate_batch(batch):
@@ -118,7 +123,8 @@ def collate_batch(batch):
     labels = torch.tensor([b["fine_label"] for b in batch], dtype=torch.long)
     return imgs, labels
 
-#! *** -------- PLOTTERS (TODO) -------- *** #
+
+# ! *** -------- PLOTTERS (TODO) -------- *** #
 
 def show_partition_distribution(partitioner):
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18, 15))
@@ -199,7 +205,7 @@ def plot_results(results):
 
     # Plot federated_evaluate_accuracy
     axes[0].plot(centralized_rounds, centralized_accuracy, label='Centralized Accuracy', marker='o', color='green')
-    
+
     axes[1].plot(rounds, avg_drift, label='Average Drift', marker='o', color='pink')
 
     axes[0].set_title('Andamento di Federated/Centralized Loss e Accuracy')

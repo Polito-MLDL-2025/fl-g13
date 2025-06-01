@@ -14,16 +14,13 @@ import flwr
 import torch
 from flwr.simulation import run_simulation
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader
-from torchvision import datasets
 
 from fl_g13.architectures import BaseDino
-from fl_g13.config import RAW_DATA_DIR
 from fl_g13.editing import SparseSGDM
 from fl_g13.fl_pytorch.client_app import get_client_app
-from fl_g13.fl_pytorch.datasets import get_eval_transforms
 from fl_g13.fl_pytorch.server_app import get_server_app
-from fl_g13.modeling.eval import eval
+from fl_g13.fl_pytorch.editing.centralized_mask import save_mask
+from fl_g13.fl_pytorch.editing.centralized_mask import load_mask
 
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -177,14 +174,14 @@ from fl_g13.modeling import load_or_create
 
 # Model
 model, start_epoch = load_or_create(
-        path=checkpoint_dir,
-        model_class=BaseDino,
-        model_config=None,
-        optimizer=None,
-        scheduler=None,
-        device=device,
-        verbose=True,
-    )
+    path=checkpoint_dir,
+    model_class=BaseDino,
+    model_config=None,
+    optimizer=None,
+    scheduler=None,
+    device=device,
+    verbose=True,
+)
 
 model.to(DEVICE)
 
@@ -211,48 +208,57 @@ scheduler = CosineAnnealingLR(
 
 # ## Calculate the centralized mask
 
-from fl_g13.editing import fisher_scores
-from fl_g13.fl_pytorch.datasets import load_flwr_datasets, get_transforms
+from fl_g13.fl_pytorch.editing.centralized_mask import get_centralized_mask
 
-## calculate fisher score of each client with idd sharding
-clients_fisher_scores = []
-train_test_split_ratio = 0.2
-for i in range(NUM_CLIENTS):
-    partition_id = i
-    num_partitions = NUM_CLIENTS
-    client_trainloader, client_valloader = load_flwr_datasets(partition_id=partition_id,
-        partition_type=partition_type,
-        num_partitions=num_partitions,
-        num_shards_per_partition=num_shards_per_partition,
-        batch_size=batch_size,
-        train_test_split_ratio=train_test_split_ratio,
-        transform=get_transforms)
-    scores = fisher_scores(dataloader=client_valloader, model=model, verbose=1, loss_fn=criterion)
-    clients_fisher_scores.append(scores)
-    
+## config client data set params
+client_partition_type = 'iid'  # 'iid' or 'shard' for non-iid dataset
+client_num_partitions = 100  # equal to number of client
+client_num_shards_per_partition = 10
+client_batch_size = 16
+client_train_test_split_ratio = 0.2
+client_dataset = "cifar100"
+client_seed = 42,
+client_return_dataset = False,
 
+## config get mask params
+mask_model = model
+mask_sparsity = 0.8
+mask_type = 'global'
+mask_rounds = 1
+mask_func = None
 
-from collections import defaultdict
-import torch
+## aggregate
+agg_strategy = 'union'
+agg_func = None
 
-agg_scores = defaultdict(list)
-
-# Collect all scores for each parameter
-for client_scores in clients_fisher_scores:
-    for name, score in client_scores.items():
-        agg_scores[name].append(score)
-
-# Average scores across clients , this is fisher scores on server size
-avg_fisher_scores = {name: torch.mean(torch.stack(scores), dim=0) for name, scores in agg_scores.items()}
+if DEBUG:
+    client_num_partitions = 10
+    client_batch_size = 128
+    client_train_test_split_ratio = 0.9
 
 
-from fl_g13.editing import create_gradiend_mask, mask_dict_to_list
+centralized_mask = get_centralized_mask(
+    client_partition_type=client_partition_type,
+    client_num_partitions=client_num_partitions,
+    client_num_shards_per_partition=client_num_shards_per_partition,
+    client_batch_size=client_batch_size,
+    client_dataset=client_dataset,
+    client_seed=client_seed,
+    client_return_dataset=client_return_dataset,
+    mask_model=mask_model,
+    mask_sparsity=mask_sparsity,
+    mask_type=mask_type,
+    mask_rounds=mask_rounds,
+    mask_func=mask_func,
+    agg_strategy=agg_strategy,
+    agg_func=agg_func
+)
 
-# compute the centralized mask
-mask_dict = create_gradiend_mask(class_score=avg_fisher_scores, sparsity=sparsity, mask_type=mask_type)
-mask = mask_dict_to_list(model, mask_dict)
 
-optimizer.set_mask(mask)
+## save and load mask to/from pth file
+save_mask(centralized_mask, filepath=f"centralized_mask.pth")
+mask = load_mask(filepath=f"centralized_mask.pth")
+mask
 
 
 # ## Define the Client, Server Apps
@@ -298,12 +304,12 @@ server = get_server_app(checkpoint_dir=checkpoint_dir,
 # 
 # Test model performance before fine-turning
 
-testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
-testloader = DataLoader(testset, batch_size=32)
+# testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
+# testloader = DataLoader(testset, batch_size=32)
 
 
-test_loss, test_accuracy, _ = eval(testloader, model, criterion)
-test_loss, test_accuracy
+# test_loss, test_accuracy, _ = eval(testloader, model, criterion)
+# test_loss, test_accuracy
 
 
 # ## Run the training
@@ -315,7 +321,7 @@ backend_config = {"client_resources": {"num_cpus": 1, "num_gpus": 0.0}}
 
 # When running on GPU, assign an entire GPU for each client
 if DEVICE == "cuda":
-    backend_config["client_resources"] = {"num_cpus": 1, "num_gpus": 0.5}
+    backend_config["client_resources"] = {"num_cpus": 1, "num_gpus": 1}
     # Refer to our Flower framework documentation for more details about Flower simulations
     # and how to set up the `backend_config`
 
