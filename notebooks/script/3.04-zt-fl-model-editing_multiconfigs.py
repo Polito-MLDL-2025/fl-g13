@@ -210,6 +210,7 @@ if DEVICE == "cuda":
 
 from fl_g13.modeling import load_or_create
 from fl_g13.editing import SparseSGDM
+from torch.optim import SGD
 K=100
 C=0.1
 
@@ -248,19 +249,7 @@ for Nc in Ncs:
 
     model.to(DEVICE)
 
-    # optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
-
-    # Create a dummy mask for SparseSGDM
-    init_mask = [torch.ones_like(p, device=p.device) for p in
-                model.parameters()]  # Must be done AFTER the model is moved to the device
-    # Optimizer, scheduler, and loss function
-    optimizer = SparseSGDM(
-        model.parameters(),
-        mask=init_mask,
-        lr=lr,
-        momentum=0.9,
-        weight_decay=1e-5
-    )
+    optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
     criterion = torch.nn.CrossEntropyLoss()
     scheduler = CosineAnnealingLR(
         optimizer=optimizer,
@@ -294,11 +283,23 @@ for Nc in Ncs:
     'Nc':Nc
     }
     # model editing config
-    model_editing = True
+    model_editing = False
     mask_type = 'global'
     sparsity = 0.8
     mask = None
     model_editing_batch_size = 16
+    if model_editing:
+        # Create a dummy mask for SparseSGDM
+        init_mask = [torch.ones_like(p, device=p.device) for p in
+                    model.parameters()]  # Must be done AFTER the model is moved to the device
+        # Optimizer, scheduler, and loss function
+        optimizer = SparseSGDM(
+            model.parameters(),
+            mask=init_mask,
+            lr=lr,
+            momentum=0.9,
+            weight_decay=1e-5
+        )
 
     client = get_client_app(
         model=model,
@@ -318,12 +319,13 @@ for Nc in Ncs:
         model_editing_batch_size=model_editing_batch_size,
         mask_func=None
     )
+    compute_round = num_rounds+1- start_epoch
     server = get_server_app(checkpoint_dir=checkpoint_dir,
                         model_class=model,
                         optimizer=optimizer,
                         criterion=criterion,
                         scheduler=scheduler,
-                        num_rounds=num_rounds,
+                        num_rounds=compute_round,
                         fraction_fit=fraction_fit,
                         fraction_evaluate=fraction_evaluate,
                         min_fit_clients=min_fit_clients,
