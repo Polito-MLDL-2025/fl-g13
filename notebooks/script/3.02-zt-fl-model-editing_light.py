@@ -168,7 +168,7 @@ MAX_PARALLEL_CLIENTS = 10
 
 if DEBUG:
     use_wandb = False
-    num_rounds = 2
+    num_rounds = 4
     J = 4
 
 
@@ -250,20 +250,21 @@ server = get_server_app(checkpoint_dir=checkpoint_dir,
                         use_wandb=use_wandb,
                         wandb_config=wandb_config,
                         save_every=save_every,
-                        prefix='fl_baseline'
+                        prefix='fl_baseline',
+                        evaluate_each=2,
                         )
 
 
-# ## Before training
+# |## Before training
 # 
 # Test model performance before fine-turning
 
-testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
-testloader = DataLoader(testset, batch_size=32)
+# testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
+# testloader = DataLoader(testset, batch_size=32)
 
 
-test_loss, test_accuracy, _ = eval(testloader, model, criterion)
-test_loss, test_accuracy
+# test_loss, test_accuracy, _ = eval(testloader, model, criterion)
+# test_loss, test_accuracy
 
 
 # ## Run the training
