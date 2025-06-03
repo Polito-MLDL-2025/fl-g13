@@ -5,7 +5,7 @@ get_ipython().run_line_magic('load_ext', 'autoreload')
 get_ipython().run_line_magic('autoreload', '2')
 
 
-get_ipython().system('pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118')
+# !pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 
 from pathlib import Path
@@ -120,13 +120,20 @@ print(f"Flower {flwr.__version__} / PyTorch {torch.__version__}")
 DEBUG = False
 
 
+# ## Model config
+
+## checkpoints directory
+current_path = Path.cwd()
+model_save_path = current_path / f"../models/fl_dino_baseline/iid"
+
+
 # Model config
 
 ## Model Hyper-parameters
 head_layers = 3
 head_hidden_size = 512
 dropout_rate = 0.0
-unfreeze_blocks = 1
+unfreeze_blocks = 12
 
 ## Training Hyper-parameters
 batch_size = 128
@@ -154,9 +161,7 @@ min_fit_clients = 10  # Never sample less than 10 clients for training
 min_evaluate_clients = 5  # Never sample less than 5 clients for evaluation
 min_available_clients = 10  # Wait until all 10 clients are available
 device = 'cuda'
-## checkpoints directory
-current_path = Path.cwd()
-model_save_path = current_path / f"../models/fl_dino_baseline/noniid"
+
 checkpoint_dir = model_save_path.resolve()
 os.makedirs(checkpoint_dir, exist_ok=True)
 
@@ -206,11 +211,9 @@ model, start_epoch = load_or_create(
     device=device,
     verbose=True,
 )
-
+model.unfreeze_blocks(unfreeze_blocks)
 model.to(DEVICE)
 
-unfreeze_blocks=12
-model.unfreeze_blocks(unfreeze_blocks)
 # optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
 
 # Create a dummy mask for SparseSGDM
@@ -232,36 +235,7 @@ scheduler = CosineAnnealingLR(
 )
 
 
-# ## Calculate the centralized mask
-
-from fl_g13.fl_pytorch.editing.centralized_mask import get_centralized_mask
-
-## config client data set params
-client_partition_type = 'shard'  # 'iid' or 'shard' for non-iid dataset
-client_num_partitions = 100  # equal to number of client
-client_num_shards_per_partition = 10
-client_batch_size = 16
-client_train_test_split_ratio = 0.2
-client_dataset = "cifar100"
-client_seed = 42,
-client_return_dataset = False,
-
-## config get mask params
-mask_model = model
-mask_sparsity = 0.8
-mask_type = 'global'
-mask_rounds = 1
-mask_func = None
-
-## aggregate
-agg_strategy = 'union'
-agg_func = None
-
-if DEBUG:
-    client_num_partitions = 10
-    client_batch_size = 128
-    client_train_test_split_ratio = 0.9
-
+# ## Compute stats for mask
 
 from typing import Dict, Any
 
@@ -352,6 +326,37 @@ def print_mask_stats(stats: Dict[str, Any], layer = False):
         print("-" * 20)
 
 
+# ## Calculate the centralized mask
+
+from fl_g13.fl_pytorch.editing.centralized_mask import get_centralized_mask
+
+## config client data set params
+client_partition_type = 'iid'  # 'iid' or 'shard' for non-iid dataset
+client_num_partitions = 100  # equal to number of client
+client_num_shards_per_partition = 10
+client_batch_size = 16
+client_train_test_split_ratio = 0.2
+client_dataset = "cifar100"
+client_seed = 42,
+client_return_dataset = False,
+
+## config get mask params
+mask_model = model
+mask_sparsity = 0.8
+mask_type = 'global'
+mask_rounds = 1
+mask_func = None
+
+## aggregate
+agg_strategy = 'union'
+agg_func = None
+
+if DEBUG:
+    client_num_partitions = 10
+    client_batch_size = 128
+    client_train_test_split_ratio = 0.9
+
+
 centralized_mask = get_centralized_mask(
     client_partition_type=client_partition_type,
     client_num_partitions=client_num_partitions,
@@ -368,12 +373,6 @@ centralized_mask = get_centralized_mask(
     agg_strategy=agg_strategy,
     agg_func=agg_func
 )
-
-
-# ## save and load mask to/from pth file
-# save_mask(centralized_mask, filepath=f"centralized_mask.pth")
-# mask = load_mask(filepath=f"centralized_mask.pth")
-# mask
 
 
 agg_strategy = 'intersection'
@@ -399,82 +398,6 @@ compute_mask_stats(centralized_mask[1])
 
 
 compute_mask_stats(centralized_mask_intersection[1])
-
-
-# ## Define the Client, Server Apps
-
-client = get_client_app(
-    model=model,
-    optimizer=optimizer,
-    criterion=criterion,
-    device=DEVICE,
-    partition_type=partition_type,
-    local_epochs=J,
-    batch_size=batch_size,
-    num_shards_per_partition=num_shards_per_partition,
-    scheduler=scheduler,
-    verbose=0,
-    model_editing=model_editing,
-    mask_type=mask_type,
-    sparsity=sparsity,
-    mask=mask
-)
-
-
-server = get_server_app(checkpoint_dir=checkpoint_dir,
-                        model_class=model,
-                        optimizer=optimizer,
-                        criterion=criterion,
-                        scheduler=scheduler,
-                        num_rounds=num_rounds,
-                        fraction_fit=fraction_fit,
-                        fraction_evaluate=fraction_evaluate,
-                        min_fit_clients=min_fit_clients,
-                        min_evaluate_clients=min_evaluate_clients,
-                        min_available_clients=min_available_clients,
-                        device=device,
-                        use_wandb=use_wandb,
-                        wandb_config=wandb_config,
-                        save_every=save_every,
-                        prefix='fl_baseline'
-                        )
-
-
-# ## Before training
-# 
-# Test model performance before fine-turning
-
-# testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
-# testloader = DataLoader(testset, batch_size=32)
-
-
-# test_loss, test_accuracy, _ = eval(testloader, model, criterion)
-# test_loss, test_accuracy
-
-
-# ## Run the training
-# 
-
-# Specify the resources each of your clients need
-# By default, each client will be allocated 1x CPU and 0x GPUs
-backend_config = {"client_resources": {"num_cpus": 1, "num_gpus": 0.0}}
-
-# When running on GPU, assign an entire GPU for each client
-if DEVICE == "cuda":
-    backend_config["client_resources"] = {"num_cpus": 1, "num_gpus": 1}
-    # Refer to our Flower framework documentation for more details about Flower simulations
-    # and how to set up the `backend_config`
-
-
-# 
-
-# Run simulation
-run_simulation(
-    server_app=server,
-    client_app=client,
-    num_supernodes=NUM_CLIENTS,
-    backend_config=backend_config
-)
 
 
 

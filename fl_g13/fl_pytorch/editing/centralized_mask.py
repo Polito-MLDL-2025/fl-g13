@@ -324,7 +324,7 @@ def get_centralized_mask(
         mask_func=mask_func
     )
     agg_mask = aggregate_masks(masks, strategy=agg_strategy, agg_func=agg_func)
-    return mask_dict_to_list(mask_model, agg_mask)
+    return mask_dict_to_list(mask_model, agg_mask),agg_mask
 
 
 def save_mask(mask: Dict[str, torch.Tensor], filepath: str = 'centralized_mask.pth'):

@@ -71,7 +71,7 @@ def load_flwr_datasets(
         dataset="cifar100",
         train_test_split_ratio=0.2,
         transform=get_transforms,
-        seed=42
+        seed=42,
 ):
     global fds
     if fds is None:
