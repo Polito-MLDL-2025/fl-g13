@@ -75,6 +75,7 @@ def get_client_app(
             train_test_split_ratio=train_test_split_ratio
         )
         client_state = context.state
+        node_id = context.node_id
 
         nonlocal strategy  # Make strategy defined as param accessible under client_fn
         if strategy == 'standard' or not strategy:
@@ -130,6 +131,7 @@ def get_client_app(
                 mask_calibration_round=mask_calibration_round,
                 warm_up_rounds=warm_up_rounds,
                 local_steps=local_steps,
+                node_id=node_id,
             ).to_client()
 
     app = ClientApp(client_fn=client_fn)

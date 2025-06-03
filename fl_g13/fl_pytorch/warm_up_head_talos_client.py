@@ -7,6 +7,8 @@ import numpy as np
 from fl_g13.modeling import train
 from flwr.common import RecordDict, ConfigRecord
 from fl_g13.editing.masking import uncompress_mask_sparse
+import os
+import json
 
 class WarmUpHeadTalosClient(CustomNumpyClient):
 
@@ -29,6 +31,7 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
             verbose=0,
             mask_calibration_round=1,
             warm_up_rounds=4,
+            node_id=None,
             *args, 
             **kwargs
     ):
@@ -57,6 +60,7 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
         self.mask_type = mask_type
         self.first_time = True
         self.warm_up_rounds = warm_up_rounds
+        self.node_id = node_id
 
         self.model.to(self.device)
         
@@ -102,13 +106,34 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
         set_weights(self.model, warm_up_head_params)
         return all_training_losses, all_training_accuracies
     
-    def _print_mask_distribution(self):
-        print("mask distribtion")
+    def _save_mask_distribution(self):
         mask_list = uncompress_mask_sparse(self.mask)
         mask_list = [mask.to(self.device) for mask in mask_list]
+        new_item = {
+            "cid": self.node_id,
+            "layers": {}
+        }
         for (name, _), mask in zip(self.model.named_parameters(), mask_list):
             percent1 = (mask == 1).float().mean().item() * 100
-            print(f"Layer: {name}, Mask percent of 1: {percent1:.2f}%")
+            new_item["layers"][name] = percent1
+
+        file_path = "mask_distribution.json"
+        if os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                try:
+                    content = json.load(f)
+                except json.JSONDecodeError:
+                    content = {}
+        else:
+            content = {}
+
+        if 'data' not in content or not isinstance(content['data'], list):
+            content['data'] = []
+
+        content['data'].append(new_item)
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(content, f, ensure_ascii=False, indent=4)
                 
     
     def fit(self, parameters, config):
@@ -131,8 +156,7 @@ class WarmUpHeadTalosClient(CustomNumpyClient):
                 participation_record["has_participated"] = True
                 self._warm_up_classification_head(params=parameters)
                 self._compute_mask(sparsity=self.sparsity, mask_type=self.mask_type)
-                if self.verbose == 1:
-                    self._print_mask_distribution()
+                self._save_mask_distribution()
                 self._save_mask_to_state()
             else:
                 self._load_mask_from_state()
