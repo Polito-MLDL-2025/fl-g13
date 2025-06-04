@@ -298,8 +298,8 @@ for Nc in Ncs:
                 model.parameters(),
                 mask=init_mask,
                 lr=lr,
-                momentum=0.9,
-                weight_decay=1e-5
+                momentum=momentum,
+                weight_decay=weight_decay
             )
 
         client = get_client_app(
