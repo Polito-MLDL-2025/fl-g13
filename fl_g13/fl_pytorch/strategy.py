@@ -141,7 +141,7 @@ class CustomFedAvg(FedAvg):
     # Wrap aggregate evaluate of FedAvg and prints
     def evaluate(self, server_round, parameters):
         # Optionally save model checkpoint
-        epoch = self.start_epoch + server_round
+        epoch = self.start_epoch + server_round -1
         if epoch % self.evaluate_each == 0:
             loss, metrics = super().evaluate(server_round, parameters)
             # logger.info(f"[Round {server_round}] Centralized Evaluation - Loss: {loss:.4f}, Metrics: {metrics}")
