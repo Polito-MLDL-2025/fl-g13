@@ -94,9 +94,8 @@ DEBUG = True
 
 
 K = 100
-C = 0.01
+C = 0.1
 J = 4
-num_rounds = 50
 # partition_type = 'iid'
 partition_type = 'shard'
 Nc = 10
@@ -219,10 +218,17 @@ Ncs = [1, 5, 10, 50]
 ## Wandb config
 use_wandb = True
 
-project_name = "FL_Dino_CIFAR100_baseline_v3"
+project_name = "FL_Dino_CIFAR100_baseline_v4"
 
 current_path = Path.cwd()
-model_save_path = current_path / f"../models/fl_dino_v3/non_iid"
+model_save_path = current_path / f"../models/fl_dino_v4/non_iid"
+
+model_config={
+    "head_layers": 3,
+    "head_hidden_size": 512,
+    "dropout_rate": 0.0,
+    "unfreeze_blocks": 0,
+}
 
 for Nc in Ncs:
     for J in Js:
@@ -235,7 +241,7 @@ for Nc in Ncs:
         model, start_epoch = load_or_create(
             path=checkpoint_dir,
             model_class=BaseDino,
-            model_config=None,
+            model_config=model_config,
             optimizer=None,
             scheduler=None,
             device=device,
