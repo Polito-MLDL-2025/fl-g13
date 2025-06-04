@@ -39,6 +39,7 @@ class CustomFedAvg(FedAvg):
             # save_best_model = True, #!! Removed
             use_wandb=False,
             wandb_config=None,
+            evaluate_each=1,
             *args,
             **kwargs
     ):
@@ -51,6 +52,7 @@ class CustomFedAvg(FedAvg):
         self.save_every = save_every
         self.use_wandb = use_wandb
         self.wandb_config = wandb_config
+        self.evaluate_each = evaluate_each
         if use_wandb:
             self._init_wandb_project()
 
@@ -138,14 +140,18 @@ class CustomFedAvg(FedAvg):
     
     # Wrap aggregate evaluate of FedAvg and prints
     def evaluate(self, server_round, parameters):
-        loss, metrics = super().evaluate(server_round, parameters)
-        # logger.info(f"[Round {server_round}] Centralized Evaluation - Loss: {loss:.4f}, Metrics: {metrics}")
-        logger.log(INFO, f"[Round {server_round}] Centralized Evaluation - Loss: {loss:.4f}, Metrics: {metrics}")
-        self.wandb_log(
-            server_round=server_round,
-            results_dict={"centralized_eval_loss": loss, **metrics},
-        )
-        return loss, metrics
+        # Optionally save model checkpoint
+        epoch = self.start_epoch + server_round -1
+        if epoch % self.evaluate_each == 0:
+            loss, metrics = super().evaluate(server_round, parameters)
+            # logger.info(f"[Round {server_round}] Centralized Evaluation - Loss: {loss:.4f}, Metrics: {metrics}")
+            logger.log(INFO, f"[Round {server_round}] Centralized Evaluation - Loss: {loss:.4f}, Metrics: {metrics}")
+            self.wandb_log(
+                server_round=server_round,
+                results_dict={"centralized_eval_loss": loss, **metrics},
+            )
+            return loss, metrics
+        return {},{}
 
     # -------- WANDB UTILITIES -------- #
 
