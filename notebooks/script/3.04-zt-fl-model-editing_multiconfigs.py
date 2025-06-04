@@ -219,8 +219,10 @@ Ncs = [1, 5, 10, 50]
 ## Wandb config
 use_wandb = True
 
+project_name = "FL_Dino_CIFAR100_baseline_v3"
+
 current_path = Path.cwd()
-model_save_path = current_path / f"../models/fl_baseline/noniid"
+model_save_path = current_path / f"../models/fl_dino_v3/non_iid"
 
 for Nc in Ncs:
     for J in Js:
@@ -258,8 +260,8 @@ for Nc in Ncs:
         ##
         os.makedirs(checkpoint_dir, exist_ok=True)
 
-        name = f"FL_Dino_Baseline_model_editing_non_iid_{Nc}_{J}"
-        project_name = "FL_Dino_CIFAR100_editing_new_batchsize64_v3_8"
+        name = f"FL_Dino_Baseline_model_non_iid_{Nc}_{J}"
+        
         wandb_config = {
             # wandb param
             'name': name,
