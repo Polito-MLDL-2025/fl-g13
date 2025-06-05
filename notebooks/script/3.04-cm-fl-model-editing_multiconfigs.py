@@ -12,27 +12,27 @@ import wandb
 import dotenv
 import os
 
-dotenv.load_dotenv() # Load API Key
-WANDB_API_KEY = os.getenv("WANDB_API_KEY")
-
-wandb.login(key=WANDB_API_KEY)
 from pathlib import Path
 
-import flwr
 import torch
+import flwr
 from flwr.simulation import run_simulation
-from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from fl_g13.architectures import BaseDino
 from fl_g13.fl_pytorch.client_app import get_client_app
 from fl_g13.fl_pytorch.server_app import get_server_app
 
+from fl_g13.fl_pytorch import build_fl_dependencies
+
+dotenv.load_dotenv() # Load API Key
+WANDB_API_KEY = os.getenv("WANDB_API_KEY")
+wandb.login(key=WANDB_API_KEY)
+
+print(f"Flower {flwr.__version__} / PyTorch {torch.__version__}")
+build_fl_dependencies()
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Training on {device}")
-print(f"Flower {flwr.__version__} / PyTorch {torch.__version__}")
-
-from fl_g13.fl_pytorch import build_fl_dependencies
-build_fl_dependencies()
 
 # Specify the resources each of your clients need
 # By default, each client will be allocated 1x CPU and 0x GPUs
@@ -64,8 +64,8 @@ batch_size = 64
 lr = 1e-3
 momentum = 0.9
 weight_decay = 1e-5
-T_max = 8
-eta_min = 1e-5
+T_max = 8 #! Unused
+eta_min = 1e-5 #! Unused
 
 # Model editing Hyper-parameters
 model_editing = False
@@ -124,11 +124,6 @@ for Nc in Ncs:
 
         optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
         criterion = torch.nn.CrossEntropyLoss()
-        scheduler = CosineAnnealingLR(
-            optimizer=optimizer,
-            T_max=T_max,
-            eta_min=eta_min
-        )
 
         ## Unfreeze blocks
         num_blocks = 0
@@ -164,7 +159,7 @@ for Nc in Ncs:
             # Create a dummy mask for SparseSGDM
             init_mask = [torch.ones_like(p, device=p.device) for p in
                          model.parameters()]  # Must be done AFTER the model is moved to the device
-            # Optimizer, scheduler, and loss function
+            # Optimizer
             optimizer = SparseSGDM(
                 model.parameters(),
                 mask=init_mask,
@@ -199,7 +194,7 @@ for Nc in Ncs:
             model_class=model,
             optimizer=optimizer,
             criterion=criterion,
-            scheduler=scheduler,
+            scheduler=None, #! Server wont use scheduler, as it doesnt make sense here
             num_rounds=compute_round,
             fraction_fit=fraction_fit,
             fraction_evaluate=fraction_evaluate,
