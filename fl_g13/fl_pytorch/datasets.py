@@ -61,6 +61,10 @@ def get_transforms(type):
 
 
 # *** -------- DATALOADER -------- *** #
+def reset_partition():
+    global fds
+    fds = None
+
 
 def load_flwr_datasets(
         partition_id,
