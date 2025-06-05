@@ -198,6 +198,7 @@ if DEVICE == "cuda":
 
 # 
 
+from fl_g13.fl_pytorch.datasets import reset_partition
 from fl_g13.modeling import load_or_create
 from fl_g13.editing import SparseSGDM
 from torch.optim import SGD
@@ -231,6 +232,7 @@ model_config={
 }
 
 for Nc in Ncs:
+    reset_partition()
     for J in Js:
         print('-' * 200)
         print(f"Training Non IId model")
