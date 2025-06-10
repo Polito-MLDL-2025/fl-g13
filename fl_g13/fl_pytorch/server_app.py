@@ -81,17 +81,20 @@ def get_server_app(
         use_wandb=False,
         wandb_config=None,
         evaluate_each=1,
+        model=None,
+        start_epoch=None
 ):
     # Load or create model if not found in checkpoint_dir (if found will always load the most recent one)
-    model, start_epoch = load_or_create(
-        path=f"{checkpoint_dir}/{model_class.__name__}" if save_with_model_dir else checkpoint_dir,
-        model_class=model_class,
-        model_config=model_config,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        device=device,
-        verbose=True,
-    )
+    if model is None or start_epoch is None:
+        model, start_epoch = load_or_create(
+            path=f"{checkpoint_dir}/{model_class.__name__}" if save_with_model_dir else checkpoint_dir,
+            model_class=model_class,
+            model_config=model_config,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            device=device,
+            verbose=True,
+        )
 
     def server_fn(context):
 
