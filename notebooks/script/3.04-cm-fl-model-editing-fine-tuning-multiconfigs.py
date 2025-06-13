@@ -56,7 +56,7 @@ model_config={
     "head_layers": 3,
     "head_hidden_size": 512,
     "dropout_rate": 0.0,
-    "unfreeze_blocks": 12,
+    "unfreeze_blocks": 0,
 }
 
 # Training Hyper-parameters
@@ -68,7 +68,7 @@ T_max = 8 #! Unused
 eta_min = 1e-5 #! Unused
 
 # Model editing Hyper-parameters
-model_editing = False
+model_editing = True
 mask_types = ['global', 'local']
 sparsities = [0.7, 0.8, 0.9]
 calibration_rounds = [1, 3]
@@ -88,14 +88,14 @@ min_fit_clients = 10  # Never sample less than 10 clients for training
 min_evaluate_clients = 5  # Never sample less than 5 clients for evaluation
 min_available_clients = 10  # Wait until all 10 clients are available
 
-num_rounds = 200
+num_rounds = 100 + 40 # Add the current number of epochs
 evaluate_each = 5
 partition_type = 'shard'
 NUM_CLIENTS = K
 
 # Wandb config
 use_wandb = True
-project_name = "FL_Dino_CIFAR100_masking_grid_search_v4_8_50"
+project_name = "FL_Dino_CIFAR100_masking_grid_search_v4_non_iid_50_8"
 
 current_path = Path.cwd()
 model_save_path = current_path / f"../models/fl_dino_masking_grid_search_v4/non_iid"
@@ -105,16 +105,16 @@ model_save_path = current_path / f"../models/fl_dino_masking_grid_search_v4/non_
 
 for mask_type in mask_types:
     for sparsity in sparsities:
-        for calibration_round in calibration_rounds:
+        for mask_calibration_round in calibration_rounds:
             print('-' * 200)
             print(f"Training Non IId model")
             print(f"Nc: {Nc}, J: {J}")
-            checkpoint_dir = f"{model_save_path}/{Nc}_{J}/editing"
+            checkpoint_dir = f"{model_save_path}/{Nc}_{J}_{mask_type}_{mask_calibration_round}_{sparsity}"
             print(f'checkpoint_dir:{checkpoint_dir}')
             
             # Model
             model, start_epoch = load_or_create(
-                path=checkpoint_dir,
+                path='/home/massimiliano/Projects/fl-g13/models/fl_dino_v4/non_iid/50_8/editing/fl_fl_baseline_BaseDino_epoch_100.pth', #checkpoint_dir,
                 model_class=BaseDino,
                 model_config=model_config,
                 optimizer=None,
@@ -136,7 +136,7 @@ for mask_type in mask_types:
             print(f"Trainable parameters: {trainable_params}")
 
             os.makedirs(checkpoint_dir, exist_ok=True)
-            name = f"FL_Dino_Baseline_model_non_iid_{Nc}_{J}"
+            name = f"FL_Dino_Baseline_model_non_iid_{Nc}_{J}_{mask_type}_{mask_calibration_round}_{sparsity}"
             
             wandb_config = {
                 # Wandb Params
@@ -155,7 +155,7 @@ for mask_type in mask_types:
                 'mask_type': mask_type,
                 'sparsity': sparsity,
                 'model_editing_batch_size': model_editing_batch_size,
-                'calibration_rounds': calibration_round,
+                'calibration_rounds': mask_calibration_round,
                 # Training params
                 'lr': lr,
                 'momentum': momentum,
@@ -190,7 +190,7 @@ for mask_type in mask_types:
                 mask_type=mask_type,
                 sparsity=sparsity,
                 mask=mask,
-                mask_calibration_round=calibration_round,
+                mask_calibration_round=mask_calibration_round,
                 model_editing_batch_size=model_editing_batch_size,
                 mask_func=None
             )
