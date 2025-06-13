@@ -216,6 +216,8 @@ for Nc in Ncs:
             num_supernodes=NUM_CLIENTS,
             backend_config=backend_config
         )
+        
+        wandb.finish()
 
 
 
