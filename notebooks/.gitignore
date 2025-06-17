@@ -5,3 +5,5 @@ wandb
 wandb_run_id.txt
 centralized_mask.json
 centralized_mask.pth
+centralized_sum_mask.pth
+centralized_sum_score.pth
