@@ -1,52 +1,10 @@
+import gc
 from typing import List, Dict, Tuple
 
 import torch
-import gc
-from torch.utils.data import DataLoader
 
 from fl_g13.editing import create_mask, mask_dict_to_list
 from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
-
-
-def _process_client(
-        partition_id: int,
-        *,  # Use keyword-only arguments to avoid argument order errors
-        client_config: dict,
-        mask_config: dict
-) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor], Tuple[DataLoader, DataLoader]]:
-    """
-    Worker function to process a single client: load data and generate a mask.
-    """
-    # 1. Load the dataset for the specific client partition
-    train_loader, val_loader = load_flwr_datasets(
-        partition_id=partition_id,
-        num_partitions=client_config['num_partitions'],
-        **client_config
-    )
-
-    # 2. Get the appropriate mask creation function
-    mask_func = mask_config.get('mask_func')
-    if not mask_func or not callable(mask_func):
-        mask_func = create_mask
-
-    # 3. Generate the mask for the client
-    mask = mask_func(
-        model=mask_config['model'],
-        dataloader=train_loader,
-        sparsity=mask_config['sparsity'],
-        mask_type=mask_config['mask_type'],
-        rounds=mask_config['rounds'],
-        return_scores=mask_config['return_scores']
-    )
-    score = None
-    if mask_config['return_scores']:
-        mask, score = mask
-
-    # 4. Return the mask and, if requested, the data loaders
-    if client_config.get('return_dataset', False):
-        return mask, score, (train_loader, val_loader)
-    else:
-        return mask, score, (None, None)
 
 
 def get_client_masks(
