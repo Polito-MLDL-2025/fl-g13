@@ -1,9 +1,52 @@
 from typing import List, Dict, Tuple
 
 import torch
+import gc
+from torch.utils.data import DataLoader
 
 from fl_g13.editing import create_mask, mask_dict_to_list
 from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
+
+
+def _process_client(
+        partition_id: int,
+        *,  # Use keyword-only arguments to avoid argument order errors
+        client_config: dict,
+        mask_config: dict
+) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor], Tuple[DataLoader, DataLoader]]:
+    """
+    Worker function to process a single client: load data and generate a mask.
+    """
+    # 1. Load the dataset for the specific client partition
+    train_loader, val_loader = load_flwr_datasets(
+        partition_id=partition_id,
+        num_partitions=client_config['num_partitions'],
+        **client_config
+    )
+
+    # 2. Get the appropriate mask creation function
+    mask_func = mask_config.get('mask_func')
+    if not mask_func or not callable(mask_func):
+        mask_func = create_mask
+
+    # 3. Generate the mask for the client
+    mask = mask_func(
+        model=mask_config['model'],
+        dataloader=train_loader,
+        sparsity=mask_config['sparsity'],
+        mask_type=mask_config['mask_type'],
+        rounds=mask_config['rounds'],
+        return_scores=mask_config['return_scores']
+    )
+    score = None
+    if mask_config['return_scores']:
+        mask, score = mask
+
+    # 4. Return the mask and, if requested, the data loaders
+    if client_config.get('return_dataset', False):
+        return mask, score, (train_loader, val_loader)
+    else:
+        return mask, score, (None, None)
 
 
 def get_client_masks(
@@ -16,7 +59,7 @@ def get_client_masks(
         client_train_test_split_ratio=0.2,
         client_transform=get_transforms,
         client_seed=42,
-        client_return_dataset=True,
+        client_return_dataset=False,
 
         ## config get mask params
         mask_model=None,
@@ -24,7 +67,13 @@ def get_client_masks(
         mask_type='global',
         mask_rounds=1,
         mask_func=None,
-) -> (List[Dict[str, torch.Tensor]], List[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]]):
+        mask_store_in_cpu=True,
+
+        ## get fisher score
+        return_scores=True
+
+) -> (List[Dict[str, torch.Tensor]], List[Dict[str, torch.Tensor]],
+      List[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]]):
     """
     Generate pruning masks for a model based on federated client datasets.
 
@@ -76,6 +125,7 @@ def get_client_masks(
     mask_func : callable, optional
         Optional custom mask generation function. If None, a default `create_mask` function will be used.
 
+
     Returns:
     -------
     masks : List[Dict[str, torch.Tensor]]
@@ -95,6 +145,7 @@ def get_client_masks(
     if mask_model is None:
         raise ValueError("mask_model is required!")
     masks = []
+    scores = []
     client_datasets = []
     for i in range(client_num_partitions):
         partition_id = i
@@ -109,25 +160,45 @@ def get_client_masks(
                                                                   seed=client_seed
                                                                   )
 
-        if mask_func and callable(mask_func):
-            mask = mask_func(model=mask_model,
-                             dataloader=client_trainloader,
-                             sparsity=mask_sparsity,
-                             mask_type=mask_type,
-                             rounds=mask_rounds
-                             )
-        else:
-            mask = create_mask(
-                model=mask_model,
-                dataloader=client_trainloader,
-                sparsity=mask_sparsity,
-                mask_type=mask_type,
-                rounds=mask_rounds
-            )
+        if not (mask_func and callable(mask_func)):
+            mask_func = create_mask
+
+        mask = mask_func(
+            model=mask_model,
+            dataloader=client_trainloader,
+            sparsity=mask_sparsity,
+            mask_type=mask_type,
+            rounds=mask_rounds,
+            return_scores=return_scores
+        )
+        if return_scores:
+            mask, score = mask
+            if mask_store_in_cpu:
+                score = {key: tensor.cpu() for key, tensor in score.items()}
+            scores.append(score)
+        if mask_store_in_cpu:
+            mask = {key: tensor.cpu() for key, tensor in mask.items()}
         masks.append(mask)
+
+        gc.collect()
+        torch.cuda.empty_cache()
+
         if client_return_dataset:
             client_datasets.append((client_trainloader, client_valloader))
-    return masks, client_datasets
+    return masks, scores, client_datasets
+
+
+def aggregate_by_sum(masks: List[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
+    if not masks:
+        return {}
+
+    aggregated = {k: torch.zeros_like(v) for k, v in masks[0].items()}
+
+    for mask in masks:
+        for k in mask:
+            aggregated[k] += mask[k]
+
+    return aggregated
 
 
 def aggregate_masks(masks: List[Dict[str, torch.Tensor]],
@@ -307,7 +378,7 @@ def get_centralized_mask(
     - This function is useful for obtaining a global view of model sparsity across decentralized data.
     - The final mask can be used to prune a model before centralized or federated fine-tuning.
     """
-    masks, _ = get_client_masks(
+    masks, scores, _ = get_client_masks(
         client_partition_type=client_partition_type,
         client_num_partitions=client_num_partitions,
         client_num_shards_per_partition=client_num_shards_per_partition,
@@ -324,7 +395,7 @@ def get_centralized_mask(
         mask_func=mask_func
     )
     agg_mask = aggregate_masks(masks, strategy=agg_strategy, agg_func=agg_func)
-    return mask_dict_to_list(mask_model, agg_mask),agg_mask
+    return mask_dict_to_list(mask_model, agg_mask), agg_mask
 
 
 def save_mask(mask: Dict[str, torch.Tensor], filepath: str = 'centralized_mask.pth'):
@@ -342,9 +413,24 @@ def save_mask(mask: Dict[str, torch.Tensor], filepath: str = 'centralized_mask.p
     torch.save(mask, filepath)
 
 
+def save_masks_scores(masks: List[Dict[str, torch.Tensor]], scores: List[Dict[str, torch.Tensor]],
+                      filepath: str = 'client_masks.pth'):
+    """
+    """
+    data = (masks, scores)
+    torch.save(data, filepath)
+
+
+def load_masks_scores(filepath: str = 'centralized_masks.pth') -> Tuple[
+    List[Dict[str, torch.Tensor]], List[Dict[str, torch.Tensor]]]:
+    """
+    """
+    return torch.load(filepath)
+
+
 def load_mask(filepath: str = 'centralized_mask.pth') -> Dict[str, torch.Tensor]:
     """
-    Load a binary mask dictionary from either compressed JSON (sparse) or .pth (dense) format.
+    Load a binary mask dictionary from either compressed .pth (dense) format.
 
     Parameters
     ----------

@@ -1,11 +1,11 @@
 import pickle
-
 from typing import Dict
 
 import numpy as np
 import torch
 
 from .fisher import masked_fisher_score
+
 
 def _local_mask(score: Dict[str, torch.Tensor], density: float = 0.2) -> Dict[str, torch.Tensor]:
     gradient_mask = {}
@@ -43,9 +43,10 @@ def _local_mask(score: Dict[str, torch.Tensor], density: float = 0.2) -> Dict[st
 
     return gradient_mask
 
+
 def _global_mask(score: Dict[str, torch.Tensor], density: float = 0.2) -> Dict[str, torch.Tensor]:
     gradient_mask = {}
-    param_info = [] # Stores (name, shape, start_flat_idx) to reshape later
+    param_info = []  # Stores (name, shape, start_flat_idx) to reshape later
 
     # Flatten scores and store info for reshaping
     all_scores_flat_list = []
@@ -66,11 +67,13 @@ def _global_mask(score: Dict[str, torch.Tensor], density: float = 0.2) -> Dict[s
     # Handle edge cases for density (0 or 1)
     if num_to_keep <= 0:
         # If density is 0 or very close, keep 0 elements (mask of all zeros)
-        gradient_mask = {name: torch.zeros(shape, dtype=torch.float, device=global_scores_flat.device) for name, shape, _ in param_info}
+        gradient_mask = {name: torch.zeros(shape, dtype=torch.float, device=global_scores_flat.device) for
+                         name, shape, _ in param_info}
         return gradient_mask
     elif num_to_keep >= total_elements:
         # If density is 1 or very close, keep all elements (mask of all ones)
-        gradient_mask = {name: torch.ones(shape, dtype=torch.float, device=global_scores_flat.device) for name, shape, _ in param_info}
+        gradient_mask = {name: torch.ones(shape, dtype=torch.float, device=global_scores_flat.device) for name, shape, _
+                         in param_info}
         return gradient_mask
 
     # Get the indices that would sort the flattened scores (ascending order)
@@ -90,13 +93,15 @@ def _global_mask(score: Dict[str, torch.Tensor], density: float = 0.2) -> Dict[s
     current_flat_idx = 0
     for name, shape, _ in param_info:
         num_elements = shape.numel()
-        layer_flat_mask = flat_mask[current_flat_idx : current_flat_idx + num_elements]
+        layer_flat_mask = flat_mask[current_flat_idx: current_flat_idx + num_elements]
         gradient_mask[name] = layer_flat_mask.view(shape)
         current_flat_idx += num_elements
 
     return gradient_mask
 
-def _create_gradiend_mask(score: Dict[str, torch.Tensor], density: float = 0.2, mask_type: str = 'local') -> Dict[str, torch.Tensor]:
+
+def _create_gradiend_mask(score: Dict[str, torch.Tensor], density: float = 0.2, mask_type: str = 'local') -> Dict[
+    str, torch.Tensor]:
     if mask_type == 'local':
         gradient_mask = _local_mask(score, density)
     elif mask_type == 'global':
@@ -106,6 +111,7 @@ def _create_gradiend_mask(score: Dict[str, torch.Tensor], density: float = 0.2, 
 
     return gradient_mask
 
+
 def mask_dict_to_list(model, gradient_mask_dict):
     """
     Converts a {param_name: mask_tensor} dict into a list of mask_tensors
@@ -114,14 +120,15 @@ def mask_dict_to_list(model, gradient_mask_dict):
     mask_list = []
     for name, param in model.named_parameters():
         if name not in gradient_mask_dict:
-            mask = torch.zeros_like(param, dtype = torch.float)
+            mask = torch.zeros_like(param, dtype=torch.float)
         else:
             mask = gradient_mask_dict[name]
-            
+
         if param.shape != mask.shape:
             raise ValueError(f"Mask shape mismatch for {name}: {param.shape} vs {mask.shape}")
         mask_list.append(mask.to(param.device))
     return mask_list
+
 
 def compress_mask_sparse(mask_list):
     """
@@ -134,6 +141,7 @@ def compress_mask_sparse(mask_list):
         compressed.append((shape, indices))
     data_bytes = pickle.dumps(compressed)
     return data_bytes
+
 
 def uncompress_mask_sparse(mask_bytes, device=None):
     """
@@ -149,58 +157,64 @@ def uncompress_mask_sparse(mask_bytes, device=None):
         uncompressed.append(mask)
     return uncompressed
 
+
 def create_mask(
-    dataloader: torch.utils.data.DataLoader,
-    model: torch.nn.Module,
-    sparsity: float | None = None,
-    density: float | None = None,
-    mask_type: str = 'local',
-    rounds: int = 1
-) -> Dict[str, torch.Tensor]:
+        dataloader: torch.utils.data.DataLoader,
+        model: torch.nn.Module,
+        sparsity: float | None = None,
+        density: float | None = None,
+        mask_type: str = 'local',
+        rounds: int = 1,
+        return_scores: bool = False,
+) -> Dict[str, torch.Tensor] | tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
     # --- Parameter Validation ---
     if sparsity is not None and density is not None:
         raise ValueError("Only one of 'sparsity' or 'density' should be provided.")
     if sparsity is None and density is None:
         raise ValueError("Either 'sparsity' or 'density' must be provided.")
-    
+
     if sparsity is not None:
         if not (0.0 <= sparsity <= 1.0):
             raise ValueError(f"Sparsity value out of range, {sparsity} was given. Expected value between 0.0 and 1.0")
         target_density = 1 - sparsity
         print_param_info = f"sparsity ({sparsity:.2f})"
-    else: # density is not None
+    else:  # density is not None
         if not (0.0 <= density <= 1.0):
             raise ValueError(f"Density value out of range, {density} was given. Expected value between 0.0 and 1.0")
         target_density = density
         print_param_info = f"density ({density:.2f})"
-        
+
     if mask_type not in ['local', 'global']:
         raise ValueError(f'Invalid mask type: {mask_type}, expected "local" or "global"')
     if rounds < 1:
         raise ValueError(f"Rounds must be a positive integer, {rounds} was given")
-    
+
     # --- Initialization ---
     # Initialize mask to all ones
-    mask = {name: torch.ones_like(param.data, device = param.device) for name, param in model.named_parameters()}
-    
+    mask = {name: torch.ones_like(param.data, device=param.device) for name, param in model.named_parameters()}
+
     # --- Calibration Rounds ---
     if rounds == 1:
         print(f'Computing simple {mask_type} mask with target {print_param_info}.')
     else:
         print(f'Computing calibrated {mask_type} mask for {rounds} rounds with target {print_param_info}.')
-        
+
     for r in range(rounds):
         print(f'Round {r + 1}/{rounds}.')
-        
+
         # --- Round Density ---
-        current_round_density = target_density**((r + 1)/rounds)
+        current_round_density = target_density ** ((r + 1) / rounds)
         print(f'\tCurrent round density {current_round_density:.2f}%')
-        
+
         # --- Compute Score ---
         print(f'\tComputing the masked fisher score')
-        score = masked_fisher_score(dataloader, model, current_mask = mask)
-        
+        score = masked_fisher_score(dataloader, model, current_mask=mask)
+
         # --- Update Mask ---
         print(f'\tUpdating the mask')
-        mask = _create_gradiend_mask(score, density = current_round_density, mask_type = mask_type)
+        mask = _create_gradiend_mask(score, density=current_round_density, mask_type=mask_type)
+
+    if return_scores:
+        return mask, score
+
     return mask
