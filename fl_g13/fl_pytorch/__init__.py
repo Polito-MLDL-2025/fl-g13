@@ -7,3 +7,5 @@ from .FullyCentralizedMaskedStrategy import FullyCentralizedMaskedFedAvg
 from .FullyCentralizedMaskedClient import FullyCentralizedMaskedClient
 from .LRUpdateFedAvg import LRUpdateFedAvg
 from .LRUpdateWarmUpHeadTalosClient import LRUpdateWarmUpHeadTalosClient
+from .DynamicQuorumClient import DynamicQuorumClient
+from .DynamicQuorumStrategy import DynamicQuorum
