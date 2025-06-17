@@ -372,11 +372,9 @@ masks, scores, _ = get_client_masks(
 from fl_g13.fl_pytorch.editing.centralized_mask import aggregate_by_sum
 
 sum_mask = aggregate_by_sum(masks)
-sum_mask
 
 
 sum_score = aggregate_by_sum(scores)
-sum_score
 
 
 # ## Save/load them to file
@@ -389,12 +387,6 @@ sum_mask = load_mask('centralized_sum_mask.pth')
 sum_score = load_mask('centralized_sum_score.pth')
 
 
-sum_mask
-
-
-sum_score
-
-
 # ## Compute mask by fisher score server-side
 
 from fl_g13.editing.masking import _create_gradiend_mask
@@ -403,5 +395,4 @@ density = 0.2
 mask_type = 'local'
 
 server_mask = _create_gradiend_mask(sum_score, density=density, mask_type=mask_type)
-server_mask
 
