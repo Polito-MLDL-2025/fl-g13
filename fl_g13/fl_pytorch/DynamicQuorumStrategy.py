@@ -30,6 +30,7 @@ class DynamicQuorum(CustomFedAvg):
         # The mask sum is now computed ONCE at initialization
         self.mask_sum = mask_sum
         self.global_mask = None # Will be generated in the first configure_fit call
+        self.sparsity = 0.0
 
     def configure_fit(self, server_round, parameters, client_manager):
         """
@@ -39,7 +40,7 @@ class DynamicQuorum(CustomFedAvg):
         
         # --- DYNAMIC QUORUM LOGIC ---
         # 1. Check if it's time to update the quorum (but not in the very first round)
-        if server_round > 1 and (server_round - 1) % self.quorum_update_frequency == 0:
+        if server_round > 2 and server_round % self.quorum_update_frequency == 0:
             self.current_quorum = min(self.num_total_clients, self.current_quorum + self.quorum_increment)
             logger.log(INFO, f"[Round {server_round}] Quorum updated to: {self.current_quorum}")
             updated_quorum = True
@@ -52,13 +53,20 @@ class DynamicQuorum(CustomFedAvg):
             # Log initial state
             total_params = sum(np.prod(layer.shape) for layer in self.global_mask)
             total_non_zero = sum(layer.cpu().numpy().nonzero()[0].size for layer in self.global_mask)
-            sparsity = 1.0 - (total_non_zero / total_params)
-            logger.log(INFO, f"[Round {server_round}] Generated global mask with sparsity: {sparsity:.4f}")
+            self.sparsity = 1.0 - (total_non_zero / total_params)
+            logger.log(INFO, f"[Round {server_round}] Generated global mask with sparsity: {self.sparsity:.4f}")
 
         # 3. Prepare the configuration to be sent to the clients
         config = {}
         if self.global_mask is not None:
             config["global_mask"] = compress_mask_sparse(self.global_mask)
+        
+        if self.use_wandb:
+            wandb_quorum_stats = {
+                'quorum': self.current_quorum,
+                'mask_sparsity': self.sparsity
+            }
+            self.wandb_log(server_round = server_round, results_dict = wandb_quorum_stats)
         
         fit_ins = FitIns(parameters, config)
         clients = client_manager.sample(num_clients=self.min_fit_clients, min_num_clients=self.min_available_clients)
