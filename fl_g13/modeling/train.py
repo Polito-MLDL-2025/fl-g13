@@ -34,7 +34,8 @@ def train_for_steps(
     step = 0
     data_iter = iter(batch_iterator)
     while step < num_steps:
-        print(f"Step {step + 1}/{num_steps} | Total batches: {total_batches}")
+        if verbose > 0:
+            print(f"Step {step + 1}/{num_steps} | Total batches: {total_batches}")
         try:
             X, y = next(data_iter)
         except StopIteration:
@@ -202,11 +203,11 @@ def train(
     # Generate a random prefix/name for the model if none is provided
     if not name:
         name = generate_goofy_name(checkpoint_dir)
-        print(f"No prefix/name for the model was provided, choosen prefix/name: {name}")
-        print()
+        if verbose > 0:
+            print(f"No prefix/name for the model was provided, choosen prefix/name: {name}")
     else:
-        print(f"Prefix/name for the model was provided: {name}")
-        print()
+        if verbose > 0:
+            print(f"Prefix/name for the model was provided: {name}")
 
     # Initialize lists if not provided
     if all_training_losses is None:
@@ -257,13 +258,14 @@ def train(
 
         # Print training results for the current epoch
         current_time = time.strftime("%H:%M", time.localtime())
-        print(
-            f"🚀 Epoch {adjusted_epoch}/{adjusted_end_epoch} ({100 * adjusted_epoch / adjusted_end_epoch:.2f}%) Completed\n"
-            f"\t📊 Training Loss: {train_loss:.4f}\n"
-            f"\t✅ Training Accuracy: {100 * training_accuracy:.2f}%\n"
-            f"\t⏳ Elapsed Time: {elapsed_time:.2f}s | ETA: {eta:.2f}s\n"
-            f"\t🕒 Completed At: {current_time}"
-        )
+        if verbose > 0:
+            print(
+                f"🚀 Epoch {adjusted_epoch}/{adjusted_end_epoch} ({100 * adjusted_epoch / adjusted_end_epoch:.2f}%) Completed\n"
+                f"\t📊 Training Loss: {train_loss:.4f}\n"
+                f"\t✅ Training Accuracy: {100 * training_accuracy:.2f}%\n"
+                f"\t⏳ Elapsed Time: {elapsed_time:.2f}s | ETA: {eta:.2f}s\n"
+                f"\t🕒 Completed At: {current_time}"
+            )
         if val_dataloader and eval_every and epoch % eval_every == 0:
             # Evaluate the model on the validation dataset
             validation_loss, validation_accuracy, _ = eval(
@@ -274,13 +276,12 @@ def train(
             all_validation_accuracies.append(validation_accuracy)
 
             # Print validation results for the current epoch
-            print(
-                f"🔍 Validation Results:\n"
-                f"\t📉 Validation Loss: {validation_loss:.4f}\n"
-                f"\t🎯 Validation Accuracy: {100 * validation_accuracy:.2f}%"
-            )
-
-        print()
+            if verbose > 0:
+                print(
+                    f"🔍 Validation Results:\n"
+                    f"\t📉 Validation Loss: {validation_loss:.4f}\n"
+                    f"\t🎯 Validation Accuracy: {100 * validation_accuracy:.2f}%"
+                )
 
         # Update the learning rate scheduler if provided
         if scheduler:
@@ -311,7 +312,8 @@ def train(
 
         if backup_every and epoch % backup_every == 0:
             # Backup the model, optimizer, and scheduler state to avoid overwriting
-            print(f"Running backup for epoch {epoch}")
+            if verbose > 0:
+                print(f"Running backup for epoch {epoch}")
             save(checkpoint_dir=f"{checkpoint_dir}/backup", prefix=f"backup_{time.strftime('%Y%m%d_%H%M%S', time.localtime())}_{name}", model=model, epoch=adjusted_epoch, optimizer=optimizer, scheduler=scheduler)
             
             # Backup metrics
@@ -329,7 +331,5 @@ def train(
                 val_accuracies = all_validation_accuracies,
                 val_epochs = val_epochs
             )
-            print()
-
-
+            
     return all_training_losses, all_validation_losses, all_training_accuracies, all_validation_accuracies
