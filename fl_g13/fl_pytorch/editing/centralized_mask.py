@@ -1,6 +1,8 @@
 import gc
 from typing import List, Dict, Tuple
 
+from tqdm import tqdm
+
 import torch
 
 from fl_g13.editing import create_mask, mask_dict_to_list
@@ -30,8 +32,8 @@ def get_client_masks(
         ## get fisher score
         return_scores=True
 
-) -> (List[Dict[str, torch.Tensor]], List[Dict[str, torch.Tensor]],
-      List[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]]):
+) -> Tuple[List[Dict[str, torch.Tensor]], List[Dict[str, torch.Tensor]],
+    List[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]]]:
     """
     Generate pruning masks for a model based on federated client datasets.
 
@@ -105,18 +107,18 @@ def get_client_masks(
     masks = []
     scores = []
     client_datasets = []
-    for i in range(client_num_partitions):
+    for i in tqdm(range(client_num_partitions), desc = 'Clients mask'):
         partition_id = i
         client_trainloader, client_valloader = load_flwr_datasets(partition_id=partition_id,
-                                                                  partition_type=client_partition_type,
-                                                                  num_partitions=client_num_partitions,
-                                                                  num_shards_per_partition=client_num_shards_per_partition,
-                                                                  batch_size=client_batch_size,
-                                                                  train_test_split_ratio=client_train_test_split_ratio,
-                                                                  dataset=client_dataset,
-                                                                  transform=client_transform,
-                                                                  seed=client_seed
-                                                                  )
+                                                                partition_type=client_partition_type,
+                                                                num_partitions=client_num_partitions,
+                                                                num_shards_per_partition=client_num_shards_per_partition,
+                                                                batch_size=client_batch_size,
+                                                                train_test_split_ratio=client_train_test_split_ratio,
+                                                                dataset=client_dataset,
+                                                                transform=client_transform,
+                                                                seed=client_seed
+                                                                )
 
         if not (mask_func and callable(mask_func)):
             mask_func = create_mask

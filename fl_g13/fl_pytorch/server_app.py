@@ -7,6 +7,7 @@ from torchvision import datasets
 from fl_g13.config import RAW_DATA_DIR
 from fl_g13.fl_pytorch.FullyCentralizedMaskedStrategy import FullyCentralizedMaskedFedAvg
 from fl_g13.fl_pytorch.LRUpdateFedAvg import LRUpdateFedAvg
+from fl_g13.fl_pytorch.DynamicQuorumStrategy import DynamicQuorum
 from fl_g13.fl_pytorch.datasets import get_eval_transforms
 from fl_g13.fl_pytorch.strategy import CustomFedAvg
 from fl_g13.fl_pytorch.task import get_weights, set_weights
@@ -82,7 +83,12 @@ def get_server_app(
         wandb_config=None,
         evaluate_each=1,
         model=None,
-        start_epoch=None
+        start_epoch=None,
+        global_mask = None,
+        num_total_clients = 100,
+        quorum_update_frequency = 10,
+        initial_quorum = 1,
+        quorum_increment = 10,
 ):
     # Load or create model if not found in checkpoint_dir (if found will always load the most recent one)
     if model is None or start_epoch is None:
@@ -178,6 +184,36 @@ def get_server_app(
                 evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
                 use_wandb=use_wandb,
                 wandb_config=wandb_config,
+                evaluate_each=evaluate_each,
+            )
+        elif strategy == 'quorum':
+            print("Using strategy 'DynmicQuorum'")
+            strategy = DynamicQuorum(
+                mask_sum = global_mask,
+                num_total_clients = num_total_clients,
+                quorum_update_frequency = quorum_update_frequency,
+                initial_quorum = initial_quorum,
+                quorum_increment = quorum_increment,
+                
+                # Default
+                checkpoint_dir=checkpoint_dir,
+                prefix=prefix,
+                model=model,
+                initial_parameters=params,
+                start_epoch=start_epoch,
+                save_every=save_every,
+                save_with_model_dir=save_with_model_dir,
+                fraction_fit=fraction_fit,
+                fraction_evaluate=fraction_evaluate,
+                min_fit_clients=min_fit_clients,
+                min_evaluate_clients=min_evaluate_clients,
+                min_available_clients=min_available_clients,
+                evaluate_fn=evaluate_fn,
+                fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
+                evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
+                use_wandb=use_wandb,
+                wandb_config=wandb_config,
+                on_fit_config_fn=on_fit_config_fn,
                 evaluate_each=evaluate_each,
             )
 

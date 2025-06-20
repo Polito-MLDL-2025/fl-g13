@@ -166,6 +166,7 @@ def create_mask(
         mask_type: str = 'local',
         rounds: int = 1,
         return_scores: bool = False,
+        verbose: bool = False
 ) -> Dict[str, torch.Tensor] | tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
     # --- Parameter Validation ---
     if sparsity is not None and density is not None:
@@ -195,23 +196,29 @@ def create_mask(
 
     # --- Calibration Rounds ---
     if rounds == 1:
-        print(f'Computing simple {mask_type} mask with target {print_param_info}.')
+        if verbose:
+            print(f'Computing simple {mask_type} mask with target {print_param_info}.')
     else:
-        print(f'Computing calibrated {mask_type} mask for {rounds} rounds with target {print_param_info}.')
+        if verbose:
+            print(f'Computing calibrated {mask_type} mask for {rounds} rounds with target {print_param_info}.')
 
     for r in range(rounds):
-        print(f'Round {r + 1}/{rounds}.')
+        if verbose:
+            print(f'Round {r + 1}/{rounds}.')
 
         # --- Round Density ---
         current_round_density = target_density ** ((r + 1) / rounds)
-        print(f'\tCurrent round density {current_round_density:.2f}%')
+        if verbose:
+            print(f'\tCurrent round density {current_round_density:.2f}%')
 
         # --- Compute Score ---
-        print(f'\tComputing the masked fisher score')
-        score = masked_fisher_score(dataloader, model, current_mask=mask)
+        if verbose:
+            print(f'\tComputing the masked fisher score')
+        score = masked_fisher_score(dataloader, model, current_mask=mask, verbose = 0)
 
         # --- Update Mask ---
-        print(f'\tUpdating the mask')
+        if verbose:
+            print(f'\tUpdating the mask')
         mask = _create_gradiend_mask(score, density=current_round_density, mask_type=mask_type)
 
     if return_scores:
