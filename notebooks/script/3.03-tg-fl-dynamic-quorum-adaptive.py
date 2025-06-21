@@ -82,14 +82,14 @@ client_batch_size = 16
 # Adaptive Quorum strategy
 strategy = 'quorum'
 mask_strategy = 'sum'
-quorum_increment = 7
+quorum_increment = 6
 quorum_update_frequency = 5
 initial_quorum = 1
 adaptive_quorum = True
-initial_target_sparsity = 0.65
-drift_threshold = 0.0005
-quorum_patience = 3
-force_quorum_update = 15
+initial_target_sparsity = 0.60
+drift_threshold = 0.00041
+quorum_patience = 4
+force_quorum_update = 17
 
 # model editing config
 model_editing = True
@@ -231,10 +231,12 @@ wandb_config = {
     # strategy config
     'adaptive_quorum': adaptive_quorum,
     'initial_quorum': initial_quorum,
+    'initial_target_sparsity': initial_target_sparsity,
     'quorum_update_frequency': quorum_update_frequency,
     'quorum_increment': quorum_increment,
     'drift_threshold': drift_threshold,
-    'quorum_patience': quorum_patience
+    'quorum_patience': quorum_patience,
+    'force_quorum_update': force_quorum_update
 }
 
 client = get_client_app(
