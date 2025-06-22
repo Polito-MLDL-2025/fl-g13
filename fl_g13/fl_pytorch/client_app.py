@@ -65,9 +65,9 @@ def get_client_app(
         mask_func=None,
 ) -> ClientApp:
     def client_fn(context: Context):
-        print(f"[Client] Client on device: {next(model.parameters()).device}")
-        if torch.cuda.is_available():
-            print(f"[Client] CUDA available in client: {torch.cuda.is_available()}")
+        if verbose > 0:
+            print(f"[Client] Client on device: {next(model.parameters()).device}")
+            # print(f"[Client] CUDA available in client: {torch.cuda.is_available()}")
 
         trainloader, valloader = load_data_fn(
             context=context,
@@ -173,7 +173,7 @@ def get_client_app(
                 mask_func=mask_func,
                 mask=mask,
                 local_steps=local_steps,
-            )
+            ).to_client()
 
     app = ClientApp(client_fn=client_fn)
     return app

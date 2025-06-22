@@ -179,6 +179,6 @@ class CustomNumpyClient(NumPyClient):
 
     def evaluate(self, parameters, config):
         set_weights(self.model, parameters)
-        test_loss, test_accuracy, _ = eval(self.valloader, self.model, self.criterion)
+        test_loss, test_accuracy, _ = eval(self.valloader, self.model, self.criterion, self.verbose)
 
         return test_loss, len(self.valloader.dataset), {"accuracy": test_accuracy}

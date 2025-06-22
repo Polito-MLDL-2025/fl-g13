@@ -19,11 +19,6 @@ from fl_g13.modeling.load import load_or_create
 
 def get_evaluate_fn(testloader, model, criterion):
     def evaluate(server_round, parameters_ndarrays, config):
-        # Debugging prints
-        print(f"[Server Eval Round {server_round}] Model device: {next(model.parameters()).device}")
-        if torch.cuda.is_available():
-            print(f"[Server Eval Round {server_round}] CUDA available in server eval: {torch.cuda.is_available()}")
-
         # Applies new parameters to model
         set_weights(model, parameters_ndarrays)
 
@@ -86,9 +81,16 @@ def get_server_app(
         start_epoch=None,
         global_mask = None,
         num_total_clients = 100,
+        verbose = 0,
+        
+        adaptive_quorum = False,
+        initial_target_sparsity = 0.7,
         quorum_update_frequency = 10,
         initial_quorum = 1,
         quorum_increment = 10,
+        drift_threshold = 0.5,
+        quorum_patience = 2,
+        force_quorum_update = 15
 ):
     # Load or create model if not found in checkpoint_dir (if found will always load the most recent one)
     if model is None or start_epoch is None:
@@ -105,9 +107,8 @@ def get_server_app(
     def server_fn(context):
 
         # Debugging prints
-        print(f"[Server] Server on device: {next(model.parameters()).device}")
-        if torch.cuda.is_available():
-            print(f"[Server] CUDA available in client: {torch.cuda.is_available()}")
+        if verbose > 0:
+            print(f"[Server] Server on device: {next(model.parameters()).device}")
 
         # Retrive test dataset and prepare dataloader
         testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
@@ -191,9 +192,14 @@ def get_server_app(
             strategy = DynamicQuorum(
                 mask_sum = global_mask,
                 num_total_clients = num_total_clients,
+                adaptive_quorum = adaptive_quorum,
+                initial_target_sparsity = initial_target_sparsity,
                 quorum_update_frequency = quorum_update_frequency,
                 initial_quorum = initial_quorum,
                 quorum_increment = quorum_increment,
+                drift_threshold = drift_threshold,
+                quorum_patience = quorum_patience,
+                force_quorum_update = force_quorum_update,
                 
                 # Default
                 checkpoint_dir=checkpoint_dir,

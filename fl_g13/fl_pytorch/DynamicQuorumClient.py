@@ -18,7 +18,8 @@ class DynamicQuorumClient(CustomNumpyClient):
     def fit(self, parameters, config):        
         # Check if the server sent a global mask. This logic is unchanged.
         if "global_mask" in config:
-            logger.log(INFO, "[CLIENT] Received global mask from the server")
+            if self.verbose > 0:
+                print("[Client] Received global mask from the server")
             global_mask_compressed = config["global_mask"]
             global_mask_uncompressed = uncompress_mask_sparse(global_mask_compressed)
             self.set_mask(global_mask_uncompressed)
