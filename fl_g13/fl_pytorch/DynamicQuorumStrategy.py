@@ -24,7 +24,9 @@ def _set_initial_quorum(mask_sum, target_sparsity = 0.7):
         sparsity = _compute_sparsity_given_quorum(mask_sum, q)
         if sparsity >= target_sparsity:
             return q
-        
+    
+    # If here, than there's a least a value that satisfy the requirement and must be the last one
+    #   since the for loop did not return prematurely
     return 100 # fallback
 
 class DynamicQuorum(CustomFedAvg):
@@ -35,11 +37,11 @@ class DynamicQuorum(CustomFedAvg):
         quorum_update_frequency=10,
         initial_quorum=1,
         quorum_increment=10,
-        # --- NEW PARAMETERS FOR ADAPTIVE MODE ---
+        # --- ADAPTIVE MODE ---
         adaptive_quorum: bool = False,
         initial_target_sparsity: float = 0.7,
         drift_threshold: float = 0.5,
-        quorum_patience: int = 2, # Rounds to wait after a quorum update before checking again
+        quorum_patience: int = 2,
         force_quorum_update: int = 15,
         *args, **kwargs
     ):
@@ -50,7 +52,7 @@ class DynamicQuorum(CustomFedAvg):
         self.initial_quorum = initial_quorum
         self.quorum_increment = quorum_increment
         
-        # --- NEW: Adaptive Quorum Parameters ---
+        # --- Adaptive Quorum Parameters ---
         self.adaptive_quorum = adaptive_quorum
         self.drift_threshold = drift_threshold
         self.quorum_patience = quorum_patience
@@ -67,7 +69,7 @@ class DynamicQuorum(CustomFedAvg):
         # Only in ADAPTIVE mode
         if self.adaptive_quorum:
             self.current_quorum = _set_initial_quorum(self.mask_sum, target_sparsity = initial_target_sparsity)
-            # if cannot reach target sparsity, return tu LINEAR mode
+            # if cannot reach target sparsity, return to LINEAR mode
             if self.current_quorum < 0:
                 self.adaptive_quorum = False
                 self.current_quorum = initial_quorum            
@@ -78,10 +80,6 @@ class DynamicQuorum(CustomFedAvg):
             logger.log(INFO, f"[DQ] LINEAR mode enabled. Quorum: {self.current_quorum}; Update frequency: {self.quorum_update_frequency} rounds.")
 
     def configure_fit(self, server_round, parameters, client_manager):
-        """
-        Adjusts the quorum and creates the global mask before sending it to clients.
-        """
-        # --- QUORUM UPDATE LOGIC ---
         updated_quorum = False
         
         # 1. Use LINEAR update logic if adaptive mode is OFF
@@ -104,7 +102,6 @@ class DynamicQuorum(CustomFedAvg):
                 self.sparsity = _compute_sparsity_given_quorum(self.mask_sum, self.current_quorum)
                 logger.log(INFO, f"[Round {server_round} DQ] Generated global mask with sparsity: {self.sparsity:.4f}")
 
-        # Prepare the configuration to be sent to the clients
         config = {}
         if self.global_mask is not None:
             # Move to CPU before serialization
@@ -116,28 +113,26 @@ class DynamicQuorum(CustomFedAvg):
             wandb_quorum_stats = { 'quorum': self.current_quorum, 'mask_sparsity': self.sparsity }
             self.wandb_log(server_round = server_round, results_dict = wandb_quorum_stats)
         
+        # Send to clients
         fit_ins = FitIns(parameters, config)
         clients = client_manager.sample(num_clients=self.min_fit_clients, min_num_clients=self.min_available_clients)
         return [(client, fit_ins) for client in clients]
     
     def aggregate_fit(self, server_round, results, failures):
-        """
-        Override aggregate_fit to implement the adaptive quorum logic.
-        """
-        # First, run the parent aggregation to get metrics, including 'avg_drift'
         aggregated_params, aggregated_metrics = super().aggregate_fit(server_round, results, failures)
 
-        # --- NEW: ADAPTIVE QUORUM UPDATE LOGIC ---
+        # --- ADAPTIVE QUORUM UPDATE LOGIC ---
         if self.adaptive_quorum and aggregated_params is not None:
+            # Average Dirft is used for the quorum update
             avg_drift = aggregated_metrics.get("avg_drift", float('inf'))
             
             # Check conditions: 
-            # Force update
+            ### Force quorum update
             if (server_round + 1 - self.last_quorum_update_round) % self.force_quorum_update == 0:
                 self.current_quorum = min(self.num_total_clients, self.current_quorum + self.quorum_increment)
                 self.last_quorum_update_round = server_round
                 logger.log(INFO, f"[Round {server_round} DQ-ADAPTIVE] New Quorum: {self.current_quorum} (Forcing an update)")
-            # drift is below threshold AND enough rounds have passed since the last update
+            ### Stable clients: Drift is below threshold
             if avg_drift < self.drift_threshold and (server_round - self.last_quorum_update_round) >= self.quorum_patience:
                 self.current_quorum = min(self.num_total_clients, self.current_quorum + self.quorum_increment)
                 self.last_quorum_update_round = server_round

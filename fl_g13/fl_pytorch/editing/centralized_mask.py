@@ -386,7 +386,6 @@ def load_or_create_centralized_mask(
     aggregation_fn,
     client_partition_type,
     client_num_shards_per_partition,
-    client_local_steps,
     
     sparsity = 0.7,
     mask_type = 'local',

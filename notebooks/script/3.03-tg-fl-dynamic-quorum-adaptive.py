@@ -183,7 +183,6 @@ sum_mask, _ = load_or_create_centralized_mask(
     aggregation_fn = None,
     client_partition_type = partition_type,
     client_num_shards_per_partition = num_shards_per_partition,
-    client_local_steps = J,
     
     sparsity = sparsity,
     mask_type = mask_type,
