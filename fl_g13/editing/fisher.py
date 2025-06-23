@@ -67,7 +67,7 @@ def masked_fisher_score(
     # Get the device where the model is located
     device = next(model.parameters()).device
     torch.cuda.empty_cache()
-    if verbose > 0:
+    if verbose == 2: # detail
         print("Computing Masked Fisher Score")
         print(f"Device:{device}")
     # Set the model to evaluation mode    

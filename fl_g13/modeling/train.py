@@ -169,6 +169,7 @@ def train(
     all_validation_accuracies: Optional[List[float]] = None,     # Pre-allocated list to store validation accuracies (optional)
     eval_every: Optional[int] = 1,    #  Frequency (in epochs) to run evaluation model
     num_steps: Optional[int] = None,  # Number of steps to train the model (optional)
+    with_model_dir: Optional[bool] = True
 ) -> Tuple[List[float], List[float], List[float], List[float]]:
     """
     Train the model for a given number of epochs, periodically saving checkpoints and tracking performance metrics.
@@ -290,7 +291,7 @@ def train(
         # Save the model checkpoint periodically based on save_every
         if save_every and epoch % save_every == 0:
             # Save the model, optimizer, and scheduler state
-            save(checkpoint_dir=checkpoint_dir, prefix=name, model=model, epoch=adjusted_epoch, optimizer=optimizer, scheduler=scheduler)
+            save(checkpoint_dir=checkpoint_dir, prefix=name, model=model, epoch=adjusted_epoch, optimizer=optimizer, scheduler=scheduler, with_model_dir = with_model_dir)
             
             # Save the train/val loss and train/val accuracy
             train_epochs = list(range(start_epoch, adjusted_epoch + 1))
@@ -306,7 +307,8 @@ def train(
                 train_epochs = train_epochs,
                 val_losses = all_validation_losses,
                 val_accuracies = all_validation_accuracies,
-                val_epochs = val_epochs
+                val_epochs = val_epochs,
+                with_model_dir = with_model_dir
             )
             print()
 

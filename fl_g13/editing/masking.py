@@ -209,12 +209,12 @@ def create_mask(
         # --- Round Density ---
         current_round_density = target_density ** ((r + 1) / rounds)
         if verbose:
-            print(f'\tCurrent round density {current_round_density:.2f}%')
+            print(f'\tCurrent round density {100*current_round_density:.2f}%')
 
         # --- Compute Score ---
         if verbose:
             print(f'\tComputing the masked fisher score')
-        score = masked_fisher_score(dataloader, model, current_mask=mask, verbose = 0)
+        score = masked_fisher_score(dataloader, model, current_mask=mask, verbose = verbose)
 
         # --- Update Mask ---
         if verbose:
