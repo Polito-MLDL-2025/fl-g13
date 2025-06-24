@@ -34,7 +34,7 @@ print(f"Using device: {device}")
 
 # Settings
 name="arcanine"
-CHECKPOINT_DIR = dotenv.dotenv_values()["CHECKPOINT_DIR"]
+CHECKPOINT_DIR = '/content/drive/MyDrive/checkpoints'
 start_epoch = 1
 num_epochs = 30
 save_every = 1
@@ -61,9 +61,9 @@ test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 # Model
 model = BaseDino(
-    head_layers=head_layers, 
-    head_hidden_size=head_hidden_size, 
-    dropout_rate=dropout_rate, 
+    head_layers=head_layers,
+    head_hidden_size=head_hidden_size,
+    dropout_rate=dropout_rate,
     unfreeze_blocks=unfreeze_blocks
     )
 model.to(device)
@@ -78,8 +78,8 @@ optimizer = SparseSGDM(
     weight_decay=weight_decay
     )
 scheduler = CosineAnnealingLR(
-    optimizer=optimizer, 
-    T_max=T_max, 
+    optimizer=optimizer,
+    T_max=T_max,
     eta_min=eta_min
     )
 criterion = CrossEntropyLoss()
