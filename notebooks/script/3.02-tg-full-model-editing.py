@@ -10,21 +10,19 @@ from torch.nn import CrossEntropyLoss
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
-import numpy as np
+from fl_g13.config import RAW_DATA_DIR
 
-import json
-
-from fl_g13.config import RAW_DATA_DIR, PROJ_ROOT
-
-from fl_g13.modeling import train, load, eval, plot_metrics, get_preprocessing_pipeline
+from fl_g13.modeling import train, load, eval, get_preprocessing_pipeline
 
 from fl_g13.architectures import BaseDino
 
 from fl_g13.editing import SparseSGDM
-from fl_g13.editing import per_class_accuracy
-from fl_g13.editing import fisher_scores
-from fl_g13.editing import create_gradiend_mask, mask_dict_to_list
+from fl_g13.editing import create_mask, mask_dict_to_list
 
+import dotenv
+
+
+dotenv.load_dotenv()
 
 train_dataset, val_dataset, test_dataset = get_preprocessing_pipeline(RAW_DATA_DIR)
 
@@ -35,121 +33,144 @@ print(f"Test dataset size: {len(test_dataset)}")
 
 # # Define model to edit
 
+# Move to CUDA
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-CHECKPOINT_DIR = str(PROJ_ROOT / 'checkpoints')
-model_name = 'archeops'
-model_checkpoint_path = f'{CHECKPOINT_DIR}/Editing/{model_name}.pth'
-model_metrics_path = f'{CHECKPOINT_DIR}/Editing/{model_name}.loss_acc.json'
+# Settings
+name="arcanine"
+CHECKPOINT_DIR = dotenv.dotenv_values()["CHECKPOINT_DIR"]
+start_epoch = 1
+num_epochs = 30
+save_every = 1
+backup_every = None
 
-# Hyper-parameters
-# model
-head_layers=3
-head_hidden_size=512
-dropout_rate=0.0
-unfreeze_blocks=12
+# Model Hyper-parameters
+head_layers = 3
+head_hidden_size = 512
+dropout_rate = 0.0
+unfreeze_blocks = 1
 
-# Dataloaders
-BATCH_SIZE = 64
-
-# SparseSGDM optimizer
-LR = 1e-3
-momentum = .9
+# Training Hyper-parameters
+batch_size = 128
+lr = 1e-3
+momentum = 0.9
 weight_decay = 1e-5
-
-# scheduler
 T_max = 8
 eta_min = 1e-5
 
-# Empty model
-# Will be replaced with the already trained model from the checkpoint
+# Dataloaders
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+# Model
 model = BaseDino(
     head_layers=head_layers, 
     head_hidden_size=head_hidden_size, 
     dropout_rate=dropout_rate, 
     unfreeze_blocks=unfreeze_blocks
+    )
+model.to(device)
+
+# Optimizer, scheduler, and loss function
+mask = [torch.ones_like(p, device=p.device) for p in model.parameters()] # Must be done AFTER the model is moved to CUDA
+optimizer = SparseSGDM(
+    model.parameters(),
+    mask=mask,
+    lr=lr,
+    momentum=momentum,
+    weight_decay=weight_decay
+    )
+scheduler = CosineAnnealingLR(
+    optimizer=optimizer, 
+    T_max=T_max, 
+    eta_min=eta_min
+    )
+criterion = CrossEntropyLoss()
+
+loading_epoch = 8
+loading_model_path =  f"{CHECKPOINT_DIR}/{name}/{name}_BaseDino_epoch_{loading_epoch}.pth"
+model, start_epoch = load(
+    loading_model_path,
+    model_class=BaseDino,
+    device=device,
+    optimizer=optimizer,
+    scheduler=scheduler,
+    verbose=True
 )
 model.to(device)
 
-# Dataloaders
-train_dataloader = DataLoader(train_dataset, batch_size = BATCH_SIZE, shuffle = True)
-val_dataloader = DataLoader(val_dataset, batch_size = BATCH_SIZE, shuffle = False)
-test_dataloader = DataLoader(test_dataset, batch_size = BATCH_SIZE, shuffle = False)
-
-# Create a dummy mask for SparseSGDM
-mask = [torch.ones_like(p, device = p.device) for p in model.parameters()] # Must be done AFTER the model is moved to the device
-# Optimizer, scheduler, and loss function
-optimizer = SparseSGDM(
-    model.parameters(), 
-    mask = mask, 
-    lr = LR,
-    momentum = momentum,
-    weight_decay = weight_decay
-)
-scheduler = CosineAnnealingLR(
-    optimizer = optimizer, 
-    T_max = T_max, 
-    eta_min = eta_min
-)
-criterion = CrossEntropyLoss()
-
-# Load the model
-model, _ = load(
-    path = model_checkpoint_path,
-    model_class = BaseDino,
-    optimizer = optimizer,
-    scheduler = scheduler,
-    device = device
-)
-model.to(device) # manually move the model to the device
-
-print(f'\nModel {model_name} loaded from checkpoint.')
-
-
-# Compute test accuracy
-# test_loss, test_accuracy, _ = eval(test_dataloader, model, criterion)
-class_acc = per_class_accuracy(test_dataloader, model)
-test_accuracy = np.mean(class_acc)
-
-# print(f'Test loss: {test_loss:.3f}')
-print(f'Test accuracy: {100*test_accuracy:.2f}%')
-
-
-# Plot training results
-plot_metrics(path = model_metrics_path)
+model_metrics_path=f"{CHECKPOINT_DIR}/{name}/{name}_BaseDino_epoch_{loading_epoch}.loss_acc.json"
 
 
 # # Define model editing
 
-# ## Compute fisher score
-# Build a new dataloader with batch size 1 to get more accurate gradient.
-
-fisher_dataloader = DataLoader(train_dataset, batch_size = 1, shuffle=True)
-
-# Unfreeze of blocks when computing the fisher score
-for param in model.backbone.blocks[-unfreeze_blocks:].parameters():
-    param.requires_grad = True
-scores = fisher_scores(fisher_dataloader, model)
-
-
 # ## Create mask
 
-global_mask = create_gradiend_mask(scores, mask_type = 'global')
-local_mask = create_gradiend_mask(scores, mask_type = 'local')
+import os
 
-global_mask_list = mask_dict_to_list(model, global_mask)
-local_mask_list = mask_dict_to_list(model, local_mask)
+def get_centralized_model_mask(model, dataloader, sparsity, mask_type, calibration_rounds, file_path = 'centralized_model_mask.pth', verbose = False):
+    if file_path and os.path.isfile(file_path):
+        if verbose:
+            print(f'[CMM] Found {file_path}. Loading mask from memory')
+            
+        return torch.load(file_path)
+    
+    # else    
+    if verbose:
+        print('[CMM] Computing mask')
+    mask = create_mask(
+        dataloader, 
+        model, 
+        sparsity = sparsity, 
+        mask_type = mask_type, 
+        rounds = calibration_rounds, 
+        verbose = verbose
+    )
+    
+    if verbose:
+        print(f'[CMM] Saving the mask at "{file_path}"')
+    torch.save(mask, file_path)
+    return mask
+
+
+sparsity = .7
+mask_type = 'local'
+calibration_rounds = 3
+fisher_dataloader = DataLoader(train_dataset, batch_size = 16, shuffle=True)
+
+me_model_name = f'{name}_{loading_epoch}_{mask_type}_{sparsity}_{calibration_rounds}'
+file_path = CHECKPOINT_DIR + f'/masks/{me_model_name}.pth'
+
+# Unfreeze the model before computing the mask
+unfreeze_blocks = 12
+for param in model.backbone.blocks[-unfreeze_blocks:].parameters():
+    param.requires_grad = True
+mask = get_centralized_model_mask(model, fisher_dataloader, sparsity, mask_type, calibration_rounds, file_path, verbose = True)
+mask_list = mask_dict_to_list(model, mask)
 
 
 # # Fine-tune the model
 
-def fine_tune(name, train_dataloader, mask, optimizer, scheduler, criterion, epochs = 10, verbose = 1):
+def fine_tune(
+    starting_model_path, 
+    model_name, 
+    train_dataloader, 
+    test_dataloader, 
+    val_dataloader, 
+    mask, 
+    optimizer, 
+    scheduler, 
+    criterion, 
+    epochs = 10, 
+    verbose = 1
+):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load the model
-    new_model, _ = load(
-        path = model_checkpoint_path,
+    new_model, start_epoch = load(
+        path = starting_model_path,
         model_class = BaseDino,
         optimizer = optimizer,
         scheduler = scheduler,
@@ -157,93 +178,60 @@ def fine_tune(name, train_dataloader, mask, optimizer, scheduler, criterion, epo
     )
     new_model.to(device) # manually move the model to the device
 
+    # unfreeze the model
+    for param in new_model.backbone.blocks[-unfreeze_blocks:].parameters():
+        param.requires_grad = True
+
     # Create a new SparseSGDM optimizer
     new_optimizer = SparseSGDM(
         new_model.parameters(), 
         mask = mask, 
-        lr = LR,
+        lr = lr,
         momentum = momentum,
         weight_decay = weight_decay
     )
 
-    _, _, _, _ = train(
-        checkpoint_dir = CHECKPOINT_DIR,
-        name = name,
-        start_epoch = 1,
-        num_epochs = epochs,
-        save_every = epochs,
-        backup_every = None,
-        train_dataloader = train_dataloader,
-        val_dataloader = None,
-        model = new_model,
-        criterion = criterion,
-        optimizer = new_optimizer,
-        scheduler = None, # No scheduler needed, too few epochs
-        verbose = verbose
-    )
+    try: 
+        _, _, _, _ = train(
+            checkpoint_dir = f'{CHECKPOINT_DIR}/{model_name}',
+            name = model_name,
+            start_epoch = start_epoch,
+            num_epochs = epochs,
+            save_every = 1,
+            backup_every = None,
+            train_dataloader = train_dataloader,
+            val_dataloader = val_dataloader,
+            model = new_model,
+            criterion = criterion,
+            optimizer = new_optimizer,
+            scheduler = scheduler,
+            verbose = verbose,
+            with_model_dir = False
+        )
+    except KeyboardInterrupt:
+        print("Training interrupted manually.")
 
-    # Compute per-class accuracy
-    class_acc = per_class_accuracy(test_dataloader, new_model)
+    except Exception as e:
+        print(f"Training stopped due to error: {e}")
 
-    return class_acc
+    # Final eval
+    test_loss, test_accuracy, _ = eval(dataloader=test_dataloader, model=new_model, criterion=criterion)
+
+    return test_loss, test_accuracy
 
 
-# GLOBAL MASK
-global_acc = fine_tune(
-    name = f'{model_name}_ft_global',
-    mask = global_mask_list,
+# Model editing
+me_test_loss, me_test_acc = fine_tune(
+    starting_model_path = loading_model_path,
+    model_name = me_model_name,
+    train_dataloader = train_dataloader,
+    test_dataloader = test_dataloader,
+    val_dataloader = val_dataloader,
+    mask = mask_list,
     optimizer = optimizer,
     scheduler = scheduler,
     criterion = criterion,
-    train_dataloader = train_dataloader
+    epochs = num_epochs - loading_epoch, # to get to 30
+    verbose = 1
 )
-
-new_test_accuracy = np.mean(global_acc)
-print(f'\nTest accuracy: {100*new_test_accuracy:.2f}% (original: {100*test_accuracy:.2f}%)')
-
-count = sum([1 for i in range(len(global_acc)) if global_acc[i] < class_acc[i]])
-print(f'Fine-tuned model is worse in {count} classes, wrt the original model')
-# Save to file the per-class accuracy difference
-# Create a dictionary with new_class_acc, class_acc, and class_idx
-accuracy_data = {
-    "class_idx": list(range(100)),
-    "new_class_acc": list(global_acc),
-    "class_acc": list(class_acc)
-}
-output_file = f"{CHECKPOINT_DIR}/Editing/{model_name}/accuracy_comparison_global.json"
-
-# Save the dictionary to a JSON file
-with open(output_file, "w") as json_file:
-    json.dump(accuracy_data, json_file, indent=4)
-print(f"Accuracy data saved to {output_file}")
-
-
-# LOCAL MASK
-local_acc = fine_tune(
-    name = f'{model_name}_ft_local',
-    mask = local_mask_list,
-    optimizer = optimizer,
-    scheduler = scheduler,
-    criterion = criterion,
-    train_dataloader = train_dataloader
-)
-
-new_test_accuracy = np.mean(local_acc)
-print(f'\nTest accuracy: {100*new_test_accuracy:.2f}% (original: {100*test_accuracy:.2f}%)')
-
-count = sum([1 for i in range(len(local_acc)) if local_acc[i] < class_acc[i]])
-print(f'Fine-tuned model is worse in {count} classes, wrt the original model')
-# Save to file the per-class accuracy difference
-# Create a dictionary with new_class_acc, class_acc, and class_idx
-accuracy_data = {
-    "class_idx": list(range(100)),
-    "new_class_acc": list(local_acc),
-    "class_acc": list(class_acc)
-}
-output_file = f"{CHECKPOINT_DIR}/Editing/{model_name}/accuracy_comparison_local.json"
-
-# Save the dictionary to a JSON file
-with open(output_file, "w") as json_file:
-    json.dump(accuracy_data, json_file, indent=4)
-print(f"Accuracy data saved to {output_file}")
 
