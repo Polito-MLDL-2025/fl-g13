@@ -179,7 +179,7 @@ def backup(path, new_filename=None):
     shutil.copy2(file_to_backup, dest_path)
     print(f"Backed up '{file_to_backup}' to '{dest_path}'")
 
-def get_preprocessing_pipeline(data_dir):
+def get_preprocessing_pipeline(data_dir, random_state = 42):
     # Define preprocessing pipeline
     train_transform = Compose([
         Resize(256), # CIFRA100 is originally 32x32
@@ -199,7 +199,7 @@ def get_preprocessing_pipeline(data_dir):
     cifar100_train = datasets.CIFAR100(root=data_dir, train=True, download=True, transform=train_transform)
     cifar100_test = datasets.CIFAR100(root=data_dir, train=False, download=True, transform=eval_transform)
 
-    train_dataset, val_dataset = train_test_split(cifar100_train, 0.8, random_state=None)
+    train_dataset, val_dataset = train_test_split(cifar100_train, 0.8, random_state = random_state)
     test_dataset = cifar100_test
 
     return train_dataset, val_dataset, test_dataset
