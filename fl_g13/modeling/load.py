@@ -9,6 +9,8 @@ from torch import nn, optim
 from torch.nn import Module
 from torch.optim.lr_scheduler import _LRScheduler
 
+import matplotlib.pyplot as plt
+
 from fl_g13.modeling.utils import generate_goofy_name
 
 
@@ -342,8 +344,6 @@ def get_model(model_class: Type[nn.Module] | Module):
         except TypeError as e:
             raise ValueError("Model class requires a config or arguments for instantiation.") from e
     return model
-
-import matplotlib.pyplot as plt
 
 def plot_metrics(
     path: str

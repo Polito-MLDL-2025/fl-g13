@@ -5,8 +5,6 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 
 from fl_g13.config import RAW_DATA_DIR
-from fl_g13.fl_pytorch.FullyCentralizedMaskedStrategy import FullyCentralizedMaskedFedAvg
-from fl_g13.fl_pytorch.LRUpdateFedAvg import LRUpdateFedAvg
 from fl_g13.fl_pytorch.DynamicQuorumStrategy import DynamicQuorum
 from fl_g13.fl_pytorch.datasets import get_eval_transforms
 from fl_g13.fl_pytorch.strategy import CustomFedAvg
@@ -141,50 +139,6 @@ def get_server_app(
                 use_wandb=use_wandb,
                 wandb_config=wandb_config,
                 on_fit_config_fn=on_fit_config_fn,
-                evaluate_each=evaluate_each,
-            )
-        elif strategy == 'fully_centralized':
-            print("Using strategy 'CentralizedMaskedFedAvg'")
-            strategy = FullyCentralizedMaskedFedAvg(
-                checkpoint_dir=checkpoint_dir,
-                prefix=prefix,
-                model=model,
-                initial_parameters=params,
-                start_epoch=start_epoch,
-                save_every=save_every,
-                save_with_model_dir=save_with_model_dir,
-                fraction_fit=fraction_fit,
-                fraction_evaluate=fraction_evaluate,
-                min_fit_clients=min_fit_clients,
-                min_evaluate_clients=min_evaluate_clients,
-                min_available_clients=min_available_clients,
-                evaluate_fn=evaluate_fn,
-                fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
-                evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
-                use_wandb=use_wandb,
-                wandb_config=wandb_config,
-                evaluate_each=evaluate_each,
-            )
-        elif strategy == 'scheduling-lr':
-            print("Using strategy 'LRUpdateFedAvg'")
-            strategy = LRUpdateFedAvg(
-                checkpoint_dir=checkpoint_dir,
-                prefix=prefix,
-                model=model,
-                initial_parameters=params,
-                start_epoch=start_epoch,
-                save_every=save_every,
-                save_with_model_dir=save_with_model_dir,
-                fraction_fit=fraction_fit,
-                fraction_evaluate=fraction_evaluate,
-                min_fit_clients=min_fit_clients,
-                min_evaluate_clients=min_evaluate_clients,
-                min_available_clients=min_available_clients,
-                evaluate_fn=evaluate_fn,
-                fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
-                evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
-                use_wandb=use_wandb,
-                wandb_config=wandb_config,
                 evaluate_each=evaluate_each,
             )
         elif strategy == 'quorum':

@@ -8,17 +8,6 @@ from torch.utils.data import DataLoader
 
 fds = None  # Cache the FederatedDataset
 
-
-def get_eval_transforms():
-    eval_transform = transforms.Compose([
-        transforms.Resize(256),  # CIFRA100 is originally 32x32
-        transforms.CenterCrop(224),  # But Dino works on 224x224
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-    return eval_transform
-
-
 # *** -------- TRANSFORMS -------- *** #
 
 def get_train_transforms():
@@ -61,6 +50,7 @@ def get_transforms(type):
 
 
 # *** -------- DATALOADER -------- *** #
+
 def reset_partition():
     global fds
     fds = None
@@ -126,101 +116,3 @@ def collate_batch(batch):
     imgs = torch.stack([b["img"] for b in batch]).float()
     labels = torch.tensor([b["fine_label"] for b in batch], dtype=torch.long)
     return imgs, labels
-
-
-# ! *** -------- PLOTTERS (TODO) -------- *** #
-
-def show_partition_distribution(partitioner):
-    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18, 15))
-
-    plot_label_distributions(
-        partitioner,
-        label_name="fine_label",
-        plot_type="bar",
-        size_unit="absolute",
-        partition_id_axis="x",
-        legend=True,
-        verbose_labels=True,
-        title="Per Partition Labels Distribution",
-        axis=axes[0][0]
-    )
-
-    plot_label_distributions(
-        partitioner,
-        label_name="fine_label",
-        plot_type="bar",
-        size_unit="percent",
-        partition_id_axis="x",
-        legend=True,
-        verbose_labels=True,
-        title="Per Partition Labels Distribution",
-        axis=axes[0][1]
-    )
-
-    plot_label_distributions(
-        partitioner,
-        label_name="fine_label",
-        plot_type="heatmap",
-        size_unit="absolute",
-        partition_id_axis="x",
-        legend=True,
-        verbose_labels=True,
-        title="Per Partition Labels Distribution",
-        axis=axes[1][0]
-    )
-
-    plot_label_distributions(
-        partitioner,
-        label_name="fine_label",
-        plot_type="heatmap",
-        size_unit="percent",
-        partition_id_axis="x",
-        legend=True,
-        verbose_labels=True,
-        title="Per Partition Labels Distribution",
-        axis=axes[1][1]
-    )
-
-    # show the plot even if the script is run in a notebook
-    plt.show()
-    plt.close(fig)
-
-
-def plot_results(results):
-    # Extract data for plotting
-    rounds = [entry['round'] for entry in results['federated_evaluate']]
-    centralized_rounds = [entry['round'] for entry in results['centralized_evaluate']]
-    federated_loss = [entry['federated_evaluate_loss'] for entry in results['federated_evaluate']]
-    federated_accuracy = [entry['federated_evaluate_accuracy'] for entry in results['federated_evaluate']]
-    centralized_loss = [entry['centralized_loss'] for entry in results['centralized_evaluate']]
-    centralized_accuracy = [entry['centralized_accuracy'] for entry in results['centralized_evaluate']]
-    avg_drift = [entry['avg_drift'] for entry in results['client_fit']]
-
-    _, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 6))
-
-    # Plot federated_evaluate_loss
-    axes[0].plot(rounds, federated_loss, label='Federated Evaluate Loss', marker='o', color='red')
-
-    # Plot federated_evaluate_accuracy
-    axes[0].plot(rounds, federated_accuracy, label='Federated Evaluate Accuracy', marker='o', color='blue')
-
-    # Plot centralized_loss
-    axes[0].plot(centralized_rounds, centralized_loss, label='Centralized Loss', marker='o', color='orange')
-
-    # Plot federated_evaluate_accuracy
-    axes[0].plot(centralized_rounds, centralized_accuracy, label='Centralized Accuracy', marker='o', color='green')
-
-    axes[1].plot(rounds, avg_drift, label='Average Drift', marker='o', color='pink')
-
-    axes[0].set_title('Andamento di Federated/Centralized Loss e Accuracy')
-    axes[1].set_title('Andamento Average Drift')
-    axes[0].set_xlabel('Round')
-    axes[0].set_ylabel('Loss and Accuracy')
-    axes[1].set_xlabel('Round')
-    axes[1].set_ylabel('Drift')
-    axes[0].legend()
-    axes[1].legend()
-    axes[0].grid(True)
-    axes[1].grid(True)
-
-    plt.show()
