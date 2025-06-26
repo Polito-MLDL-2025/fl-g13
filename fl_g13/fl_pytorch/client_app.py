@@ -95,6 +95,7 @@ def get_client_app(
                 mask_func=mask_func,
                 mask=mask,
                 local_steps=local_steps,
+                verbose = verbose,
             ).to_client()
         elif strategy == 'quorum':
             # Same params as Default class
@@ -116,6 +117,7 @@ def get_client_app(
                 mask_func=mask_func,
                 mask=mask,
                 local_steps=local_steps,
+                verbose = verbose,
             ).to_client()
 
     app = ClientApp(client_fn=client_fn)

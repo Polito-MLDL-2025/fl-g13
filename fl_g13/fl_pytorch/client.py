@@ -89,7 +89,8 @@ class CustomNumpyClient(NumPyClient):
             dataloader=mask_dataloader,
             sparsity=sparsity,
             mask_type=mask_type,
-            rounds=self.mask_calibration_round
+            rounds=self.mask_calibration_round,
+            verbose = self.verbose
         )
         mask_list = mask_dict_to_list(self.model, mask)
         self.set_mask(mask_list)
