@@ -380,10 +380,8 @@ def load_masks_scores(
 def load_mask(filepath: str = 'centralized_mask.pth') -> Dict[str, torch.Tensor]:
     return torch.load(filepath)
 
-def load_or_create_centralized_mask(
+def load_or_create_masks_scores(
     model,
-    strategy,
-    aggregation_fn,
     client_partition_type,
     client_num_shards_per_partition,
     
@@ -393,31 +391,26 @@ def load_or_create_centralized_mask(
     
     num_clients = 100,
     client_batch_size = 16,
-    return_scores = False,
     
     file_name: str = None,
     
     verbose = False
 ) -> Tuple[
-    Dict[str, torch.Tensor], # mask
-    List[Dict[str, torch.Tensor]] # scores
+    List[Dict[str, torch.Tensor]],  # masks
+    List[Dict[str, torch.Tensor]]   # scores
 ]:
-    if not strategy in ['sum', 'union', 'intersection', 'custom']:
-        raise ValueError(f"[CENTR_MASK] Unknown strategy {strategy}")
-    
     if file_name and os.path.isfile(file_name):
         if verbose:
             print(f'[CENTR_MASK] Found {file_name}. Loading mask from memory')
-            
-        return load_mask(file_name), []
+        return load_masks_scores(file_name)
     
-    ## -- Computing Mask --
     if verbose:
         print('[CENTR_MASK] Computing mask')
+    
     client_masks, scores, _ = get_client_masks(
         ## config client data set params
-        client_partition_type=client_partition_type,  # 'iid' or 'shard' for non-iid dataset
-        client_num_partitions=num_clients,  # equal to number of client
+        client_partition_type=client_partition_type,        # 'iid' or 'shard' for non-iid dataset
+        client_num_partitions=num_clients,                  # equal to number of client
         client_num_shards_per_partition=client_num_shards_per_partition,
         client_batch_size=client_batch_size,
 
@@ -426,24 +419,14 @@ def load_or_create_centralized_mask(
         mask_sparsity=sparsity,
         mask_type=mask_type,
         mask_rounds=mask_rounds,
-        return_scores = return_scores
+        return_scores = True # Always return the scores
     )
     
-    ## -- Aggregation --
-    if verbose:
-        print(f'[CENTR_MASK] Aggregation strategy: {strategy}')
-        
-    if strategy == 'sum':        
-        final_mask = aggregate_by_sum(client_masks)
-    elif strategy in ['union', 'intersection', 'custom']:
-        final_mask = aggregate_masks(client_masks, strategy, aggregation_fn)
-    
-    ## -- Saving for future uses
     if not file_name:
         file_name = 'centralized_mask.pth'
-    if verbose:
-        print(f'[CENTR_MASK] Saving the mask at "{file_name}"')
         
-    save_mask(final_mask, file_name)
+    if verbose:
+        print(f'[CENTR_MASK] Saving the mask and scores at "{file_name}"')
+    save_masks_scores(client_masks, scores, file_name)
     
-    return final_mask, scores
+    return client_masks, scores
