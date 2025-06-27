@@ -8,19 +8,8 @@ get_ipython().run_line_magic('autoreload', '2')
 # !pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 
-from pathlib import Path
-
 import flwr
 import torch
-from flwr.simulation import run_simulation
-from torch.optim.lr_scheduler import CosineAnnealingLR
-
-from fl_g13.architectures import BaseDino
-from fl_g13.editing import SparseSGDM
-from fl_g13.fl_pytorch.client_app import get_client_app
-from fl_g13.fl_pytorch.server_app import get_server_app
-from fl_g13.fl_pytorch.editing.centralized_mask import save_mask
-from fl_g13.fl_pytorch.editing.centralized_mask import load_mask
 
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -97,18 +86,10 @@ from pathlib import Path
 
 import flwr
 import torch
-from flwr.simulation import run_simulation
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader
-from torchvision import datasets
 
 from fl_g13.architectures import BaseDino
-from fl_g13.config import RAW_DATA_DIR
 from fl_g13.editing import SparseSGDM
-from fl_g13.fl_pytorch.client_app import get_client_app
-from fl_g13.fl_pytorch.datasets import get_eval_transforms
-from fl_g13.fl_pytorch.server_app import get_server_app
-from fl_g13.modeling.eval import eval
 
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -239,6 +220,7 @@ scheduler = CosineAnnealingLR(
 
 from typing import Dict, Any
 
+
 def compute_mask_stats(mask_dict: Dict[str, torch.Tensor]) -> Dict[str, Any]:
     """
     Computes various statistics for a mask represented as a dictionary
@@ -255,8 +237,8 @@ def compute_mask_stats(mask_dict: Dict[str, torch.Tensor]) -> Dict[str, Any]:
 
     # --- Overall Statistics ---
     total_elements = 0
-    kept_elements_overall = 0 # Elements with value 1
-    masked_elements_overall = 0 # Elements with value 0
+    kept_elements_overall = 0  # Elements with value 1
+    masked_elements_overall = 0  # Elements with value 0
 
     for name, mask_tensor in mask_dict.items():
         num_elements = mask_tensor.numel()
@@ -289,7 +271,7 @@ def compute_mask_stats(mask_dict: Dict[str, torch.Tensor]) -> Dict[str, Any]:
     return stats
 
 
-def print_mask_stats(stats: Dict[str, Any], layer = False):
+def print_mask_stats(stats: Dict[str, Any], layer=False):
     """
     Prints the mask statistics in a readable format.
 
@@ -310,7 +292,7 @@ def print_mask_stats(stats: Dict[str, Any], layer = False):
     print("-" * 30)
 
     if not layer:
-      return
+        return
 
     print("--- Layer-wise Mask Statistics ---")
     # Sort layer names for consistent output
