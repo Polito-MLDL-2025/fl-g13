@@ -56,7 +56,7 @@ dropout_rate = 0.0
 unfreeze_blocks = 12
 
 ## Training Hyper-parameters
-batch_size = 128
+batch_size = 64
 lr = 1e-3
 momentum = 0.9
 weight_decay = 1e-5
@@ -132,19 +132,13 @@ for m_calibration_rounds, m_type, m_sparsity in product(calibration_rounds, mask
         )
     else:
         optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
-        
     criterion = torch.nn.CrossEntropyLoss()
-    scheduler = CosineAnnealingLR(
-        optimizer=optimizer,
-        T_max=T_max,
-        eta_min=eta_min
-    )
     
     # Unfreeze entire model for model_editing
     model.unfreeze_blocks(unfreeze_blocks)
 
     # Wandb settings
-    use_wandb = False
+    use_wandb = True
     run_name = f"fl_gs_{num_shards_per_partition}_{J}_{m_type}_{m_sparsity}_{m_calibration_rounds}"
     wandb_config = {
         # wandb param
@@ -186,7 +180,7 @@ for m_calibration_rounds, m_type, m_sparsity in product(calibration_rounds, mask
         local_steps=J,
         batch_size=batch_size,
         num_shards_per_partition=num_shards_per_partition,
-        scheduler=scheduler,
+        scheduler=None,
         model_editing=model_editing,
         mask_type=m_type,
         sparsity=m_sparsity,
@@ -201,7 +195,7 @@ for m_calibration_rounds, m_type, m_sparsity in product(calibration_rounds, mask
         model_class=model,
         optimizer=optimizer,
         criterion=criterion,
-        scheduler=scheduler,
+        scheduler=None,
         num_rounds=num_rounds,
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_evaluate,
