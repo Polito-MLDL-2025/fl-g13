@@ -246,6 +246,7 @@ server = get_server_app(
     model= model,
     start_epoch= start_epoch,
     # AdaQuo
+    strategy = strategy,
     global_mask = sum_mask,
     num_total_clients = NUM_CLIENTS,
     adaptive_quorum = adaptive_quorum,
