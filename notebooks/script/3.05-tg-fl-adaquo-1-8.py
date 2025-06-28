@@ -219,10 +219,11 @@ client = get_client_app(
     model_editing=model_editing,
     mask_type=mask_type,
     sparsity=sparsity,
-    mask=mask,
+    mask=dummy_mask, # Will be replaced by the mask sent by the server
     model_editing_batch_size=model_editing_batch_size,
     mask_func=None,
-    mask_calibration_round=calibration_rounds
+    mask_calibration_round=calibration_rounds,
+    strategy=strategy
 )
 
 server = get_server_app(
@@ -242,7 +243,7 @@ server = get_server_app(
     wandb_config=wandb_config,
     save_every=save_every,
     prefix='AdaQuo',
-    evaluate_each=evaluate_each,
+    evaluate_each=1,
     model= model,
     start_epoch= start_epoch,
     # AdaQuo
@@ -256,7 +257,7 @@ server = get_server_app(
     initial_quorum = initial_quorum,
     drift_threshold = drift_threshold,
     quorum_patience = quorum_patience,
-    force_quorum_update = force_quorum_update,
+    force_quorum_update = force_quorum_update
 )
 
 # Run simulation
