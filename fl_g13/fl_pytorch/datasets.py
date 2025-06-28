@@ -108,7 +108,23 @@ def load_flwr_datasets(
         partition_train_test["test"], batch_size=batch_size, shuffle=False, collate_fn=collate_batch
     )
     return trainloader, valloader
+def load_flwr_datasets_test(
+        dataset="cifar100",
+        transform=get_transforms,
+        batch_size=32
+):
+    federated_dataset = FederatedDataset(dataset=dataset, partitioners={"test": IidPartitioner(
+        num_partitions=1
+    )})
+    partition = federated_dataset.load_partition(0)
+    partition_train_test = partition.with_transform(transform(type='eval'))
 
+    # Create train/val for each partition and wrap it into DataLoader
+
+    valloader = DataLoader(
+        partition_train_test, batch_size=batch_size, shuffle=False, collate_fn=collate_batch
+    )
+    return valloader
 
 # *** -------- UTILITY FUNCTIONS -------- *** #
 

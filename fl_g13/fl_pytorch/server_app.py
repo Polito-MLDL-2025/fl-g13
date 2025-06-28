@@ -6,7 +6,7 @@ from torchvision import datasets
 
 from fl_g13.config import RAW_DATA_DIR
 from fl_g13.fl_pytorch.DynamicQuorumStrategy import DynamicQuorum
-from fl_g13.fl_pytorch.datasets import get_eval_transforms
+from fl_g13.fl_pytorch.datasets import get_eval_transforms, load_flwr_datasets_test
 from fl_g13.fl_pytorch.strategy import CustomFedAvg
 from fl_g13.fl_pytorch.task import get_weights, set_weights
 from fl_g13.modeling.eval import eval
@@ -109,8 +109,9 @@ def get_server_app(
             print(f"[Server] Server on device: {next(model.parameters()).device}")
 
         # Retrive test dataset and prepare dataloader
-        testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
-        testloader = DataLoader(testset, batch_size=32)
+        # testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
+        # testloader = DataLoader(testset, batch_size=32)
+        testloader = load_flwr_datasets_test(dataset="cifar100",batch_size=32)
         evaluate_fn = get_evaluate_fn(testloader, model, criterion)
 
         # Retrive parameters
