@@ -380,13 +380,13 @@ def load_masks_scores(
 def load_mask(filepath: str = 'centralized_mask.pth') -> Dict[str, torch.Tensor]:
     return torch.load(filepath)
 
-def load_or_create_masks_scores(
+def compute_masks_and_scores(
     model,
     client_partition_type,
     client_num_shards_per_partition,
     
     sparsity = 0.7,
-    mask_type = 'local',
+    mask_type = 'global',
     mask_rounds = 3,
     
     num_clients = 100,
