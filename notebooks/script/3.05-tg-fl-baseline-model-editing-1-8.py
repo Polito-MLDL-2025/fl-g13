@@ -1,5 +1,9 @@
-%load_ext autoreload
-%autoreload 2
+#!/usr/bin/env python
+# coding: utf-8
+
+get_ipython().run_line_magic('load_ext', 'autoreload')
+get_ipython().run_line_magic('autoreload', '2')
+
 
 import flwr
 import torch
@@ -21,6 +25,7 @@ from torch.optim import SGD
 from fl_g13.fl_pytorch import get_client_app, get_server_app
 from flwr.simulation import run_simulation
 
+
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Training on {DEVICE}")
 print(f"Flower {flwr.__version__} / PyTorch {torch.__version__}")
@@ -33,12 +38,14 @@ if DEVICE == "cuda":
 else:
     backend_config = {"client_resources": {"num_cpus": 1, "num_gpus": 0.0}}
 
+
 # login by key in .env file
 WANDB_API_KEY = dotenv.dotenv_values()["WANDB_API_KEY"]
 wandb.login(key=WANDB_API_KEY)
 
 # Load checkpoint from .env file
 CHECKPOINT_DIR = dotenv.dotenv_values()["CHECKPOINT_DIR"]
+
 
 # Model config
 ## Model Hyper-parameters
@@ -75,7 +82,7 @@ min_available_clients = 10
 
 # model editing config
 model_editing = True
-mask_type = 'local'
+mask_type = 'global'
 sparsity = 0.7
 calibration_rounds = 3
 model_editing_batch_size = 1
@@ -89,6 +96,7 @@ MAX_PARALLEL_CLIENTS = 10
 # The 200-epoch model folder
 # Ensure that the most recent file is the correct one
 model_save_path = CHECKPOINT_DIR + f"/fl/non-iid/{num_shards_per_partition}_{J}"
+
 
 # Run simulations
 reset_partition()
@@ -219,3 +227,4 @@ run_simulation(
 
 if use_wandb:
     wandb.finish()
+
