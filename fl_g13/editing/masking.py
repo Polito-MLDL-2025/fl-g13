@@ -225,3 +225,72 @@ def create_mask(
         return mask, score
 
     return mask
+
+def compute_mask_stats(mask_dict):
+    stats = {}
+
+    # --- Overall Statistics ---
+    total_elements = 0
+    kept_elements_overall = 0 # Elements with value 1
+    masked_elements_overall = 0 # Elements with value 0
+
+    for name, mask_tensor in mask_dict.items():
+        num_elements = mask_tensor.numel()
+        kept_in_layer = torch.sum(mask_tensor == 1).item()
+        masked_in_layer = num_elements - kept_in_layer
+
+        total_elements += num_elements
+        kept_elements_overall += kept_in_layer
+        masked_elements_overall += masked_in_layer
+
+        # --- Layer-wise Statistics ---
+        layer_stats = {
+            'num_elements': num_elements,
+            'kept_elements': kept_in_layer,
+            'masked_elements': masked_in_layer,
+            'density': kept_in_layer / num_elements if num_elements > 0 else 0.0,
+            'sparsity': masked_in_layer / num_elements if num_elements > 0 else 0.0
+        }
+        stats[name] = layer_stats
+
+    # --- Add Overall Statistics to the result dictionary ---
+    stats['overall'] = {
+        'total_elements': total_elements,
+        'kept_elements': kept_elements_overall,
+        'masked_elements': masked_elements_overall,
+        'density': kept_elements_overall / total_elements if total_elements > 0 else 0.0,
+        'sparsity': masked_elements_overall / total_elements if total_elements > 0 else 0.0
+    }
+
+    return stats
+
+
+def print_mask_stats(stats, layer = False):
+    if 'overall' not in stats:
+        print("Invalid stats dictionary format.")
+        return
+
+    overall_stats = stats['overall']
+    print("--- Overall Mask Statistics ---")
+    print(f"Total Elements: {overall_stats['total_elements']}")
+    print(f"Kept Elements (1s): {overall_stats['kept_elements']}")
+    print(f"Masked Elements (0s): {overall_stats['masked_elements']}")
+    print(f"Overall Density: {overall_stats['density']:.4f}")
+    print(f"Overall Sparsity: {overall_stats['sparsity']:.4f}")
+    print("-" * 30)
+
+    if not layer:
+        return 
+
+    print("--- Layer-wise Mask Statistics ---")
+    # Sort layer names for consistent output
+    layer_names = sorted([name for name in stats if name != 'overall'])
+    for name in layer_names:
+        layer_stats = stats[name]
+        print(f"Layer: {name}")
+        print(f"  Num Elements: {layer_stats['num_elements']}")
+        print(f"  Kept Elements: {layer_stats['kept_elements']}")
+        print(f"  Masked Elements: {layer_stats['masked_elements']}")
+        print(f"  Density: {layer_stats['density']:.4f}")
+        print(f"  Sparsity: {layer_stats['sparsity']:.4f}")
+        print("-" * 20)
