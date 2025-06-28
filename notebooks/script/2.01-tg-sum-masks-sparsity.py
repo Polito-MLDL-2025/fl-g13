@@ -14,7 +14,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from fl_g13.fl_pytorch import build_fl_dependencies
 
-from fl_g13.fl_pytorch.editing import load_or_create_centralized_mask
+from fl_g13.fl_pytorch.editing import load_mask
 from fl_g13.modeling import load_or_create
 
 from fl_g13.editing.masking import mask_dict_to_list
@@ -35,23 +35,16 @@ CHECKPOINT_DIR = dotenv.dotenv_values()['CHECKPOINT_DIR']
 
 J = 8
 partition_type = 'shard'
-shards = 50
+shards = 10
 strategy = 'sum'
-mask_type = 'local'
+mask_type = 'global'
 mask_sparsity = 0.7
 mask_rounds = 3
 
-mask_name = f'{shards}_{J}_{strategy}_mask_{mask_type}_{mask_sparsity}_{mask_rounds}.pth'
-file_name = CHECKPOINT_DIR + '/masks/' + mask_name
+mask_name = f'sum_{shards}_{J}_{mask_type}_{mask_sparsity}_{mask_rounds}.pth'
+mask_file_name = CHECKPOINT_DIR + '/masks/' + mask_name
 
-partition_name = 'iid' if partition_type == 'iid' else 'non_iid'
-model_save_path = CHECKPOINT_DIR + f"/fl_dino_v4/{partition_name}/{shards}_{J}"
-model_config={
-    "head_layers": 3,
-    "head_hidden_size": 512,
-    "dropout_rate": 0.0,
-    "unfreeze_blocks": 0,
-}
+model_save_path = CHECKPOINT_DIR + f"/fl/non-iid/{shards}_{J}"
 
 model, start_epoch = load_or_create(
     path=model_save_path,
@@ -87,21 +80,8 @@ scheduler = CosineAnnealingLR(
 )
 
 
-sum_mask, _ = load_or_create_centralized_mask(
-    model = model,
-    strategy = strategy,
-    aggregation_fn = None,
-    client_partition_type = partition_type,
-    client_num_shards_per_partition = shards,
-    client_local_steps = J,
-    
-    sparsity = mask_sparsity,
-    mask_type = mask_type,
-    mask_rounds = mask_rounds,
-    
-    file_name = file_name,
-    verbose = True
-)
+mask_file_name = CHECKPOINT_DIR + f'/masks/sum_{shards}_{J}_{mask_type}_{mask_sparsity}_{mask_rounds}.pth'
+sum_mask = load_mask(mask_file_name)
 sum_mask = mask_dict_to_list(model, sum_mask)
 
 
