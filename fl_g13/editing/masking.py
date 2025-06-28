@@ -99,6 +99,35 @@ def _global_mask(score: Dict[str, torch.Tensor], density: float = 0.2) -> Dict[s
 
     return gradient_mask
 
+def create_mask_from_scores(
+    score: Dict[str, torch.Tensor], 
+    sparsity: float | None = None, 
+    density: float | None = None, 
+    mask_type: str = 'local'
+) -> Dict[str, torch.Tensor]:
+    # --- Parameter Validation ---
+    if sparsity is not None and density is not None:
+        raise ValueError("Only one of 'sparsity' or 'density' should be provided.")
+    if sparsity is None and density is None:
+        raise ValueError("Either 'sparsity' or 'density' must be provided.")
+
+    if sparsity is not None:
+        if not (0.0 <= sparsity <= 1.0):
+            raise ValueError(f"Sparsity value out of range, {sparsity} was given. Expected value between 0.0 and 1.0")
+        target_density = 1 - sparsity
+    else:  # density is not None
+        if not (0.0 <= density <= 1.0):
+            raise ValueError(f"Density value out of range, {density} was given. Expected value between 0.0 and 1.0")
+        target_density = density
+
+    if mask_type not in ['local', 'global']:
+        raise ValueError(f'Invalid mask type: {mask_type}, expected "local" or "global"')
+    
+    return _create_gradiend_mask(
+        score=score,
+        density = target_density,
+        mask_type = mask_type
+    )
 
 def _create_gradiend_mask(score: Dict[str, torch.Tensor], density: float = 0.2, mask_type: str = 'local') -> Dict[
     str, torch.Tensor]:
