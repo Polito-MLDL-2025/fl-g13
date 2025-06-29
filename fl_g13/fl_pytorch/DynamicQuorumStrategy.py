@@ -16,18 +16,18 @@ def _compute_sparsity_given_quorum(mask, q):
     total_non_zero = sum(layer.cpu().numpy().nonzero()[0].size for layer in global_mask)
     return 1.0 - (total_non_zero / total_params)
 
-def _set_initial_quorum(mask_sum, target_sparsity = 0.7):
-    if _compute_sparsity_given_quorum(mask_sum, 100) < target_sparsity: # Check if it's possible to achieve target sparsity
+def _set_initial_quorum(mask_sum, total_clients = 100, target_sparsity = 0.7):
+    if _compute_sparsity_given_quorum(mask_sum, total_clients) < target_sparsity: # Check if it's possible to achieve target sparsity
         return -1
     
-    for q in range(1, 101):
+    for q in range(1, total_clients + 1):
         sparsity = _compute_sparsity_given_quorum(mask_sum, q)
         if sparsity >= target_sparsity:
             return q
     
     # If here, than there's a least a value that satisfy the requirement and must be the last one
     #   since the for loop did not return prematurely
-    return 100 # fallback
+    return total_clients # fallback
 
 class DynamicQuorum(CustomFedAvg):
     def __init__(
@@ -68,7 +68,7 @@ class DynamicQuorum(CustomFedAvg):
         # --- Set initial quorum ---
         # Only in ADAPTIVE mode
         if self.adaptive_quorum:
-            self.current_quorum = _set_initial_quorum(self.mask_sum, target_sparsity = initial_target_sparsity)
+            self.current_quorum = _set_initial_quorum(self.mask_sum, self.num_total_clients, target_sparsity = initial_target_sparsity)
             # if cannot reach target sparsity, return to LINEAR mode
             if self.current_quorum < 0:
                 self.adaptive_quorum = False
