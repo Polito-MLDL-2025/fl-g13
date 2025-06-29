@@ -84,7 +84,7 @@ min_available_clients = 10
 
 # model editing config
 model_editing = True
-mask_type = 'global'
+mask_type = 'local'
 sparsity = 0.7
 calibration_rounds = 3
 model_editing_batch_size = 1
@@ -96,12 +96,12 @@ adaptive_quorum = True
 # Mask option
 mask_strategy = 'sum'
 initial_quorum = 1
-initial_target_sparsity = 0.65
+initial_target_sparsity = 0.7
 # Linear mode
 quorum_increment = 5
 quorum_update_frequency = 5
 # Adaptive mode
-drift_threshold = 0.0005
+drift_threshold = 0.00089251314 # minimum value from the last 10 rounds of the warmup
 quorum_patience = 4
 force_quorum_update = 15
 
@@ -243,7 +243,7 @@ server = get_server_app(
     wandb_config=wandb_config,
     save_every=save_every,
     prefix='AdaQuo',
-    evaluate_each=1,
+    evaluate_each=evaluate_each,
     model= model,
     start_epoch= start_epoch,
     # AdaQuo
