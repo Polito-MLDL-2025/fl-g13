@@ -35,7 +35,7 @@ CHECKPOINT_DIR = dotenv.dotenv_values()['CHECKPOINT_DIR']
 
 J = 8
 partition_type = 'shard'
-shards = 10
+shards = 1
 strategy = 'sum'
 mask_type = 'global'
 mask_sparsity = 0.7
@@ -80,13 +80,13 @@ scheduler = CosineAnnealingLR(
 )
 
 
-mask_file_name = CHECKPOINT_DIR + f'/masks/sum_{shards}_{J}_{mask_type}_{mask_sparsity}_{mask_rounds}.pth'
 sum_mask = load_mask(mask_file_name)
 sum_mask = mask_dict_to_list(model, sum_mask)
 
 
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 def sparsity_over_quorum_plot(sum_mask, mask_name):
     def compute_sparsity_given_quorum(mask, quorum):
@@ -97,7 +97,7 @@ def sparsity_over_quorum_plot(sum_mask, mask_name):
         total_non_zero = sum(layer.cpu().numpy().nonzero()[0].size for layer in global_mask)
         return 1.0 - (total_non_zero / total_params)
 
-    all_sparsity = [compute_sparsity_given_quorum(sum_mask, quorum) for quorum in range(1, 101)]
+    all_sparsity = [compute_sparsity_given_quorum(sum_mask, quorum) for quorum in tqdm(range(1, 101), desc = 'Quormum')]
     
     plt.figure(figsize=(10, 6))
     plt.plot(range(1, 101), all_sparsity, '-')
