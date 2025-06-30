@@ -136,6 +136,6 @@ class DynamicQuorum(CustomFedAvg):
             if avg_drift < self.drift_threshold and (server_round - self.last_quorum_update_round) >= self.quorum_patience:
                 self.current_quorum = min(self.num_total_clients, self.current_quorum + self.quorum_increment)
                 self.last_quorum_update_round = server_round
-                logger.log(INFO, f"[Round {server_round} DQ-ADAPTIVE] New Quorum: {self.current_quorum} (Drift ({avg_drift:.4f}) < Threshold ({self.drift_threshold}))")
+                logger.log(INFO, f"[Round {server_round} DQ-ADAPTIVE] New Quorum: {self.current_quorum} (Drift ({avg_drift}) < Threshold ({self.drift_threshold}))")
         
         return aggregated_params, aggregated_metrics
