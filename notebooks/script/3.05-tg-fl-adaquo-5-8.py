@@ -68,7 +68,7 @@ eta_min = 1e-5
 K = 100
 C = 0.1
 J = 8
-num_shards_per_partition = 1 # Nc
+num_shards_per_partition = 5 # Nc
 partition_type = 'shard'
 
 num_rounds = 100
@@ -101,7 +101,7 @@ initial_target_sparsity = 0.7
 quorum_increment = 5
 quorum_update_frequency = 5
 # Adaptive mode
-drift_threshold = 0.00089251314 # minimum value from the last 10 rounds of the warmup
+drift_threshold = 0.0006914556 # minimum value from the last 10 rounds of the warmup
 quorum_patience = 4
 force_quorum_update = 15
 
