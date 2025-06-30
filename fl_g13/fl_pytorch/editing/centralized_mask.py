@@ -14,7 +14,7 @@ def get_client_masks(
     client_partition_type = 'iid',
     client_num_partitions = 100,
     client_num_shards_per_partition = 10,
-    client_batch_size = 16,
+    client_batch_size = 1,
     client_dataset = "cifar100",
     client_train_test_split_ratio = 0.2,
     client_transform = get_transforms,
@@ -390,7 +390,7 @@ def compute_masks_and_scores(
     mask_rounds = 3,
     
     num_clients = 100,
-    client_batch_size = 16,
+    client_batch_size = 1,
     
     file_name: str = None,
     
