@@ -6,6 +6,7 @@ import glob
 from torchvision.transforms import Compose, Resize, CenterCrop, RandomCrop, RandomHorizontalFlip, Normalize, ToTensor
 from torchvision import datasets
 from fl_g13.dataset import train_test_split
+from torch.utils.data import Subset
 
 
 # Sample lists of funny adjectives and nouns
@@ -179,27 +180,40 @@ def backup(path, new_filename=None):
     shutil.copy2(file_to_backup, dest_path)
     print(f"Backed up '{file_to_backup}' to '{dest_path}'")
 
-def get_preprocessing_pipeline(data_dir, random_state = 42):
-    # Define preprocessing pipeline
+def get_preprocessing_pipeline(data_dir, random_state=42, do_full_training=False):
+    # Preprocessing pipeline
     train_transform = Compose([
-        Resize(256), # CIFRA100 is originally 32x32
-        RandomCrop(224), # But Dino works on 224x224
+        Resize(256),
+        RandomCrop(224),
         RandomHorizontalFlip(),
         ToTensor(),
-        Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]) # ImageNet stats
+        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet stats
     ])
 
     eval_transform = Compose([
-        Resize(256), # CIFRA100 is originally 32x32
-        CenterCrop(224), # But Dino works on 224x224
+        Resize(256),
+        CenterCrop(224),
         ToTensor(),
         Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]), # ImageNet stats
     ])
 
-    cifar100_train = datasets.CIFAR100(root=data_dir, train=True, download=True, transform=train_transform)
+    cifar100_train_full = datasets.CIFAR100(root=data_dir, train=True, download=True, transform=train_transform)
     cifar100_test = datasets.CIFAR100(root=data_dir, train=False, download=True, transform=eval_transform)
-
-    train_dataset, val_dataset = train_test_split(cifar100_train, 0.8, random_state = random_state)
+    
     test_dataset = cifar100_test
 
-    return train_dataset, val_dataset, test_dataset
+    if do_full_training:
+        # In full training, we return train+test datasets
+        train_dataset = cifar100_train_full
+        return train_dataset, test_dataset
+    else:
+        # Create a second source, with eval_transformation
+        cifar100_val = datasets.CIFAR100(root=data_dir, train=True, download=True, transform=eval_transform)
+        
+        # Split
+        train_dataset, val_dataset_tmp = train_test_split(cifar100_train_full, 0.8, random_state = random_state)
+        
+        # Use the same indices to create the validation dataset with the correct tranformations
+        val_dataset = Subset(cifar100_val, val_dataset_tmp.indices)
+        
+        return train_dataset, val_dataset, test_dataset
