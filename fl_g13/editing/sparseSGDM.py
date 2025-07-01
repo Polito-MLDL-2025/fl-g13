@@ -4,15 +4,22 @@ import torch
 from torch import Tensor
 from torch.optim.optimizer import Optimizer
 
-
 # Reference:    https://pytorch.org/docs/stable/generated/torch.optim.SGD.html
 #               https://github.com/pytorch/pytorch/blob/v2.7.0/torch/optim/sgd.py#L26
 
 class SparseSGDM(Optimizer):
-    def __init__(self, params, mask: List[Tensor], lr: float, momentum: float = 0.0, dampening: float = 0.0,
-                 weight_decay: float = 0.00, nesterov: bool = False, maximize=False) -> None:
+    def __init__(
+        self, 
+        params, 
+        mask: List[Tensor], 
+        lr: float, 
+        momentum: float = 0.0, 
+        dampening: float = 0.0,
+        weight_decay: float = 0.00, 
+        nesterov: bool = False, 
+        maximize=False
+    ) -> None:
 
-        # Checks
         if not isinstance(mask, list):
             raise ValueError("Mask must be a list of tensors.")
         for m in mask:
@@ -65,8 +72,6 @@ class SparseSGDM(Optimizer):
                     raise ValueError("Mask shape must match the shape of the corresponding parameter.")
         self.defaults['mask'] = mask
 
-    # TODO?: sparsity management for mask
-    # TODO? dynamic require_grad control: set to True or False and completely skip them in the Differentiation Graph
     @torch.no_grad()
     def step(self, closure=None):
         loss = None
@@ -89,7 +94,7 @@ class SparseSGDM(Optimizer):
 
                 # Detached for safety, not cloned as done in:
                 # https://github.com/pytorch/pytorch/blob/134179474539648ba7dee1317959529fbd0e7f89/torch/optim/sgd.py#L93)
-                grad = p.grad.detach()  # .clone()
+                grad = p.grad.detach()
                 if weight_decay != 0:
                     grad.add_(p.data, alpha=weight_decay)  # Modify tensor in-place using add_
 
@@ -116,12 +121,6 @@ class SparseSGDM(Optimizer):
 
                 if maximize:
                     grad.neg_()
-
-                # Uncomment this in the future if we are sure we do not need gradients after multiplication is done,
-                # while also substituting grad*m with grad in lines below
-                # 
-                # Apply mask to gradient directly (safest + most common approach)
-                # grad.mul_(m) # If m is zero, the grad is completely lost!
 
                 # Apply mask and step
                 p.data.add_(grad * m, alpha=-lr)
