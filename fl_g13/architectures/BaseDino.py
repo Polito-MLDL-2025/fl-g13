@@ -98,10 +98,8 @@ class BaseDino(nn.Module):
         head.apply(init)
 
     def forward(self, x):
-        # Extract features with the DINO backbone
-        feat = self.backbone(x)
-        # Feed forward the MLP
-        out = self.head(feat)
+        features = self.backbone(x)
+        out = self.head(features)
         return out
 
     def get_config(self) -> dict:
@@ -127,6 +125,7 @@ class BaseDino(nn.Module):
             # Make LayerNorm fine-tunable
             for param in self.backbone.norm.parameters():
                 param.requires_grad = True
+                
     @classmethod
     def from_config(cls, config: dict) -> 'BaseDino':
         # Map string activation name back to class
