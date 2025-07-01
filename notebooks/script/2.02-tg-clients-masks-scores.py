@@ -29,8 +29,8 @@ CHECKPOINT_DIR = dotenv.dotenv_values()['CHECKPOINT_DIR']
 
 J = 8
 partition_type = 'shard'
-shards = [1, 10, 50]
-mask_type = 'local'
+shards = [1, 5, 10, 50]
+mask_type = 'global'
 mask_sparsity = 0.7
 mask_rounds = 3
 client_batch_size = 1

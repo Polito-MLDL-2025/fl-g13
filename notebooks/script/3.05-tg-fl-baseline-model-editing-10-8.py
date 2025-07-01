@@ -1,5 +1,11 @@
-%load_ext autoreload
-%autoreload 2
+#!/usr/bin/env python
+# coding: utf-8
+
+get_ipython().run_line_magic('load_ext', 'autoreload')
+get_ipython().run_line_magic('autoreload', '2')
+
+
+# # Import cell
 
 import flwr
 import torch
@@ -21,6 +27,9 @@ from torch.optim import SGD
 from fl_g13.fl_pytorch import get_client_app, get_server_app
 from flwr.simulation import run_simulation
 
+
+# # Configurations
+
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Training on {DEVICE}")
 print(f"Flower {flwr.__version__} / PyTorch {torch.__version__}")
@@ -33,12 +42,16 @@ if DEVICE == "cuda":
 else:
     backend_config = {"client_resources": {"num_cpus": 1, "num_gpus": 0.0}}
 
+
 # login by key in .env file
 WANDB_API_KEY = dotenv.dotenv_values()["WANDB_API_KEY"]
 wandb.login(key=WANDB_API_KEY)
 
 # Load checkpoint from .env file
 CHECKPOINT_DIR = dotenv.dotenv_values()["CHECKPOINT_DIR"]
+
+
+# # Training parameters definition
 
 # Model config
 ## Model Hyper-parameters
@@ -75,7 +88,7 @@ min_available_clients = 10
 
 # model editing config
 model_editing = True
-mask_type = 'local'
+mask_type = 'global'
 sparsity = 0.7
 calibration_rounds = 3
 model_editing_batch_size = 1
@@ -86,19 +99,11 @@ NUM_CLIENTS = 100
 MAX_PARALLEL_CLIENTS = 10
 
 ## Base model location
-# The 200-epoch model folder
-# Ensure that the most recent file is the correct one
 model_save_path = CHECKPOINT_DIR + f"/fl/non-iid/{num_shards_per_partition}_{J}"
 
-# Run simulations
-reset_partition()
 
-# print('-' * 200)
-# print(f" Nc={num_shards_per_partition}, J={J}, mask_type={mask_type}, sparsity={sparsity}, mask_calibration_round={calibration_rounds}\n")
+# # Load model
 
-model_checkpoint = CHECKPOINT_DIR + f"/fl/non-iid/Baseline/{num_shards_per_partition}_{J}_{mask_type}_{sparsity}_{calibration_rounds}"
-
-# Load Base model
 model, start_epoch = load_or_create(
     path=model_save_path,
     model_class=BaseDino,
@@ -134,8 +139,15 @@ scheduler = CosineAnnealingLR(
 # Unfreeze entire model for model_editing
 model.unfreeze_blocks(unfreeze_blocks)
 
+
+# # Run Flower Simulation
+
+reset_partition()
+
+model_checkpoint = CHECKPOINT_DIR + f"/fl/non-iid/Baseline/{num_shards_per_partition}_{J}_{mask_type}_{sparsity}_{calibration_rounds}"
+
 # Wandb settings
-use_wandb = True
+use_wandb = False
 run_name = f"fl_bl_{num_shards_per_partition}_{J}_{mask_type}_{sparsity}_{calibration_rounds}"
 wandb_config = {
     # wandb param
@@ -219,3 +231,4 @@ run_simulation(
 
 if use_wandb:
     wandb.finish()
+

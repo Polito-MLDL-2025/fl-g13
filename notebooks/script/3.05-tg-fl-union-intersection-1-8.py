@@ -5,6 +5,8 @@ get_ipython().run_line_magic('load_ext', 'autoreload')
 get_ipython().run_line_magic('autoreload', '2')
 
 
+# # Import cell
+
 import flwr
 import torch
 import dotenv
@@ -19,7 +21,7 @@ from fl_g13.fl_pytorch import build_fl_dependencies
 
 from fl_g13.fl_pytorch.datasets import reset_partition
 from fl_g13.modeling import load_or_create
-from fl_g13.editing import SparseSGDM, mask_dict_to_list, compute_mask_stats, print_mask_stats
+from fl_g13.editing import SparseSGDM, mask_dict_to_list, compute_mask_stats, format_mask_stats
 from torch.optim import SGD
 
 from fl_g13.fl_pytorch.editing import load_mask
@@ -27,6 +29,8 @@ from fl_g13.fl_pytorch.editing import load_mask
 from fl_g13.fl_pytorch import get_client_app, get_server_app
 from flwr.simulation import run_simulation
 
+
+# # Configurations
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Training on {DEVICE}")
@@ -49,7 +53,8 @@ wandb.login(key=WANDB_API_KEY)
 CHECKPOINT_DIR = dotenv.dotenv_values()["CHECKPOINT_DIR"]
 
 
-# Model config
+# # Training parameters definition
+
 ## Model Hyper-parameters
 head_layers = 3
 head_hidden_size = 512
@@ -84,7 +89,7 @@ min_available_clients = 10
 
 # model editing config
 model_editing = True
-mask_type = 'global'
+mask_type = 'local'
 sparsity = 0.7
 calibration_rounds = 3
 model_editing_batch_size = 1
@@ -94,12 +99,11 @@ NUM_CLIENTS = 100
 MAX_PARALLEL_CLIENTS = 10
 
 ## Base model location
-# The 200-epoch model folder
-# Ensure that the most recent file is the correct one
 model_save_path = CHECKPOINT_DIR + f"/fl/non-iid/{num_shards_per_partition}_{J}"
 
 
-# Load Base model
+# # Load model
+
 model, start_epoch = load_or_create(
     path=model_save_path,
     model_class=BaseDino,
@@ -136,29 +140,30 @@ scheduler = CosineAnnealingLR(
 model.unfreeze_blocks(unfreeze_blocks)
 
 
+# # Load masks
+
 union_mask_file_name = CHECKPOINT_DIR + f'/masks/union_{num_shards_per_partition}_{J}_{mask_type}_{sparsity}_{calibration_rounds}.pth'
 
 union_mask = load_mask(union_mask_file_name)
-print_mask_stats(compute_mask_stats(union_mask))
+print(format_mask_stats(compute_mask_stats(union_mask)))
 union_mask = mask_dict_to_list(model, union_mask) # converts for SparseSGDM
 
 
 intersection_mask_file_name = CHECKPOINT_DIR + f'/masks/intersection_{num_shards_per_partition}_{J}_{mask_type}_{sparsity}_{calibration_rounds}.pth'
 
 intersection_mask = load_mask(intersection_mask_file_name)
-print_mask_stats(compute_mask_stats(intersection_mask))
+print(format_mask_stats(compute_mask_stats(intersection_mask)))
 intersection_mask = mask_dict_to_list(model, intersection_mask) # converts for SparseSGDM
 
 
 # # Union simulation
 
-# Run simulations
 reset_partition()
 
 model_checkpoint = CHECKPOINT_DIR + f"/fl/non-iid/Union/{num_shards_per_partition}_{J}_{mask_type}_{sparsity}_{calibration_rounds}"
 
 # Wandb settings
-use_wandb = True
+use_wandb = False
 run_name = f"fl_union_{num_shards_per_partition}_{J}_{mask_type}_{sparsity}_{calibration_rounds}"
 wandb_config = {
     # wandb param
@@ -229,7 +234,7 @@ server = get_server_app(
     prefix='Union',
     evaluate_each=evaluate_each,
     model= model,
-    start_epoch= start_epoch,
+    start_epoch= start_epoch
 )
 
 # Run simulation
@@ -246,7 +251,6 @@ if use_wandb:
 
 # # Intersection Simulation
 
-# Run simulations
 reset_partition()
 
 model_checkpoint = CHECKPOINT_DIR + f"/fl/non-iid/Intersection/{num_shards_per_partition}_{J}_{mask_type}_{sparsity}_{calibration_rounds}"

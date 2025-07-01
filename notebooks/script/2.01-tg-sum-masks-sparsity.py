@@ -8,7 +8,6 @@ get_ipython().run_line_magic('autoreload', '2')
 import flwr
 import torch
 import dotenv
-import os
 
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
@@ -58,13 +57,9 @@ model.to(DEVICE)
 
 unfreeze_blocks = 12
 model.unfreeze_blocks(unfreeze_blocks)
-# optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
 
 # Create a dummy mask for SparseSGDM
-# Must be done AFTER the model is moved to the device
 init_mask = [torch.ones_like(p, device=p.device) for p in model.parameters()]
-
-# Optimizer, scheduler, and loss function
 optimizer = SparseSGDM(
     model.parameters(),
     mask=init_mask,

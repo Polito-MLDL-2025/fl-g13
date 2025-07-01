@@ -5,6 +5,8 @@ get_ipython().run_line_magic('load_ext', 'autoreload')
 get_ipython().run_line_magic('autoreload', '2')
 
 
+# # Import cell
+
 import flwr
 import torch
 import dotenv
@@ -28,6 +30,8 @@ from fl_g13.fl_pytorch import get_client_app, get_server_app
 from flwr.simulation import run_simulation
 
 
+# # Configurations
+
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Training on {DEVICE}")
 print(f"Flower {flwr.__version__} / PyTorch {torch.__version__}")
@@ -49,7 +53,8 @@ wandb.login(key=WANDB_API_KEY)
 CHECKPOINT_DIR = dotenv.dotenv_values()["CHECKPOINT_DIR"]
 
 
-# Model config
+# # Training parameters definition
+
 ## Model Hyper-parameters
 head_layers = 3
 head_hidden_size = 512
@@ -84,7 +89,7 @@ min_available_clients = 10
 
 # model editing config
 model_editing = True
-mask_type = 'local'
+mask_type = 'global'
 sparsity = 0.7
 calibration_rounds = 3
 model_editing_batch_size = 1
@@ -101,19 +106,20 @@ initial_target_sparsity = 0.7
 quorum_increment = 5
 quorum_update_frequency = 5
 # Adaptive mode
-drift_threshold = 0.00034702837
 quorum_patience = 4
 force_quorum_update = 15
+# This is computed as the minimum value from the last 10 rounds of the warmup
+drift_threshold = 0.00034702837
 
 ## simulation run config
 NUM_CLIENTS = 100
 MAX_PARALLEL_CLIENTS = 10
 
 ## Base model location
-# The 200-epoch model folder
-# Ensure that the most recent file is the correct one
 model_save_path = CHECKPOINT_DIR + f"/fl/non-iid/{num_shards_per_partition}_{J}"
 
+
+# # Load model
 
 # Load Base model
 model, start_epoch = load_or_create(
@@ -152,13 +158,16 @@ scheduler = CosineAnnealingLR(
 model.unfreeze_blocks(unfreeze_blocks)
 
 
+# # Load sum mask
+
 mask_file_name = CHECKPOINT_DIR + f'/masks/sum_{num_shards_per_partition}_{J}_{mask_type}_{sparsity}_{calibration_rounds}.pth'
 
 sum_mask = load_mask(mask_file_name)
 sum_mask = mask_dict_to_list(model, sum_mask) # converts for SparseSGDM
 
 
-# Run simulations
+# # Run Flower simulation
+
 reset_partition()
 
 model_checkpoint = CHECKPOINT_DIR + f"/fl/non-iid/AdaQuo/{num_shards_per_partition}_{J}_{mask_type}_{sparsity}_{calibration_rounds}"
@@ -246,6 +255,7 @@ server = get_server_app(
     evaluate_each=evaluate_each,
     model= model,
     start_epoch= start_epoch,
+    
     # AdaQuo
     strategy = strategy,
     global_mask = sum_mask,
@@ -257,7 +267,7 @@ server = get_server_app(
     initial_quorum = initial_quorum,
     drift_threshold = drift_threshold,
     quorum_patience = quorum_patience,
-    force_quorum_update = force_quorum_update,
+    force_quorum_update = force_quorum_update
 )
 
 # Run simulation
