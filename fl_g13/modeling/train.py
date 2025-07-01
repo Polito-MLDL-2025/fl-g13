@@ -1,4 +1,5 @@
 import time
+import itertools
 from typing import Optional, List, Tuple
 from tqdm import tqdm
 
@@ -10,7 +11,7 @@ from torch.optim.lr_scheduler import _LRScheduler
 
 from fl_g13.modeling.eval import eval
 from fl_g13.modeling.load import save, save_loss_and_accuracy
-from fl_g13.modeling.utils import generate_goofy_name
+from fl_g13.modeling.utils import generate_unique_name
 
 def train_for_steps(
     dataloader: DataLoader,
@@ -20,51 +21,76 @@ def train_for_steps(
     verbose: int = 1,
     num_steps: Optional[int] = None
 ) -> Tuple[float, float, List[float]]:
+    """
+    Train the model for a specified number of steps, which may span across multiple epochs.
+
+    This function is useful for scenarios where training is defined by a fixed number of updates
+    rather than a full pass over the dataset. If the dataloader is exhausted before all steps
+    are completed, it will be re-initialized to continue training.
+
+    Args:
+        dataloader (DataLoader): DataLoader providing the training data.
+        model (torch.nn.Module): The model to be trained.
+        criterion (torch.nn.Module): Loss function used for training.
+        optimizer (torch.optim.Optimizer): Optimizer to update model parameters.
+        verbose (int, optional): Verbosity level for progress display. Defaults to 1.
+        num_steps (Optional[int]): The total number of training steps to perform.
+
+    Returns:
+        tuple: A tuple containing:
+            - float: Average training loss over the performed steps.
+            - float: Training accuracy over the performed steps.
+            - list: List of loss values for each iteration/step.
+
+    Raises:
+        ValueError: If `num_steps` is not provided (is None).
+    """
+    if num_steps is None:
+        raise ValueError("num_steps must be provided for train_for_steps.")
+    if num_steps == 0:
+        return 0.0, 0.0, []
+
     device = next(model.parameters()).device
     model.train()
-    if verbose == 1:
-        batch_iterator = tqdm(dataloader, desc='Training progress', unit='batch')
-    else:
-        batch_iterator = dataloader
 
     total_loss, correct, total = 0.0, 0, 0
     iteration_losses = []
-    total_batches = len(dataloader)
 
-    step = 0
-    data_iter = iter(batch_iterator)
-    while step < num_steps:
-        if verbose > 0:
-            print(f"Step {step + 1}/{num_steps} | Total batches: {total_batches}")
-        try:
-            X, y = next(data_iter)
-        except StopIteration:
-            # Restart the iterator if it runs out of data
-            data_iter = iter(batch_iterator)
-            X, y = next(data_iter)
+    data_iter = itertools.cycle(dataloader)
+
+    # Setup iterator based on verbosity
+    if verbose == 1:
+        iterator = tqdm(range(num_steps), desc='Training for steps', unit='step')
+    else:
+        iterator = range(num_steps)
+
+    for step in iterator:
+        X, y = next(data_iter)
         X, y = X.to(device), y.to(device)
+
         optimizer.zero_grad()
         logits = model(X)
         loss = criterion(logits, y)
         loss.backward()
         optimizer.step()
-        total_loss += loss.item()
-        iteration_losses.append(loss.item())
-        _, predicted = torch.max(logits, 1)
-        batch_correct = (predicted == y).sum().item()
-        batch_total = y.size(0)
-        correct += batch_correct
-        total += batch_total
-        step += 1
-        if num_steps is not None and step >= num_steps:
-            break
-        if verbose > 1 and (step % (10 if verbose == 2 else 1) == 0):
-            print(f"  ↳ Step {step} | Loss: {loss.item():.4f}")
 
-    training_loss = total_loss / step
+        loss_item = loss.item()
+        total_loss += loss_item
+        iteration_losses.append(loss_item)
+
+        _, predicted = torch.max(logits, 1)
+        correct += (predicted == y).sum().item()
+        total += y.size(0)
+
+        if verbose == 1:
+            iterator.set_postfix(loss=f"{loss_item:.4f}", acc=f"{(correct / total):.2%}")
+
+        if verbose > 1 and ((step + 1) % (10 if verbose == 2 else 1) == 0):
+            print(f"  ↳ Step {step + 1}/{num_steps} | Loss: {loss_item:.4f} | Accuracy: {(correct / total):.2%}")
+
+    training_loss = total_loss / num_steps
     training_accuracy = correct / total
     return training_loss, training_accuracy, iteration_losses
-
 
 def train_one_epoch(
     dataloader: DataLoader,
@@ -89,109 +115,95 @@ def train_one_epoch(
             - float: Training accuracy for the epoch.
             - list: List of loss values for each iteration.
     """
-    # Get the device where the model is located
     device = next(model.parameters()).device
-    # Set the model to training mode
     model.train()
 
-    # Set the for loop iterator according to the verbose flag
     if verbose == 1:
-        # Default, use tqdm with progress bar
-        batch_iterator = tqdm(dataloader, desc = 'Training progress', unit = 'batch')
+        batch_iterator = tqdm(dataloader, desc='Training progress', unit='batch')
     else:
-        # No progress bar
         batch_iterator = dataloader
 
-    # Initialize variables to track total loss, correct predictions, total samples, and per-iteration losses
     total_loss, correct, total = 0.0, 0, 0
     iteration_losses = []
-    total_batches = len(dataloader)
 
     for batch_idx, (X, y) in enumerate(batch_iterator):
-
-        # Move input data and labels to the same device as the model
         X, y = X.to(device), y.to(device)
-        # Zero the gradients for the optimizer
         optimizer.zero_grad()
 
-        # Perform a forward pass through the model
         logits = model(X)
-        # Compute the loss using the criterion
         loss = criterion(logits, y)
-        # Backpropagate the loss
         loss.backward()
-        # Update the model's parameters
         optimizer.step()
 
-        # Accumulate the total loss
-        total_loss += loss.item()
-        # Append the current loss to the iteration losses list
-        iteration_losses.append(loss.item())
-        # Get the predicted class labels
+        loss_item = loss.item()
+        total_loss += loss_item
+        iteration_losses.append(loss_item)
+
         _, predicted = torch.max(logits, 1)
-        # Count the number of correct predictions in the batch
-        batch_correct = (predicted == y).sum().item()
-        # Get the total number of samples in the batch
-        batch_total = y.size(0)
+        correct += (predicted == y).sum().item()
+        total += y.size(0)
 
-        # Update the total correct predictions and total samples
-        correct += batch_correct
-        total += batch_total
+        if verbose == 1:
+            batch_iterator.set_postfix(loss=f"{loss_item:.4f}", acc=f"{(correct / total):.2%}")
 
-        # Verbose == 2 print progress every 10 batches, else every batch
         if verbose > 1 and (batch_idx + 1) % (10 if verbose == 2 else 1) == 0:
-            print(f"  ↳ Batch {batch_idx + 1}/{total_batches} | Loss: {loss.item():.4f}")
+            print(
+                f"  ↳ Batch {batch_idx + 1}/{len(dataloader)} | "
+                f"Loss: {loss_item:.4f} | Accuracy: {(correct / total):.2%}"
+            )
             
-    # Compute the average training loss for the epoch
-    training_loss = total_loss / total_batches
-    # Compute the training accuracy for the epoch
+    training_loss = total_loss / len(dataloader)
     training_accuracy = correct / total
     return training_loss, training_accuracy, iteration_losses
 
-
 def train(
-    checkpoint_dir: Optional[str],         # Directory where model checkpoints will be saved
-    name: Optional[str],         # Prefix or name for the model checkpoints
-    start_epoch: int,            # Starting epoch number (useful for resuming training)
-    num_epochs: int,             # Total number of epochs to train the model
-    save_every: Optional[int],             # Frequency (in epochs) to save model checkpoints
-    backup_every: Optional[int],           # Frequency (in epochs) to backup model checkpoints
-    train_dataloader: DataLoader,       # DataLoader for the training dataset
-    val_dataloader: Optional[DataLoader],         # DataLoader for the validation dataset
-    model: Module,                              # The model to be trained
-    criterion: Module,                          # Loss function used for training
-    optimizer: Optimizer,                       # Optimizer used to update model parameters
-    scheduler: Optional[_LRScheduler] = None,   # Learning rate scheduler (optional)
-    verbose: int = 1,                      # Verbosity level
-    all_training_losses: Optional[List[float]] = None,           # Pre-allocated list to store training losses (optional)
-    all_validation_losses: Optional[List[float]] = None,         # Pre-allocated list to store validation losses (optional)
-    all_training_accuracies: Optional[List[float]] = None,       # Pre-allocated list to store training accuracies (optional)
-    all_validation_accuracies: Optional[List[float]] = None,     # Pre-allocated list to store validation accuracies (optional)
-    eval_every: Optional[int] = 1,    #  Frequency (in epochs) to run evaluation model
-    num_steps: Optional[int] = None,  # Number of steps to train the model (optional)
+    checkpoint_dir: Optional[str],
+    name: Optional[str],
+    start_epoch: int,
+    num_epochs: int,
+    save_every: Optional[int],
+    backup_every: Optional[int],
+    train_dataloader: DataLoader,
+    val_dataloader: Optional[DataLoader],
+    model: Module,
+    criterion: Module,
+    optimizer: Optimizer,
+    scheduler: Optional[_LRScheduler] = None,
+    verbose: int = 1,
+    all_training_losses: Optional[List[float]] = None,
+    all_validation_losses: Optional[List[float]] = None,
+    all_training_accuracies: Optional[List[float]] = None,
+    all_validation_accuracies: Optional[List[float]] = None,
+    eval_every: Optional[int] = 1,
+    num_steps: Optional[int] = None,
     with_model_dir: Optional[bool] = True
 ) -> Tuple[List[float], List[float], List[float], List[float]]:
     """
-    Train the model for a given number of epochs, periodically saving checkpoints and tracking performance metrics.
+    Train the model, with periodic evaluation, checkpointing, and backup.
+
+    Can train for a fixed number of epochs or a fixed number of steps.
     
     Args:
-        checkpoint_dir (str): Directory where model checkpoints will be saved.
-        name (str): Prefix or name for the model checkpoints. If not provided, a random name will be generated.
-        start_epoch (int): Starting epoch number (useful for resuming training).
-        num_epochs (int): Total number of epochs to train the model.
-        save_every (int): Frequency (in epochs) to save model checkpoints.
-        backup_every (int): Frequency (in epochs) to backup model checkpoints.
+        checkpoint_dir (Optional[str]): Directory to save model checkpoints.
+        name (Optional[str]): A name for the training run. If None, a unique name is generated.
+        start_epoch (int): The starting epoch number, useful for resuming training.
+        num_epochs (int): The total number of epochs to train for.
+        save_every (Optional[int]): Frequency (in epochs) to save model checkpoints.
+        backup_every (Optional[int]): Frequency (in epochs) to create a backup checkpoint.
         train_dataloader (DataLoader): DataLoader for the training dataset.
-        val_dataloader (DataLoader): DataLoader for the validation dataset.
-        model (torch.nn.Module): The model to be trained.
-        criterion (torch.nn.Module): Loss function used for training.
-        optimizer (torch.optim.Optimizer): Optimizer used to update model parameters.
-        scheduler (torch.optim.lr_scheduler._LRScheduler, optional): Learning rate scheduler (optional). Defaults to None.
-        verbose (int, optional): Verbosity level for progress display. Defaults to 1.
-        all_training_losses (list, optional): Pre-allocated list to store training losses (optional). Defaults to None.
-        all_validation_losses (list, optional): Pre-allocated list to store validation losses (optional). Defaults to None.
-        all_training_accuracies (list, optional): Pre-allocated list to store training accuracies (optional). Defaults to None.
-        all_validation_accuracies (list, optional): Pre-allocated list to store validation accuracies (optional). Defaults to None.
+        val_dataloader (Optional[DataLoader]): DataLoader for the validation dataset.
+        model (Module): The model to be trained.
+        criterion (Module): The loss function.
+        optimizer (Optimizer): The optimizer for updating model parameters.
+        scheduler (Optional[_LRScheduler], optional): Learning rate scheduler. Defaults to None.
+        verbose (int, optional): Verbosity level. 0=silent, 1=progress bars, >1=detailed logs. Defaults to 1.
+        all_training_losses (Optional[List[float]], optional): List to append training losses. Defaults to None.
+        all_validation_losses (Optional[List[float]], optional): List to append validation losses. Defaults to None.
+        all_training_accuracies (Optional[List[float]], optional): List to append training accuracies. Defaults to None.
+        all_validation_accuracies (Optional[List[float]], optional): List to append validation accuracies. Defaults to None.
+        eval_every (Optional[int], optional): Frequency (in epochs) to run evaluation. Defaults to 1.
+        num_steps (Optional[int], optional): If specified, train for a fixed number of steps instead of epochs. Defaults to None.
+        with_model_dir (Optional[bool], optional): Whether to save checkpoints in a subdirectory named after the model. Defaults to True
     
     Returns:
         tuple: A tuple containing:
@@ -203,14 +215,13 @@ def train(
 
     # Generate a random prefix/name for the model if none is provided
     if not name:
-        name = generate_goofy_name(checkpoint_dir)
+        name = generate_unique_name(checkpoint_dir)
         if verbose > 0:
             print(f"No prefix/name for the model was provided, choosen prefix/name: {name}")
     else:
         if verbose > 0:
             print(f"Prefix/name for the model was provided: {name}")
 
-    # Initialize lists if not provided
     if all_training_losses is None:
         all_training_losses = []
     if val_dataloader and all_validation_losses is None:
@@ -225,11 +236,8 @@ def train(
         
         # Adjust the epoch number for saving checkpoints
         adjusted_epoch = start_epoch + epoch - 1
-
-
-        # Start the timer for the epoch
+        
         start_time = time.time()
-
         if num_steps is not None:
             # Train the model for a specified number of steps
             train_loss, training_accuracy, _ = train_for_steps(
@@ -249,13 +257,12 @@ def train(
                 optimizer=optimizer,
                 verbose=verbose,
             )
+        elapsed_time = time.time() - start_time
+        eta = elapsed_time * (num_epochs - epoch)
+        
         # Append the per-iteration training losses and accuracy to the total lists
         all_training_losses.append(train_loss)
         all_training_accuracies.append(training_accuracy)
-
-        # Calculate elapsed time and estimate time remaining
-        elapsed_time = time.time() - start_time
-        eta = elapsed_time * (num_epochs - epoch)
 
         # Print training results for the current epoch
         current_time = time.strftime("%H:%M", time.localtime())
@@ -267,16 +274,18 @@ def train(
                 f"\t⏳ Elapsed Time: {elapsed_time:.2f}s | ETA: {eta:.2f}s\n"
                 f"\t🕒 Completed At: {current_time}"
             )
+        
+        # Validation round, if needed
         if val_dataloader and eval_every and epoch % eval_every == 0:
-            # Evaluate the model on the validation dataset
             validation_loss, validation_accuracy, _ = eval(
-                dataloader=val_dataloader, model=model, criterion=criterion, verbose=verbose
+                dataloader=val_dataloader, 
+                model=model, 
+                criterion=criterion, 
+                verbose=verbose
             )
-            # Append the per-iteration validation losses and accuracy to the total lists
             all_validation_losses.append(validation_loss)
             all_validation_accuracies.append(validation_accuracy)
 
-            # Print validation results for the current epoch
             if verbose > 0:
                 print(
                     f"🔍 Validation Results:\n"
@@ -284,54 +293,65 @@ def train(
                     f"\t🎯 Validation Accuracy: {100 * validation_accuracy:.2f}%"
                 )
 
-        # Update the learning rate scheduler if provided
         if scheduler:
             scheduler.step()
 
-        # Save the model checkpoint periodically based on save_every
+        # Save the model checkpoint periodically
         if save_every and epoch % save_every == 0:
             # Save the model, optimizer, and scheduler state
-            save(checkpoint_dir=checkpoint_dir, prefix=name, model=model, epoch=adjusted_epoch, optimizer=optimizer, scheduler=scheduler, with_model_dir = with_model_dir)
+            save(
+                checkpoint_dir=checkpoint_dir, 
+                prefix=name, 
+                model=model, 
+                epoch=adjusted_epoch, 
+                optimizer=optimizer, 
+                scheduler=scheduler, 
+                with_model_dir=with_model_dir
+            )
             
             # Save the train/val loss and train/val accuracy
             train_epochs = list(range(start_epoch, adjusted_epoch + 1))
             val_epochs = list(range(start_epoch, adjusted_epoch + 1, eval_every)) if val_dataloader else None
             
             save_loss_and_accuracy(
-                checkpoint_dir = checkpoint_dir,
-                prefix = name,
-                model = model,
-                epoch = adjusted_epoch,
-                train_losses = all_training_losses,
-                train_accuracies = all_training_accuracies,
-                train_epochs = train_epochs,
-                val_losses = all_validation_losses,
-                val_accuracies = all_validation_accuracies,
-                val_epochs = val_epochs,
-                with_model_dir = with_model_dir
+                checkpoint_dir=checkpoint_dir,
+                prefix=name,
+                model=model,
+                epoch=adjusted_epoch,
+                train_losses=all_training_losses,
+                train_accuracies=all_training_accuracies,
+                train_epochs=train_epochs,
+                val_losses=all_validation_losses,
+                val_accuracies=all_validation_accuracies,
+                val_epochs=val_epochs,
+                with_model_dir= with_model_dir
             )
-            print()
 
         if backup_every and epoch % backup_every == 0:
-            # Backup the model, optimizer, and scheduler state to avoid overwriting
             if verbose > 0:
                 print(f"Running backup for epoch {epoch}")
-            save(checkpoint_dir=f"{checkpoint_dir}/backup", prefix=f"backup_{time.strftime('%Y%m%d_%H%M%S', time.localtime())}_{name}", model=model, epoch=adjusted_epoch, optimizer=optimizer, scheduler=scheduler)
+            save(
+                checkpoint_dir=f"{checkpoint_dir}/backup", 
+                prefix=f"backup_{time.strftime('%Y%m%d_%H%M%S', time.localtime())}_{name}", 
+                model=model, 
+                epoch=adjusted_epoch, 
+                optimizer=optimizer, 
+                scheduler=scheduler
+            )
             
-            # Backup metrics
             train_epochs = list(range(start_epoch, adjusted_epoch + 1))
             val_epochs = list(range(start_epoch, adjusted_epoch + 1, eval_every)) if val_dataloader else None
             save_loss_and_accuracy(
-                checkpoint_dir = f"{checkpoint_dir}/backup",
-                prefix = f"backup_{time.strftime('%Y%m%d_%H%M%S', time.localtime())}_{name}",
-                model = model,
-                epoch = adjusted_epoch,
-                train_losses = all_training_losses,
-                train_accuracies = all_training_accuracies,
-                train_epochs = train_epochs,
-                val_losses = all_validation_losses,
-                val_accuracies = all_validation_accuracies,
-                val_epochs = val_epochs
+                checkpoint_dir=f"{checkpoint_dir}/backup",
+                prefix=f"backup_{time.strftime('%Y%m%d_%H%M%S', time.localtime())}_{name}",
+                model=model,
+                epoch=adjusted_epoch,
+                train_losses=all_training_losses,
+                train_accuracies=all_training_accuracies,
+                train_epochs=train_epochs,
+                val_losses=all_validation_losses,
+                val_accuracies=all_validation_accuracies,
+                val_epochs=val_epochs
             )
             
     return all_training_losses, all_validation_losses, all_training_accuracies, all_validation_accuracies
