@@ -186,14 +186,21 @@ class CustomNumpyClient(NumPyClient):
 
         # Perform local training
         all_training_losses, _, all_training_accuracies, _ = train(
+            checkpoint_dir=None,
+            name=None,
+            start_epoch=1,
+            num_epochs=self.local_epochs,
+            save_every=None,
+            backup_every=None,
             train_dataloader=self.trainloader,
+            val_dataloader=None,
             model=self.model,
             criterion=self.criterion,
             optimizer=self.optimizer,
-            num_epochs=self.local_epochs,
-            num_steps=self.local_steps,
             scheduler=self.scheduler,
+            eval_every=None,
             verbose=self.verbose,
+            num_steps=self.local_steps,
         )
 
         updated_weights = get_weights(self.model)

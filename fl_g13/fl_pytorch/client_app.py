@@ -3,8 +3,7 @@ from logging import INFO
 
 import torch
 from flwr.client import ClientApp
-from flwr.common import logger
-from flwr.common.typing import Context
+from flwr.common import logger, Context
 from torch.utils.data import DataLoader
 
 from fl_g13.fl_pytorch.client import CustomNumpyClient
