@@ -12,14 +12,13 @@ from fl_g13.modeling.train import train
 class DynamicQuorumClient(CustomNumpyClient):
     def __init__(self, *args, **kwargs):
         # The __init__ method is inherited directly from CustomNumpyClient.
-        # No changes are needed here. It will run the original setup logic.
         super().__init__(*args, **kwargs)
 
     def fit(self, parameters, config):        
         # Check if the server sent a global mask. This logic is unchanged.
         if "global_mask" in config:
             if self.verbose > 0:
-                print("[Client] Received global mask from the server")
+                logger.log(INFO, "[Client] Received global mask from the server")
             global_mask_compressed = config["global_mask"]
             global_mask_uncompressed = uncompress_mask_sparse(global_mask_compressed)
             self.set_mask(global_mask_uncompressed)

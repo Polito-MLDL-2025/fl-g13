@@ -3,6 +3,7 @@ from flwr.common import ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from torch.utils.data import DataLoader
 from torchvision import datasets
+from typing import Any, Callable, Dict, Optional, Type
 
 from fl_g13.config import RAW_DATA_DIR
 from fl_g13.fl_pytorch.DynamicQuorumStrategy import DynamicQuorum
@@ -14,7 +15,6 @@ from fl_g13.modeling.load import load_or_create
 
 
 # *** -------- UTILITY FUNCTIONS FOR SERVER -------- *** #
-
 def get_evaluate_fn(testloader, model, criterion):
     def evaluate(server_round, parameters_ndarrays, config):
         # Applies new parameters to model
@@ -26,23 +26,17 @@ def get_evaluate_fn(testloader, model, criterion):
 
     return evaluate
 
-
 def fit_metrics_aggregation_fn(metrics):
     losses = [n * m["train_loss"] for n, m in metrics]
-    # drifts = [n * m["drift"] for n, m in metrics] --> remove
     total = sum(n for n, _ in metrics)
     return {
         "avg_train_loss": sum(losses) / total,
-        # "avg_drift": sum(drifts) / total --> remove
     }
-
 
 def evaluate_metrics_aggregation_fn(metrics):
     accuracies = [n * m["accuracy"] for n, m in metrics]
     total = sum(n for n, _ in metrics)
-
     return {"decentralized_avg_eval_accuracy": sum(accuracies) / total}
-
 
 def on_fit_config_fn(server_round):
     config = {
@@ -50,47 +44,44 @@ def on_fit_config_fn(server_round):
     }
     return config
 
-
 # *** -------- SERVER APP -------- *** #
-
 def get_server_app(
-        checkpoint_dir,
-        prefix,
-        model_class,
-        model_config=None,
-        optimizer=None,
-        criterion=None,
-        scheduler=None,
-        device=None,
-        save_every=1,
-        save_with_model_dir=False,
-        strategy=None,  # Strategy at choice, chose among classes defined in the codebase
-        get_evaluate_fn=get_evaluate_fn,  # Factory for running centralized evaluation at end of each round
-        num_rounds=200,  # Number of Federated Rounds to run (warmup and mask calibration included)
-        fraction_fit=0.1,  # Sample 10% of available clients for training
-        fraction_evaluate=0.1,  # Sample 10% of available clients for evaluation
-        min_fit_clients=10,  # Never sample less than 10 clients for training
-        min_evaluate_clients=10,  # Never sample less than 10 clients for evaluation
-        min_available_clients=100,  # Wait until all 100 clients are available
-        use_wandb=False,
-        wandb_config=None,
-        evaluate_each=1,
-        model=None,
-        start_epoch=None,
-        global_mask = None,
-        num_total_clients = 100,
-        verbose = 0,
-        
-        adaptive_quorum = False,
-        initial_target_sparsity = 0.7,
-        quorum_update_frequency = 10,
-        initial_quorum = 1,
-        quorum_increment = 10,
-        drift_threshold = 0.5,
-        quorum_patience = 2,
-        force_quorum_update = 15
-):
-    # Load or create model if not found in checkpoint_dir (if found will always load the most recent one)
+    checkpoint_dir: str,
+    prefix: str,
+    model_class: Type[torch.nn.Module],
+    model_config: Optional[Dict[str, Any]] = None,
+    optimizer: Optional[Type[torch.optim.Optimizer]] = None,
+    criterion: Optional[Type[torch.nn.Module]] = None,
+    scheduler: Optional[Any] = None,
+    device: Optional[torch.device] = None,
+    save_every: int = 1,
+    save_with_model_dir: bool = False,
+    strategy: Optional[str] = None,
+    get_evaluate_fn: Callable = get_evaluate_fn,
+    num_rounds: int = 200,
+    fraction_fit: float = 0.1,
+    fraction_evaluate: float = 0.1,
+    min_fit_clients: int = 10,
+    min_evaluate_clients: int = 10,
+    min_available_clients: int = 100,
+    use_wandb: bool = False,
+    wandb_config: Optional[Dict[str, Any]] = None,
+    evaluate_each: int = 1,
+    model: Optional[torch.nn.Module] = None,
+    start_epoch: Optional[int] = None,
+    global_mask: Optional[Any] = None,
+    num_total_clients: int = 100,
+    verbose: int = 0,
+    adaptive_quorum: bool = False,
+    initial_target_sparsity: float = 0.7,
+    quorum_update_frequency: int = 10,
+    initial_quorum: int = 1,
+    quorum_increment: int = 10,
+    drift_threshold: float = 0.5,
+    quorum_patience: int = 2,
+    force_quorum_update: int = 15,
+) -> ServerApp:
+    # Load a new model, if not already given
     if model is None or start_epoch is None:
         model, start_epoch = load_or_create(
             path=f"{checkpoint_dir}/{model_class.__name__}" if save_with_model_dir else checkpoint_dir,
@@ -103,14 +94,12 @@ def get_server_app(
         )
 
     def server_fn(context):
-
-        # Debugging prints
         if verbose > 0:
             print(f"[Server] Server on device: {next(model.parameters()).device}")
 
         # Retrive test dataset and prepare dataloader
         testset = datasets.CIFAR100(RAW_DATA_DIR, train=False, download=True, transform=get_eval_transforms())
-        testloader = DataLoader(testset, batch_size=32)
+        testloader = DataLoader(testset, batch_size=64)
         evaluate_fn = get_evaluate_fn(testloader, model, criterion)
 
         # Retrive parameters
@@ -119,7 +108,8 @@ def get_server_app(
         # Call custom strategy for aggregating data
         nonlocal strategy  # Make strategy defined as param accessible under server_fn
         if strategy == 'standard' or not strategy:
-            print("Using strategy 'CustomFedAvg' (default option)")
+            if verbose > 0:
+                print("Using strategy 'CustomFedAvg' (default option)")
             strategy = CustomFedAvg(
                 checkpoint_dir=checkpoint_dir,
                 prefix=prefix,
@@ -142,7 +132,8 @@ def get_server_app(
                 evaluate_each=evaluate_each,
             )
         elif strategy == 'quorum':
-            print("Using strategy 'DynmicQuorum'")
+            if verbose > 0:
+                print("Using strategy 'AdaQuo'")
             strategy = DynamicQuorum(
                 mask_sum = global_mask,
                 num_total_clients = num_total_clients,
