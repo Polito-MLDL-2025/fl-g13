@@ -115,6 +115,10 @@ All Flower simulations are run exclusively through the Jupyter notebooks located
         └── utils.py
 ```
 
+## Project Workflows
+
+To understand the federated learning workflows and the architecture of the Flower implementation, please refer to the [FLOWER.md](FLOWER.md) file.
+
 ---
 
 ## How to contribute
