@@ -10,7 +10,7 @@ Federated Learning Project, Group 13
 
 ### Using `make`
 
-1. Ensure you have `make` installed on your system.
+1. Ensure you have `make` installed on your system. If not, you can find installation guides for your operating system online (e.g., for Linux: `sudo apt install build-essential`, for macOS: `brew install make`, for Windows: `choco install make`).
 2. Run the following command to set up the project environment:
 
     ```bash
@@ -24,7 +24,7 @@ Federated Learning Project, Group 13
 
 ### Using `venv`
 
-1. Ensure you have Python installed on your system.
+1. Ensure you have Python installed on your system. This project was developed using Python 3.10, which is the suggested version.
 2. Create a virtual environment and install the required dependencies:
 
     ```bash
@@ -44,21 +44,23 @@ Federated Learning Project, Group 13
 2. Create a new conda environment and install the required dependencies:
 
     ```bash
-    conda create --name fl-g13 python=3.11
+    conda create --name fl-g13 python=3.10
     conda activate fl-g13
     pip install -r requirements.txt
     ```
 
     This will:
-    - Create a new conda environment named `fl-g13` with Python 3.9.
+    - Create a new conda environment named `fl-g13` with Python 3.10.
     - Install the required Python dependencies listed in `requirements.txt`.
     - Set up the environment for the project.
 
 ## Project Organization
 
+All Flower simulations are run exclusively through the Jupyter notebooks located in the `notebooks/` directory. The Python modules within `fl_g13/` are imported and utilized by these notebooks.
+
 ```text
 ├── LICENSE            <- Open-source license if one is chosen
-├── Makefile           <- Makefile with convenience commands like `make data` or `make train`
+├── Makefile           <- Makefile with convenience commands for environment setup and notebook export
 ├── README.md          <- The top-level README for developers using this project.
 ├── data
 │   ├── external       <- Data from third party sources.
@@ -85,43 +87,32 @@ Federated Learning Project, Group 13
 └── fl_g13   <- Source code for use in this project.
     │
     ├── __init__.py             <- Makes fl_g13 a Python module
-    │
     ├── config.py               <- Store useful variables and configuration
-    │
     ├── dataset.py              <- Scripts to download or generate data
-    │
-    ├── architectures           <- Classes for models architectures
-    │   └── BaseDino.py          
-    │
-    ├── modeling                <- Code for train, test, save and load models
-    │   ├── load.py             
-    │   ├── test.py                  
-    │   ├── train.py            
-    │   └── utils.py            
-    │
-    ├── editing                 <- Code for model editing
-    │   ├── dataloader_utils.py
+    ├── architectures/          <- Classes for models architectures
+    │   └── BaseDino.py
+    ├── editing/                <- Code for model editing
     │   ├── fisher.py
-    │   ├── __init__.py
     │   ├── masking.py
-    │   ├── pruner.py
-    │   ├── sparse-fine-tuning.py
     │   └── sparseSGDM.py
-    │
-    └── fl_pytorch              <- Code for Flower federated learning apps
-        ├── client_app.py
-        ├── client.py
-        ├── constants.py
-        ├── datasets.py
-        ├── FLOWER.md
-        ├── FullyCentralizedMaskedClient.py
-        ├── FullyCentralizedMaskedStrategy.py
-        ├── model.py
-        ├── server_app.py
-        ├── strategy.py
-        ├── task.py
-        ├── utils.py
-        └── warm_up_head_talos_client.py
+    ├── fl_pytorch/             <- Code for Flower federated learning apps
+    │   ├── client_app.py
+    │   ├── client.py
+    │   ├── datasets.py
+    │   ├── DynamicQuorumClient.py
+    │   ├── DynamicQuorumStrategy.py
+    │   ├── model.py
+    │   ├── server_app.py
+    │   ├── strategy.py
+    │   ├── task.py
+    │   ├── utils.py
+    │   └── editing/            <- Code for centralized mask computation
+    │       └── centralized_mask.py
+    └── modeling/               <- Code for train, test, save and load models
+        ├── eval.py
+        ├── load.py
+        ├── train.py
+        └── utils.py
 ```
 
 ---
@@ -177,8 +168,8 @@ Federated Learning Project, Group 13
             - `2` – Visualization
             - `3` – Modeling
             - `4` – Publication
-        - `pjb` – Your initials; helps identify the author and avoid conflicts.
-        - `data-source-1` – Short, clear description of the notebook's purpose.
+        - `INITIALS` – Your initials; helps identify the author and avoid conflicts.
+        - `DESCRIPTION` – Short, clear description of the notebook's purpose.
 
 ### **Code Reusability & Refactoring Regulation**
 
@@ -193,14 +184,7 @@ Federated Learning Project, Group 13
 
 ### **Code Review & Version Control Regulation**
 
-Sure! Here's your updated section with the hint about `make export` and the suggestion to automate it at the end of each notebook:
-
----
-
-1. **Ensure Reviewability**
-    - Commit both `.ipynb` files and their exported `.py` versions to version control.
-
-2. **Use `nbautoexport` Tool**
+1. **Use `nbautoexport` Tool**
     - Install with:
 
     ```bash
@@ -233,6 +217,9 @@ Sure! Here's your updated section with the hint about `make export` and the sugg
     ```python
     !make export
     ```
+
+2. **Ensure Reviewability**
+     - Commit both `.ipynb` files and their exported `.py` versions to version control.
 
 #### (PyCharm only) Use a Git Hook or File Watcher
 
