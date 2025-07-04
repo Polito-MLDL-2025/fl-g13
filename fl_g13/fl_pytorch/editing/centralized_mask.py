@@ -1,118 +1,79 @@
 import gc
 import os
-from typing import List, Dict, Tuple
-
-from tqdm import tqdm
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import torch
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from fl_g13.editing import create_mask, mask_dict_to_list
 from fl_g13.fl_pytorch.datasets import get_transforms, load_flwr_datasets
 
+
 def get_client_masks(
-    # Client config
-    client_partition_type = 'iid',
-    client_num_partitions = 100,
-    client_num_shards_per_partition = 10,
-    client_batch_size = 16,
-    client_dataset = "cifar100",
-    client_train_test_split_ratio = 0.2,
-    client_transform = get_transforms,
-    client_seed = 42,
-    client_return_dataset = False,
-
-    ## config get mask params
-    mask_model = None,
-    mask_sparsity = 0.8,
-    mask_type = 'global',
-    mask_rounds = 1,
-    mask_func = None,
-    mask_store_in_cpu = True,
-
-    ## get fisher score
-    return_scores = True
+    # Client configuration
+    client_partition_type: str = "iid",
+    client_num_partitions: int = 100,
+    client_num_shards_per_partition: int = 10,
+    client_batch_size: int = 1,
+    client_dataset: str = "cifar100",
+    client_train_test_split_ratio: float = 0.2,
+    client_transform: Callable = get_transforms,
+    client_seed: int = 42,
+    client_return_dataset: bool = False,
+    # Mask generation parameters
+    mask_model: Optional[torch.nn.Module] = None,
+    mask_sparsity: float = 0.8,
+    mask_type: str = "global",
+    mask_rounds: int = 1,
+    mask_func: Optional[Callable] = None,
+    mask_store_in_cpu: bool = True,
+    # Fisher score parameters
+    return_scores: bool = True,
 ) -> Tuple[
-    List[Dict[str, torch.Tensor]], # masks
-    List[Dict[str, torch.Tensor]], # scores
-    List[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]] # datasets
-    ]:
+    List[Dict[str, torch.Tensor]],  # Masks
+    List[Dict[str, torch.Tensor]],  # Scores
+    List[Tuple[DataLoader, DataLoader]],  # Datasets
+]:
     """
-    Generate pruning masks for a model based on federated client datasets.
+    Generate masks and (optionally) scores for a specified number of clients.
 
-    This function simulates a federated learning setup by partitioning a dataset into multiple client-specific
-    data loaders and generating corresponding sparsity masks for each client using a specified model and
-    pruning strategy.
+    This function simulates a federated environment where each client computes a
+    mask for a given model based on its local data. It can also return the
+    raw scores used for mask generation and the client datasets.
 
-    Parameters:
-    ----------
-    client_partition_type : str, optional
-        Type of data partitioning: 'iid' or 'shard' (non-iid). Default is 'iid'.
-
-    client_num_partitions : int, optional
-        Total number of clients (data partitions). Default is 100.
-
-    client_num_shards_per_partition : int, optional
-        Number of shards per client, used only when partitioning is 'shard'. Default is 10.
-
-    client_batch_size : int, optional
-        Batch size used for training and validation data loaders. Default is 16.
-
-    client_dataset : str, optional
-        Dataset name to be loaded (e.g., 'cifar100'). Default is 'cifar100'.
-
-    client_train_test_split_ratio : float, optional
-        Fraction of the client dataset to use for validation. Default is 0.2.
-
-    client_transform : callable, optional
-        Transform function applied to the dataset. Should return torchvision transforms.
-
-    client_seed : int, optional
-        Random seed for dataset partitioning and reproducibility. Default is 42.
-
-    client_return_dataset : bool, optional
-        If True, returns the client train and validation dataloaders. Default is True.
-
-    mask_model : torch.nn.Module
-        The model on which sparsity masks are to be generated. Must be provided.
-
-    mask_sparsity : float, optional
-        Target sparsity level (0.0 to 1.0), where 1.0 means all weights are zeroed out. Default is 0.8.
-
-    mask_type : str, optional
-        Type of pruning: 'global' or 'local'. Global prunes across all layers; local prunes per-layer. Default is 'global'.
-
-    mask_rounds : int, optional
-        Number of iterations for the mask generation process. Default is 1.
-
-    mask_func : callable, optional
-        Optional custom mask generation function. If None, a default `create_mask` function will be used.
-
+    Args:
+        client_partition_type (str): The data partitioning strategy ('iid' or 'shard').
+        client_num_partitions (int): The total number of clients.
+        client_num_shards_per_partition (int): Shards per partition for non-IID data.
+        client_batch_size (int): The batch size for client DataLoaders.
+        client_dataset (str): The dataset to use (e.g., 'cifar100').
+        client_train_test_split_ratio (float): The train-test split ratio for client data.
+        client_transform (Callable): The function for data transformations.
+        client_seed (int): The random seed for data partitioning.
+        client_return_dataset (bool): If True, returns the client DataLoaders.
+        mask_model (torch.nn.Module): The model to generate masks for.
+        mask_sparsity (float): The target sparsity for the masks.
+        mask_type (str): The type of mask to generate ('global' or 'local').
+        mask_rounds (int): The number of rounds for mask calibration.
+        mask_func (Optional[Callable]): A custom function for mask generation.
+        mask_store_in_cpu (bool): If True, stores masks and scores on the CPU.
+        return_scores (bool): If True, returns the scores alongside the masks.
 
     Returns:
-    -------
-    masks : List[Dict[str, torch.Tensor]]
-        A list of pruning masks (one per client), each being a dictionary mapping parameter names to binary masks.
-
-    client_datasets : List[Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]]
-        A list of tuples containing (train_loader, val_loader) for each client, if `client_return_dataset` is True.
-        Otherwise, this list will be empty.
-
-    Raises:
-    ------
-    ValueError
-        If `mask_model` is not provided.
-
+        Tuple: A tuple containing lists of masks, scores, and client datasets.
     """
-    
     if mask_model is None:
-        raise ValueError("mask_model is required!")
-    masks = []
-    scores = []
-    client_datasets = []
-    for i in tqdm(range(client_num_partitions), desc = 'Clients mask'):
-        partition_id = i
+        raise ValueError("A `mask_model` must be provided.")
+
+    masks: List[Dict[str, torch.Tensor]] = []
+    scores: List[Dict[str, torch.Tensor]] = []
+    client_datasets: List[Tuple[DataLoader, DataLoader]] = []
+
+    for i in tqdm(range(client_num_partitions), desc="Generating client masks"):
+        # Load the dataset for the current client
         client_trainloader, client_valloader = load_flwr_datasets(
-            partition_id=partition_id,
+            partition_id=i,
             partition_type=client_partition_type,
             num_partitions=client_num_partitions,
             num_shards_per_partition=client_num_shards_per_partition,
@@ -120,45 +81,63 @@ def get_client_masks(
             train_test_split_ratio=client_train_test_split_ratio,
             dataset=client_dataset,
             transform=client_transform,
-            seed=client_seed
+            seed=client_seed,
         )
 
+        # Use the default `create_mask` function if none is provided
         if not (mask_func and callable(mask_func)):
             mask_func = create_mask
 
-        mask = mask_func(
+        # Generate the mask (and scores if requested)
+        mask_result = mask_func(
             model=mask_model,
             dataloader=client_trainloader,
             sparsity=mask_sparsity,
             mask_type=mask_type,
             rounds=mask_rounds,
-            return_scores=return_scores
+            return_scores=return_scores,
         )
-        
+
         if return_scores:
-            mask, score = mask
+            mask, score = mask_result
             if mask_store_in_cpu:
                 score = {key: tensor.cpu() for key, tensor in score.items()}
             scores.append(score)
+        else:
+            mask = mask_result
+
         if mask_store_in_cpu:
             mask = {key: tensor.cpu() for key, tensor in mask.items()}
         masks.append(mask)
 
+        # Clean up memory
         gc.collect()
         torch.cuda.empty_cache()
 
         if client_return_dataset:
             client_datasets.append((client_trainloader, client_valloader))
+
     return masks, scores, client_datasets
 
 def aggregate_by_sum(
     masks: List[Dict[str, torch.Tensor]]
 ) -> Dict[str, torch.Tensor]:
+    """
+    Aggregate a list of masks by summing them element-wise.
+
+    Args:
+        masks (List[Dict[str, torch.Tensor]]): A list of masks to aggregate.
+
+    Returns:
+        Dict[str, torch.Tensor]: The aggregated mask.
+    """
     if not masks:
         return {}
 
+    # Initialize the aggregated mask with zeros
     aggregated = {k: torch.zeros_like(v) for k, v in masks[0].items()}
 
+    # Sum the masks
     for mask in masks:
         for k in mask:
             aggregated[k] += mask[k]
@@ -166,183 +145,95 @@ def aggregate_by_sum(
     return aggregated
 
 def aggregate_masks(
-    masks: List[Dict[str, torch.Tensor]], 
-    strategy = 'union', 
-    agg_func = lambda x: x[0]
+    masks: List[Dict[str, torch.Tensor]],
+    strategy: str = "union",
+    agg_func: Optional[Callable[[List[Dict[str, torch.Tensor]]], Dict[str, torch.Tensor]]] = None,
 ) -> Dict[str, torch.Tensor]:
     """
-    Aggregate a list of binary pruning masks using a specified strategy.
+    Aggregate a list of masks using a specified strategy.
 
-    This function combines individual client pruning masks into a single global mask.
-    It supports standard aggregation strategies such as union (logical OR),
-    intersection (logical AND), or a custom user-defined function.
+    Args:
+        masks (List[Dict[str, torch.Tensor]]): The list of masks to aggregate.
+        strategy (str): The aggregation strategy ('union', 'intersection', or 'custom').
+        agg_func (Optional[Callable]): A custom aggregation function for the 'custom' strategy.
 
-    Parameters
-    ----------
-    masks : List[Dict[str, torch.Tensor]]
-        A list of pruning masks, where each mask is a dictionary mapping parameter names
-        to binary `torch.Tensor` masks.
-
-    strategy : str, optional
-        Aggregation strategy to use. One of:
-            - 'union': combines masks using element-wise logical OR.
-            - 'intersection': combines masks using element-wise logical AND.
-            - 'custom': applies a user-defined aggregation function.
-        Default is 'union'.
-
-    agg_func : callable, optional
-        A custom function for aggregation, used only when `strategy='custom'`.
-        It must take a list of masks as input and return a single aggregated mask
-        in the same format. Default is `lambda x: x[0]` (returns the first mask).
-
-    Returns
-    -------
-    agg_mask : Dict[str, torch.Tensor]
-        A dictionary representing the aggregated mask, mapping parameter names to
-        binary tensors.
-
-    Raises
-    ------
-    ValueError
-        If the strategy is invalid or if `agg_func` is not callable when using 'custom'.
-
-    Notes
-    -----
-    - The 'union' strategy ensures any parameter selected by at least one client is retained.
-    - The 'intersection' strategy retains only parameters selected by all clients.
-    - Use 'custom' for advanced or statistical aggregation (e.g., threshold-based voting).
-    - Assumes all input masks have the same keys and tensor shapes.
+    Returns:
+        Dict[str, torch.Tensor]: The aggregated mask.
     """
-    agg_mask: Dict[str, torch.Tensor] = {}
-
     if not masks:
-        return agg_mask  # return empty if no masks
+        return {}
 
     keys = masks[0].keys()
-    dtype = next(iter(masks[0].values())).dtype  # assume all masks use same dtype
+    dtype = next(iter(masks[0].values())).dtype
+    agg_mask: Dict[str, torch.Tensor] = {}
 
-    if strategy == 'union':
+    if strategy == "union":
         for key in keys:
             agg_bool = torch.zeros_like(masks[0][key], dtype=torch.bool)
             for mask in masks:
                 agg_bool |= mask[key].bool()
             agg_mask[key] = agg_bool.to(dtype)
-
-    elif strategy == 'intersection':
+    elif strategy == "intersection":
         for key in keys:
             agg_bool = torch.ones_like(masks[0][key], dtype=torch.bool)
             for mask in masks:
                 agg_bool &= mask[key].bool()
             agg_mask[key] = agg_bool.to(dtype)
-
-    elif strategy == 'custom':
+    elif strategy == "custom":
         if not callable(agg_func):
-            raise ValueError("agg_func must be callable!")
+            raise ValueError("`agg_func` must be a callable for the 'custom' strategy.")
         agg_mask = agg_func(masks)
-
     else:
-        raise ValueError("Invalid strategy! Use 'union', 'intersection', or 'custom'.")
+        raise ValueError("Invalid strategy. Choose from 'union', 'intersection', or 'custom'.")
 
     return agg_mask
 
 def get_centralized_mask(
-    ## config client data set params
-    client_partition_type='iid',  # 'iid' or 'shard' for non-iid dataset
-    client_num_partitions=100,  # equal to number of client
-    client_num_shards_per_partition=10,
-    client_batch_size=16,
-    client_dataset="cifar100",
-    client_train_test_split_ratio=0.2,
-    client_transform=get_transforms,
-    client_seed=42,
-    client_return_dataset=False,
-
-    ## config get mask params
-    mask_model=None,
-    mask_sparsity=0.8,
-    mask_type='global',
-    mask_rounds=1,
-    mask_func=None,
-
-    ## aggregate
-    agg_strategy='union',
-    agg_func=None
-) -> List[torch.Tensor]:
+    # Client data configuration
+    client_partition_type: str = "iid",
+    client_num_partitions: int = 100,
+    client_num_shards_per_partition: int = 10,
+    client_batch_size: int = 16,
+    client_dataset: str = "cifar100",
+    client_train_test_split_ratio: float = 0.2,
+    client_transform: Callable = get_transforms,
+    client_seed: int = 42,
+    client_return_dataset: bool = False,
+    # Mask generation parameters
+    mask_model: Optional[torch.nn.Module] = None,
+    mask_sparsity: float = 0.8,
+    mask_type: str = "global",
+    mask_rounds: int = 1,
+    mask_func: Optional[Callable] = None,
+    # Aggregation parameters
+    agg_strategy: str = "union",
+    agg_func: Optional[Callable] = None,
+) -> Tuple[List[torch.Tensor], Dict[str, torch.Tensor]]:
     """
-    Generate a centralized mask by aggregating sparsity masks computed across federated clients.
+    Generate and aggregate client masks to create a centralized mask.
 
-    This function simulates multiple clients using a federated data partitioning strategy, generates
-    individual sparsity masks per client, and aggregates them into a single global mask using a
-    specified aggregation strategy.
+    Args:
+        client_partition_type (str): The data partitioning strategy.
+        client_num_partitions (int): The total number of clients.
+        client_num_shards_per_partition (int): Shards per partition for non-IID.
+        client_batch_size (int): The batch size for client DataLoaders.
+        client_dataset (str): The dataset to use.
+        client_train_test_split_ratio (float): The train-test split ratio.
+        client_transform (Callable): The function for data transformations.
+        client_seed (int): The random seed for data partitioning.
+        client_return_dataset (bool): If True, returns client datasets.
+        mask_model (torch.nn.Module): The model to generate masks for.
+        mask_sparsity (float): The target sparsity for the masks.
+        mask_type (str): The type of mask to generate.
+        mask_rounds (int): The number of rounds for mask calibration.
+        mask_func (Optional[Callable]): A custom function for mask generation.
+        agg_strategy (str): The aggregation strategy.
+        agg_func (Optional[Callable]): A custom aggregation function.
 
-    Parameters
-    ----------
-    client_partition_type : str, optional
-        Data partitioning strategy: 'iid' or 'shard' (for non-iid splits). Default is 'iid'.
-
-    client_num_partitions : int, optional
-        Number of simulated clients (i.e., partitions). Default is 100.
-
-    client_num_shards_per_partition : int, optional
-        Number of shards per partition (used for 'shard' partitioning). Default is 10.
-
-    client_batch_size : int, optional
-        Batch size for data loaders used in mask generation. Default is 16.
-
-    client_dataset : str, optional
-        Name of the dataset (e.g., 'cifar100'). Default is 'cifar100'.
-
-    client_train_test_split_ratio : float, optional
-        Ratio of client data used for validation. Default is 0.2.
-
-    client_transform : callable, optional
-        Function that applies preprocessing/transforms to the dataset. Should return torchvision transforms.
-
-    client_seed : int, optional
-        Random seed for reproducibility in dataset partitioning. Default is 42.
-
-    client_return_dataset : bool, optional
-        Whether to return client datasets. This is ignored here but passed to `get_client_masks`. Default is False.
-
-    mask_model : torch.nn.Module
-        Model on which sparsity masks are to be generated. Must be provided.
-
-    mask_sparsity : float, optional
-        Target sparsity level for the pruning masks (0.0 to 1.0). Default is 0.8.
-
-    mask_type : str, optional
-        Type of sparsity to apply: 'global' or 'local'. Default is 'global'.
-
-    mask_rounds : int, optional
-        Number of rounds/iterations for applying the mask. Default is 1.
-
-    mask_func : callable, optional
-        Optional custom function to generate the mask per client.
-
-    agg_strategy : str, optional
-        Aggregation strategy for combining masks across clients.
-        Options: 'union', 'intersection', or 'custom'. Default is 'union'.
-
-    agg_func : callable, optional
-        Custom aggregation function to use when `strategy='custom'`. Must take a list of masks and return one.
-
-    Returns
-    -------
-    agg_mask : Dict[str, torch.Tensor]
-        A dictionary representing the aggregated global pruning mask, mapping model parameter names
-        to binary `torch.Tensor` masks.
-
-    Raises
-    ------
-    ValueError
-        If `mask_model` is not provided or an invalid strategy is specified.
-
-    Notes
-    -----
-    - This function is useful for obtaining a global view of model sparsity across decentralized data.
-    - The final mask can be used to prune a model before centralized or federated fine-tuning.
+    Returns:
+        Tuple[List[torch.Tensor], Dict[str, torch.Tensor]]: The centralized mask as a list and a dictionary.
     """
-    masks, scores, _ = get_client_masks(
+    masks, _, _ = get_client_masks(
         client_partition_type=client_partition_type,
         client_num_partitions=client_num_partitions,
         client_num_shards_per_partition=client_num_shards_per_partition,
@@ -356,94 +247,90 @@ def get_centralized_mask(
         mask_sparsity=mask_sparsity,
         mask_type=mask_type,
         mask_rounds=mask_rounds,
-        mask_func=mask_func
+        mask_func=mask_func,
     )
     agg_mask = aggregate_masks(masks, strategy=agg_strategy, agg_func=agg_func)
     return mask_dict_to_list(mask_model, agg_mask), agg_mask
 
-def save_mask(mask: Dict[str, torch.Tensor], filepath: str = 'centralized_mask.pth'):
+def save_mask(mask: Dict[str, torch.Tensor], filepath: str = "centralized_mask.pth") -> None:
+    """Save a mask dictionary to a file."""
     torch.save(mask, filepath)
 
 def save_masks_scores(
-    masks: List[Dict[str, torch.Tensor]], 
-    scores: List[Dict[str, torch.Tensor]], 
-    filepath: str = 'client_masks.pth'
-):
+    masks: List[Dict[str, torch.Tensor]],
+    scores: List[Dict[str, torch.Tensor]],
+    filepath: str = "client_masks.pth",
+) -> None:
+    """Save lists of masks and scores to a file."""
     data = (masks, scores)
     torch.save(data, filepath)
 
 def load_masks_scores(
-    filepath: str = 'centralized_masks.pth'
+    filepath: str = "centralized_masks.pth",
 ) -> Tuple[List[Dict[str, torch.Tensor]], List[Dict[str, torch.Tensor]]]:
+    """Load lists of masks and scores from a file."""
+    masks, scores = torch.load(filepath)
+    return masks, scores
+
+def load_mask(filepath: str = "centralized_mask.pth") -> Dict[str, torch.Tensor]:
+    """Load a mask dictionary from a file."""
     return torch.load(filepath)
 
-def load_mask(filepath: str = 'centralized_mask.pth') -> Dict[str, torch.Tensor]:
-    return torch.load(filepath)
+def compute_masks_and_scores(
+    model: torch.nn.Module,
+    client_partition_type: str,
+    client_num_shards_per_partition: int,
+    sparsity: float = 0.7,
+    mask_type: str = "global",
+    mask_rounds: int = 3,
+    num_clients: int = 100,
+    client_batch_size: int = 1,
+    file_name: Optional[str] = None,
+    verbose: bool = False,
+) -> Tuple[List[Dict[str, torch.Tensor]], List[Dict[str, torch.Tensor]]]:
+    """
+    Compute and save client masks and scores, or load them if they already exist.
 
-def load_or_create_centralized_mask(
-    model,
-    strategy,
-    aggregation_fn,
-    client_partition_type,
-    client_num_shards_per_partition,
-    
-    sparsity = 0.7,
-    mask_type = 'local',
-    mask_rounds = 3,
-    
-    num_clients = 100,
-    client_batch_size = 16,
-    return_scores = False,
-    
-    file_name: str = None,
-    
-    verbose = False
-) -> Tuple[
-    Dict[str, torch.Tensor], # mask
-    List[Dict[str, torch.Tensor]] # scores
-]:
-    if not strategy in ['sum', 'union', 'intersection', 'custom']:
-        raise ValueError(f"[CENTR_MASK] Unknown strategy {strategy}")
-    
+    Args:
+        model (torch.nn.Module): The model to generate masks for.
+        client_partition_type (str): The data partitioning strategy.
+        client_num_shards_per_partition (int): Shards per partition for non-IID.
+        sparsity (float): The target sparsity for the masks.
+        mask_type (str): The type of mask to generate.
+        mask_rounds (int): The number of rounds for mask calibration.
+        num_clients (int): The total number of clients.
+        client_batch_size (int): The batch size for client DataLoaders.
+        file_name (Optional[str]): The file to save or load the masks and scores from.
+        verbose (bool): Inf True, prints progress informatio.
+
+    Returns:
+        Tuple[List[Dict[str, torch.Tensor]], List[Dict[str, torch.Tensor]]]: The client masks and scores.
+    """
     if file_name and os.path.isfile(file_name):
         if verbose:
-            print(f'[CENTR_MASK] Found {file_name}. Loading mask from memory')
-            
-        return load_mask(file_name), []
-    
-    ## -- Computing Mask --
+            print(f"[CENTR_MASK] Found {file_name}. Loading masks and scores from memory.")
+        return load_masks_scores(file_name)
+
     if verbose:
-        print('[CENTR_MASK] Computing mask')
+        print("[CENTR_MASK] Computing masks and scores.")
+
     client_masks, scores, _ = get_client_masks(
-        ## config client data set params
-        client_partition_type=client_partition_type,  # 'iid' or 'shard' for non-iid dataset
-        client_num_partitions=num_clients,  # equal to number of client
+        client_partition_type=client_partition_type,
+        client_num_partitions=num_clients,
         client_num_shards_per_partition=client_num_shards_per_partition,
         client_batch_size=client_batch_size,
-
-        ## config get mask params
         mask_model=model,
         mask_sparsity=sparsity,
         mask_type=mask_type,
         mask_rounds=mask_rounds,
-        return_scores = return_scores
+        return_scores=True,  # Always return scores
     )
-    
-    ## -- Aggregation --
-    if verbose:
-        print(f'[CENTR_MASK] Aggregation strategy: {strategy}')
-        
-    if strategy == 'sum':        
-        final_mask = aggregate_by_sum(client_masks)
-    elif strategy in ['union', 'intersection', 'custom']:
-        final_mask = aggregate_masks(client_masks, strategy, aggregation_fn)
-    
-    ## -- Saving for future uses
+
     if not file_name:
-        file_name = 'centralized_mask.pth'
+        file_name = "centralized_mask.pth"
+
     if verbose:
-        print(f'[CENTR_MASK] Saving the mask at "{file_name}"')
-        
-    save_mask(final_mask, file_name)
-    
-    return final_mask, scores
+        print(f'[CENTR_MASK] Saving masks and scores to "{file_name}"')
+    save_masks_scores(client_masks, scores, file_name)
+
+    return client_masks, scores

@@ -9,8 +9,9 @@ from torch import nn, optim
 from torch.nn import Module
 from torch.optim.lr_scheduler import _LRScheduler
 
-from fl_g13.modeling.utils import generate_goofy_name
+import matplotlib.pyplot as plt
 
+from fl_g13.modeling.utils import generate_unique_name
 
 class ModelKeys(Enum):
     EPOCH = "epoch"
@@ -21,7 +22,6 @@ class ModelKeys(Enum):
     OPTIMIZER_CLASS = "optimizer_class"
     SCHEDULER_STATE_DICT = "scheduler_state_dict"
     SCHEDULER_CLASS = "scheduler_class"
-
 
 def save(
         checkpoint_dir: str,
@@ -48,7 +48,6 @@ def save(
     Returns:
         None
     """
-    # Get the name of the model class
     model_name = model.__class__.__name__
 
     # Create a directory for saving checkpoints specific to the model
@@ -56,23 +55,23 @@ def save(
         checkpoint_dir = os.path.join(checkpoint_dir, model_name)
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    # If no prefix is provided, generate a random one
     if not prefix:
-        prefix = generate_goofy_name()
+        prefix = generate_unique_name()
 
     # Construct the filename for the checkpoint
     if not filename:
         filename = os.path.join(checkpoint_dir, f"{prefix}_{model_name}_epoch_{epoch}.pth")
     else:
         filename = os.path.join(checkpoint_dir, filename)
+
     # Create a dictionary to store the checkpoint data
     checkpoint = {
-        ModelKeys.EPOCH.value: epoch,  # Save the current epoch
-        ModelKeys.MODEL_STATE_DICT.value: model.state_dict(),  # Save model parameters
-        ModelKeys.MODEL_CLASS.value: model.__class__.__name__,  # Save model class name
+        ModelKeys.EPOCH.value: epoch,                           # current epoch
+        ModelKeys.MODEL_STATE_DICT.value: model.state_dict(),   # model parameters
+        ModelKeys.MODEL_CLASS.value: model.__class__.__name__,  # model class name
     }
     if hasattr(model, "_config") and model._config is not None:
-        checkpoint[ModelKeys.CONFIG.value] = model._config  # Save model configuration
+        checkpoint[ModelKeys.CONFIG.value] = model._config      # model configuration
 
     # If optimizer is provided, save its state and class name
     if optimizer is not None:
@@ -124,7 +123,6 @@ def save_loss_and_accuracy(
     Returns:
         None
     """
-    # Get the name of the model class
     model_name = model.__class__.__name__
 
     # Create a directory for saving checkpoints specific to the model
@@ -132,9 +130,8 @@ def save_loss_and_accuracy(
         checkpoint_dir = os.path.join(checkpoint_dir, model_name)
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    # If no prefix is provided, generate a random one
     if not prefix:
-        prefix = generate_goofy_name()
+        prefix = generate_unique_name()
 
     # Construct the filename for the checkpoint
     if not filename:
@@ -155,7 +152,6 @@ def save_loss_and_accuracy(
     with open(filename, 'w') as f:
         json.dump(metrics, f, indent = 4)
         
-    # Print confirmation message with the path to the saved checkpoint
     print(f"💾 Saved losses and accuracies (training and validation) at: {filename}")
 
 def load(
@@ -179,113 +175,89 @@ def load(
     Returns:
         Tuple[nn.Module, int]: The model with restored state and the epoch to resume training from.
     """
-    # Check if the path is a directory
     if os.path.isdir(path):
         # Get all .pth files in the directory, sorted by modification time (oldest to newest)
         checkpoint_files = sorted(glob.glob(os.path.join(path, "*.pth")), key=os.path.getmtime)
-
-        # Raise an error if no checkpoint files are found
         if not checkpoint_files:
             raise FileNotFoundError(f"No checkpoint found in directory: {path}")
 
-        # Use the most recent checkpoint file
-        ckpt_path = checkpoint_files[-1]
-
-    # If path is a file, use it directly as the checkpoint path
+        ckpt_path = checkpoint_files[-1] # most recent file
     elif os.path.isfile(path):
         ckpt_path = path
-
-    # If path is neither file nor directory, raise an error
     else:
         raise FileNotFoundError(f"Checkpoint path is neither a file nor a directory: {path}")
 
-    # Load the checkpoint, mapping it to the specified device if given
     checkpoint = torch.load(ckpt_path, map_location=device) if device else torch.load(ckpt_path)
 
-    # If verbose is enabled, print checkpoint details for debugging
     if verbose:
         print(f"🔍 Loading checkpoint from {ckpt_path}")
-
-        # Print model class info if available
         if ModelKeys.MODEL_CLASS.value in checkpoint:
             print(f"📦 Model class in checkpoint: {checkpoint[ModelKeys.MODEL_CLASS.value]}")
-
-        # Print optimizer class info if available
         if ModelKeys.OPTIMIZER_CLASS.value in checkpoint:
             print(f"⚙️ Optimizer class in checkpoint: {checkpoint[ModelKeys.OPTIMIZER_CLASS.value]}")
-
-        # Print scheduler class info if available
         if ModelKeys.SCHEDULER_CLASS.value in checkpoint:
             print(f"📈 Scheduler class in checkpoint: {checkpoint[ModelKeys.SCHEDULER_CLASS.value]}")
-
-        # Print model configuration info if available
         if ModelKeys.CONFIG.value in checkpoint:
             print(f"🔧 Model configuration: {checkpoint[ModelKeys.CONFIG.value]}")
 
     model = get_model(model_class)
-
     if hasattr(model_class, "from_config") and callable(getattr(model_class, "from_config")):
         model = model_class.from_config(checkpoint[ModelKeys.CONFIG.value])
-
-    # Load model weights from the checkpoint
     model.load_state_dict(checkpoint[ModelKeys.MODEL_STATE_DICT.value])
 
-    if device: # Only move if a device was specified
+    if device:
         model.to(device)
         if verbose:
             print(f"➡️ Moved model to device: {device}")
 
-    # Load optimizer state if an optimizer is provided and the checkpoint contains its state
     if optimizer and ModelKeys.OPTIMIZER_STATE_DICT.value in checkpoint:
         optimizer.load_state_dict(checkpoint[ModelKeys.OPTIMIZER_STATE_DICT.value])
 
-    # Load scheduler state if a scheduler is provided and the checkpoint contains its state
     if scheduler and ModelKeys.SCHEDULER_STATE_DICT.value in checkpoint:
         scheduler.load_state_dict(checkpoint[ModelKeys.SCHEDULER_STATE_DICT.value])
 
-    # Determine the epoch to resume from (one after the saved epoch, default to 0 if not found)
     start_epoch = checkpoint.get(ModelKeys.EPOCH.value, 0) + 1
-
-    # Confirm successful loading
+    
     print(f"✅ Loaded checkpoint from {ckpt_path}, resuming at epoch {start_epoch}")
-
-    # Return the loaded model and starting epoch
     return model, start_epoch
-
 
 def load_or_create(
         path: str,
         model_class: Type[nn.Module] | Module,
-        model_config = None,
+        model_config: Optional[Dict] = None,
         device: Optional[torch.device] = None,
         optimizer: Optional[optim.Optimizer] = None,
         scheduler: Optional[_LRScheduler] = None,
         verbose: bool = False
 ) -> tuple[Module, int]:
     """
-    Loads a model checkpoint or creates a new model if no checkpoint is found.
-    This function attempts to load a checkpoint from the specified path into a model. 
-    If no checkpoint is found, it creates a new model instance. Optionally, it can also 
-    restore the states of an optimizer and a learning rate scheduler.
-        model_class (Type[nn.Module] | nn.Module): The model class or an instance of the model.
-        model_config (Optional[dict]): Configuration dictionary for creating the model, 
-            used if no checkpoint is found. If provided, the model class must have a 
-            `from_config` method.
-        device (Optional[torch.device]): The device to map the model and checkpoint to. 
-            Defaults to "cuda:0" if available, otherwise "cpu".
-        optimizer (Optional[torch.optim.Optimizer]): Optimizer instance to restore state into, if provided.
-        scheduler (Optional[torch.optim.lr_scheduler._LRScheduler]): Learning rate scheduler 
-            instance to restore state into, if provided.
-        verbose (bool): If True, prints information about the loading process. Defaults to False.
-        tuple[nn.Module, int]: A tuple containing the model (with restored state if a checkpoint 
-        was found) and the epoch to resume training from. If no checkpoint is found, the epoch 
-        is set to 1.
-    Raises:
-        ValueError: If a model configuration is provided but the model class does not have 
-        a `from_config` method.
+    Attempts to load a model checkpoint from a given path; creates a new model if no checkpoint is found.
+
+    This function acts as a convenient wrapper around `load`. If a checkpoint exists at the specified
+    path, it will be loaded. If the path does not exist or contains no checkpoint files, a new
+    instance of the model will be created, initialized, and moved to the specified device.
+
+    Args:
+        path (str): The path to the checkpoint file or directory.
+        model_class (Type[nn.Module] | Module): The class of the model to load or create.
+        model_config (Optional[Dict], optional): Configuration dictionary used to instantiate a new model
+            via a `from_config` class method if the checkpoint is not found. Defaults to None.
+        device (Optional[torch.device], optional): The device to map the model to. If None, defaults to
+            "cuda" if available, otherwise "cpu". Defaults to None.
+        optimizer (Optional[optim.Optimizer], optional): An optimizer instance whose state will be
+            loaded from the checkpoint if available. Defaults to None.
+        scheduler (Optional[_LRScheduler], optional): A scheduler instance whose state will be
+            loaded from the checkpoint if available. Defaults to None.
+        verbose (bool, optional): If True, prints detailed loading information or a warning if a new
+            model is created. Defaults to False.
+
+    Returns:
+        Tuple[Module, int]: A tuple containing:
+            - The loaded or newly created model instance.
+            - The starting epoch number (from the checkpoint, or 1 for a new model).
     """
     try:
-        return  load(path, model_class, device, optimizer, scheduler, verbose)
+        return load(path, model_class, device, optimizer, scheduler, verbose)
     except FileNotFoundError:
         if verbose:
             print(f"⚠️ No checkpoint found at {path}. Creating a new model.")
@@ -316,12 +288,9 @@ def load_loss_and_accuracies(
     Returns:
         Dict[str, Optional[List[float|int]]]: Dictionary with the metrics. 
     """
-    # Check if the file exists
     if not os.path.isfile(path):
-        # raise an error if the file does not exists
         raise FileNotFoundError(f"Specified path does not exists: {path}")
     
-    # Load data
     with open(path, 'r') as f:
         loaded_metrics = json.load(f)
     
@@ -332,30 +301,25 @@ def load_loss_and_accuracies(
     return loaded_metrics
 
 def get_model(model_class: Type[nn.Module] | Module):
-    # If model_class is already an instance, use it directly
     if isinstance(model_class, nn.Module):
         model = model_class
     else:
-        # Otherwise, instantiate a new model with a default config
         try:
             model = model_class()
         except TypeError as e:
             raise ValueError("Model class requires a config or arguments for instantiation.") from e
     return model
 
-import matplotlib.pyplot as plt
-
 def plot_metrics(
     path: str
 ):
-    # load metrics
     metrics = load_loss_and_accuracies(path)
 
     train_epochs = metrics['train_epochs']
     val_epochs = metrics.get('val_epochs', [])
 
-    # two plots, separate for loss and accuracy
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    # two plots, loss and accuracy
+    _, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
     # Loss
     ax1.plot(train_epochs, metrics['train_loss'], label='Train Loss', color='tab:blue')

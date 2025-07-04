@@ -1,4 +1,3 @@
-# TODO: move in a "make client dependencies function"m maybe under utils
 import os
 import urllib
 

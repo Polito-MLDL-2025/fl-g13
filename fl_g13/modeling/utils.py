@@ -6,9 +6,9 @@ import glob
 from torchvision.transforms import Compose, Resize, CenterCrop, RandomCrop, RandomHorizontalFlip, Normalize, ToTensor
 from torchvision import datasets
 from fl_g13.dataset import train_test_split
+from torch.utils.data import Subset
 
-
-# Sample lists of funny adjectives and nouns
+# Sample lists of adjectives and nouns
 adjectives = [
     "sleepy",
     "fluffy",
@@ -87,54 +87,43 @@ nouns = [
     "clefairy",
 ]
 
-
-def generate_goofy_name(folder_path=None):
+def generate_unique_name(folder_path=None):
     """
-    Generates a unique and "goofy" name by combining a random adjective, noun, and a two-digit number.
-    
+    Generates a unique name by combining a random adjective, noun, and a two-digit number.
+
     If a folder path is provided, the function ensures that the generated name does not conflict
-    with existing names in the folder (specifically, filenames ending with ".pth" and following
-    a specific naming convention).
+    with existing file prefixes in the folder or its subdirectories.
 
     Args:
-        folder_path (str, optional): The path to a folder where existing names are checked. 
-            If None, the function generates a name without checking for conflicts.
+        folder_path (str, optional): The path to a folder where existing names are checked.
+            If the folder does not exist, it will be created. Defaults to None.
 
     Returns:
-        str: A unique goofy name in the format "<adjective>_<noun>_<two-digit-number>".
+        str: A unique name in the format "<adjective>_<noun>_<two-digit-number>".
 
     Raises:
-        FileNotFoundError: If the provided folder path does not exist or is not a directory.
-        RuntimeError: If an unexpected error occurs while listing files in the folder, or if
-            a unique name cannot be generated after 1000 attempts.
+        RuntimeError: If a unique name cannot be generated after 1000 attempts.
     """
-    taken_names = set()
-
     if not folder_path:
         return f"{random.choice(adjectives)}_{random.choice(nouns)}_{random.randint(10, 99)}"
 
     if not os.path.isdir(folder_path):
-        raise FileNotFoundError(
-            f"Folder path '{folder_path}' does not exist or is not a directory."
-        )
-    try:
-        taken_names = {
-            f.split("_epoch_")[0] for f in os.listdir(folder_path) if f.endswith(".pth")
-        }
-    except Exception as e:
-        raise RuntimeError(
-            f"An unexpected error occurred while listing files in '{folder_path}': {e}"
-        )
+        os.makedirs(folder_path, exist_ok=True)
 
     max_attempts = 1000
     for _ in range(max_attempts):
         name = f"{random.choice(adjectives)}_{random.choice(nouns)}_{random.randint(10, 99)}"
-        if name not in taken_names:
+        # Check if a file with this prefix already exists in any subdirectory
+        conflict_found = False
+        for _, _, filenames in os.walk(folder_path):
+            if any(f.startswith(f"{name}_") for f in filenames):
+                conflict_found = True
+                break
+        if not conflict_found:
             return name
     raise RuntimeError(
         f"Failed to generate a unique name after {max_attempts} attempts. All names could be already taken."
     )
-
 
 def backup(path, new_filename=None):
     """
@@ -179,27 +168,61 @@ def backup(path, new_filename=None):
     shutil.copy2(file_to_backup, dest_path)
     print(f"Backed up '{file_to_backup}' to '{dest_path}'")
 
-def get_preprocessing_pipeline(data_dir, random_state = 42):
-    # Define preprocessing pipeline
+def get_preprocessing_pipeline(data_dir, random_state=42, do_full_training=False):
+    """
+    Initializes and returns the datasets for the CIFAR-100 classification task,
+    with appropriate data augmentation and preprocessing pipelines.
+
+    This function prepares the training, validation, and test datasets.
+    - The training pipeline includes data augmentation (random crop, horizontal flip).
+    - The evaluation pipeline (for validation and testing) uses a deterministic crop.
+    - All datasets are normalized using ImageNet statistics.
+
+    Args:
+        data_dir (str): The root directory where the CIFAR-100 dataset is stored or will be downloaded.
+        random_state (int, optional): The seed for the random train/validation split. Defaults to 42.
+        do_full_training (bool, optional): If True, the function returns the full training dataset and the test set,
+            without creating a validation split. This is useful for final model training. Defaults to False.
+
+    Returns:
+        tuple: A tuple containing the datasets.
+            - If `do_full_training` is False, it returns (train_dataset, val_dataset, test_dataset).
+            - If `do_full_training` is True, it returns (train_dataset, test_dataset).
+    """
+    # Define the preprocessing pipeline for training
     train_transform = Compose([
-        Resize(256), # CIFRA100 is originally 32x32
-        RandomCrop(224), # But Dino works on 224x224
+        Resize(256),
+        RandomCrop(224),
         RandomHorizontalFlip(),
         ToTensor(),
-        Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]) # ImageNet stats
+        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet stats
     ])
 
+    # Define the preprocessing pipeline for evaluation (validation and testing)
     eval_transform = Compose([
-        Resize(256), # CIFRA100 is originally 32x32
-        CenterCrop(224), # But Dino works on 224x224
+        Resize(256),
+        CenterCrop(224),
         ToTensor(),
         Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]), # ImageNet stats
     ])
 
-    cifar100_train = datasets.CIFAR100(root=data_dir, train=True, download=True, transform=train_transform)
-    cifar100_test = datasets.CIFAR100(root=data_dir, train=False, download=True, transform=eval_transform)
+    # Load the full training and test sets with their respective transforms
+    full_train_set = datasets.CIFAR100(root=data_dir, train=True, download=True, transform=train_transform)
+    test_set = datasets.CIFAR100(root=data_dir, train=False, download=True, transform=eval_transform)
 
-    train_dataset, val_dataset = train_test_split(cifar100_train, 0.8, random_state = random_state)
-    test_dataset = cifar100_test
+    if do_full_training:
+        # Return the full training set and the test set
+        return full_train_set, test_set
+    else:
+        # To create a validation set with evaluation transforms, we first need to get the indices
+        # from a split of the training data. We create a temporary dataset with evaluation transforms
+        # to apply the same indices later.
+        full_train_set_with_eval_transform = datasets.CIFAR100(root=data_dir, train=True, download=True, transform=eval_transform)
 
-    return train_dataset, val_dataset, test_dataset
+        # Split the training data to get the indices for the training and validation sets
+        train_subset, val_subset_with_train_transform = train_test_split(full_train_set, 0.8, random_state=random_state)
+
+        # Create the validation set using the indices from the split, but with the evaluation transforms
+        val_subset = Subset(full_train_set_with_eval_transform, val_subset_with_train_transform.indices)
+
+        return train_subset, val_subset, test_set
