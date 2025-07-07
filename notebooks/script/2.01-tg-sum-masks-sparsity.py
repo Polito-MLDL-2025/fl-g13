@@ -68,11 +68,7 @@ optimizer = SparseSGDM(
     weight_decay=1e-5
 )
 criterion = torch.nn.CrossEntropyLoss()
-scheduler = CosineAnnealingLR(
-    optimizer=optimizer,
-    T_max=8,
-    eta_min=1e-5
-)
+scheduler = None
 
 
 sum_mask = load_mask(mask_file_name)

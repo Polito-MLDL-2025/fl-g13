@@ -62,12 +62,10 @@ dropout_rate = 0.0
 unfreeze_blocks = 12
 
 ## Training Hyper-parameters
-batch_size = 128
+batch_size = 64
 lr = 1e-3
 momentum = 0.9
 weight_decay = 1e-5
-T_max = 8
-eta_min = 1e-5
 
 # FL config
 K = 100
@@ -130,11 +128,7 @@ else:
     optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
     
 criterion = torch.nn.CrossEntropyLoss()
-scheduler = CosineAnnealingLR(
-    optimizer=optimizer,
-    T_max=T_max,
-    eta_min=eta_min
-)
+scheduler = None
 
 # Unfreeze entire model for model_editing
 model.unfreeze_blocks(unfreeze_blocks)

@@ -96,8 +96,6 @@ batch_size = 64
 lr = 1e-3
 momentum = 0.9
 weight_decay = 1e-5
-T_max = 8
-eta_min = 1e-5
 
 def load_model_for_simulation(shard, J):
     ## Base model location
@@ -129,11 +127,7 @@ def load_model_for_simulation(shard, J):
         optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
         
     criterion = torch.nn.CrossEntropyLoss()
-    scheduler = CosineAnnealingLR(
-        optimizer=optimizer,
-        T_max=T_max,
-        eta_min=eta_min
-    )
+    scheduler = None
     
     return model, start_epoch, optimizer, criterion, scheduler
 
