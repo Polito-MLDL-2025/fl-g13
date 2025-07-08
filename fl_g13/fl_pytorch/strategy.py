@@ -141,7 +141,7 @@ class CustomFedAvg(FedAvg):
         # Avoid division by zero
         avg_accuracy = total_accuracy / total_examples if total_examples > 0 else 0.0
         avg_loss = total_loss / total_examples if total_examples > 0 else 0.0
-        avg_drift = total_drift / len(results) if results else 0.0
+        avg_drift = total_drift / total_examples if total_examples > 0 else 0.0
 
         # Log decentralized metrics to W&B
         self.wandb_log(

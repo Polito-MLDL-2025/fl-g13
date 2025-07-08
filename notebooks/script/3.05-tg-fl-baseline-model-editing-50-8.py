@@ -60,6 +60,13 @@ head_hidden_size = 512
 dropout_rate = 0.0
 unfreeze_blocks = 12
 
+dino_config = {
+    'head_layers': head_layers,
+    'head_hidden_size': head_hidden_size,
+    'dropout_rate': dropout_rate,
+    'unfreeze_blocks': unfreeze_blocks
+}
+
 ## Training Hyper-parameters
 batch_size = 64
 lr = 1e-3
@@ -105,7 +112,7 @@ model_save_path = CHECKPOINT_DIR + f"/fl/non-iid/{num_shards_per_partition}_{J}"
 model, start_epoch = load_or_create(
     path=model_save_path,
     model_class=BaseDino,
-    model_config=None,
+    model_config=dino_config,
     optimizer=None,
     scheduler=None,
     device=DEVICE,
