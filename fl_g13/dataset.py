@@ -24,7 +24,6 @@ def check_distribution(dataset, name="Dataset"):
     print(dict(sorted(dist.items())))
 
 
-# TODO remove random state default parameter
 def train_test_split(dataset, train_ratio=0.8, random_state=42):
     targets = np.array(dataset.targets)
     sss = StratifiedShuffleSplit(n_splits=1, train_size=train_ratio, random_state=random_state)
